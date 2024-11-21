@@ -1,0 +1,18 @@
+{
+  "name": "Python3",
+  "image": "mcr.microsoft.com/devcontainers/python:3", //"python-sam2:latest",
+  //"forwardPorts": [3000],
+  //"postCreateCommand": "",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.debugpy", "ms-toolsai.jupyter"]
+    }
+  },
+  "runArgs": [
+        "--net", "host", 
+        "-e", "DISPLAY=${env:DISPLAY}",
+        "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+        "--gpus",
+        "all"
+  ]
+}

@@ -1,0 +1,7 @@
+
+dataroot: "" # Path of the NuImages folder
+openlabel: "" # Path of the generated OpenLABEL
+BEV_conf:
+  BEV_MAX_DISTANCE: 30.0
+  BEV_HEIGHT: 1024
+  BEV_WIDTH: 1024

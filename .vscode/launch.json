@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",  // Esto ejecuta el archivo que esté abierto
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"  // Establecer el PYTHONPATH para todo el proyecto
+            }
+        }
+    ]
+}

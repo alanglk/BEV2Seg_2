@@ -1,0 +1,12 @@
+# Byte-compiled / optimized / DLL files
+*__pycache__/
+*.py[cod]
+*$py.class
+
+# Folders
+.venv/
+tmp/
+
+# Files
+*.mp4
+*.gz
