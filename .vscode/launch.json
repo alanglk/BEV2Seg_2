@@ -2,13 +2,34 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger",
+            "name": "Python Debugger: Module",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",  // Esto ejecuta el archivo que esté abierto
+            "module": "pytest",
+            "args": ["${file}"],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "Python File Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}", // Esto ejecuta el archivo que esté abierto
             "console": "integratedTerminal",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"  // Establecer el PYTHONPATH para todo el proyecto
+                "PYTHONPATH": "${workspaceFolder}" // Establecer el PYTHONPATH para todo el proyecto
+            }
+        },
+        {
+            "name": "Python Main Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py", // Esto ejecuta el archivo que esté abierto
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}" // Establecer el PYTHONPATH para todo el proyecto
             }
         }
     ]
