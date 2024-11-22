@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 from vcd import core, types, utils, draw, scl
 from PIL import Image
 from typing import Union, List
@@ -37,16 +36,17 @@ class Dataset2BEV():
         self.drawer.draw_bevs(_frame_num=framenum)
         return self.drawer.topView
 
-    def _mask2bev(self, mask: np.ndarray) -> np.ndarray:
+    def _target2bev(self, target: np.ndarray) -> np.ndarray:
         """
-            mask (H, W)
+            target (seg mask) (H, W)
         """
-        mask = np.expand_dims(mask, 0).repeat(3, axis=0)
-        mask = np.moveaxis(mask, 0, -1)
+        target = np.expand_dims(target, 0).repeat(3, axis=0)
+        target = np.moveaxis(target, 0, -1)
+        # target (H, W, 3)
         
         map_x = self.drawer.images[self.camera_name]["mapX"]
         map_y = self.drawer.images[self.camera_name]["mapY"]
-        bev = cv2.remap(mask, map_x, map_y,
+        bev = cv2.remap(target, map_x, map_y,
             interpolation=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
         )
@@ -55,11 +55,12 @@ class Dataset2BEV():
         if "weights" in self.drawer.images[self.camera_name]:
             cv2.multiply(self.drawer.images[self.camera_name]["weights"], bev32, bev32)
 
-        return bev32.astype(np.uint8)
+        target = bev32.astype(np.uint8)
+        return target[:, :, 0] # return (H, W)
     
     def convert2bev(self, image, target):
         image_bev = self._img2bev(image)
-        target_bev = self._mask2bev(target)
+        target_bev = self._target2bev(target)
         return image_bev, target_bev
 
 
@@ -74,10 +75,9 @@ def _test(camera_name, image_path, openlabel_path):
 
     bev_image = bev_g.src_img2bev(image)
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(bev_image)
-    plt.axis('on')
-    plt.show()
+    cv2.namedWindow("BEV_vcd", cv2.WINDOW_NORMAL)
+    cv2.imshow("BEV_vcd", bev_image)
+    cv2.waitKey(0)
 
 
 if __name__ == "__main__":

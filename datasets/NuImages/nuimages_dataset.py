@@ -1,6 +1,5 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision.transforms import transforms
 from torchvision import datasets
 
 # pip install nuscenes-devkit # Parser for NuImages dataset
@@ -16,6 +15,7 @@ import numpy as np
 import cv2
 import os
 
+from typing import Union
 
 class NuImagesOpenLABEL():
     def __init__(self, nudataroot:str, openlabelroot, nuversion:str, sample_token:str):
@@ -34,6 +34,9 @@ class NuImagesOpenLABEL():
             "nuImages_version": nuversion,
             "sample_token":     sample_token,
             })
+        
+        # Add frame interval
+        self.vcd.add_frame_properties(0)
         
         self.output_path = os.path.join(openlabelroot, sample_token + ".json")
 
@@ -60,7 +63,7 @@ class NuImagesOpenLABEL():
                 - translation:  translation matrix
                 - rotation:     rotation matrix (quaternion)
                 - camera_intrinsic: intrinsic matrix
-                - camera_distorsion: distorsion matrix
+                - camera_distortion: distorsion matrix
         width: width resolution of the sensor in pixels
         height: height resolution of the sensor in pixels
         """
@@ -72,6 +75,7 @@ class NuImagesOpenLABEL():
         traslation  = calibrated_sensor['translation']
         rotation_q  = calibrated_sensor['rotation'] # quaternion
         intrinsics  = calibrated_sensor['camera_intrinsic']
+        distorsion  = calibrated_sensor['camera_distortion']
 
         # Add Sensor Extrinsics
         C = np.array(traslation).reshape(3, 1)
@@ -90,15 +94,14 @@ class NuImagesOpenLABEL():
             cy = intrinsics[1][2]
             K_3x4 = utils.fromPinholeParamsToCameraMatrix3x4(fx, fy, cx, cy)
             flatK3x4 = [item for sublist in K_3x4 for item in sublist]
+
             intrinsics = types.IntrinsicsPinhole(width_px=width,
                                                  height_px=height,
                                                  camera_matrix_3x4=flatK3x4,
-                                                 distortion_coeffs_1xN=None)
+                                                 distortion_coeffs_1xN=distorsion)
             
             self.vcd.add_stream(stream_name=channel, uri='', description=token, stream_type=core.StreamType.camera)
             self.vcd.add_stream_properties(stream_name=channel, intrinsics=intrinsics)
-            # TODO: Como añadir la distorsion
-
 
         elif sensor['modality'] == 'lidar':
             self.vcd.add_stream(stream_name=channel, uri='', 
@@ -110,12 +113,15 @@ class NuImagesOpenLABEL():
                                 stream_type=core.StreamType.other)
 
     def add_frame(self, stream_name: str, frame_filename: str, frame_num = 0):
-        # Chapuza para que funcione
+        # TODO: Esto es una chapuza para que funcione
         if "frames" not in self.vcd.data["openlabel"]:
             self.vcd.data["openlabel"]["frames"] = {}
         if frame_num not in self.vcd.data["openlabel"]["frames"]:
             self.vcd.data["openlabel"]["frames"][frame_num] = {}
+
+        self.vcd.add_metadata_properties({"sample_path_hardcoded": frame_filename})
         return
+        
         self.vcd.add_stream_properties(stream_name=stream_name,
                                        stream_sync=types.StreamSync(frame_vcd=frame_num),
                                        properties={"uri": frame_filename}
@@ -236,8 +242,8 @@ class NuImagesDataset(Dataset):
         INPUT:
             Index of the current sample in the dataset
         OUTPUT:
-            image   -> torch.Tensor
-            target  -> annotations of the image: {"mask": torch.Tensor ... } 
+            image   -> torch.Tensor (H, W, 3)
+            target  -> annotations of the image: {"mask": torch.Tensor ... } (H, W)
         """
         assert index < len(self)
 
@@ -275,48 +281,40 @@ class NuImagesDataset(Dataset):
             mask = mask_decode(ann['mask'])
             label = self.nutoken2label[ann['category_token']]
             target[mask == 1] = label.trainId
-
-            # rgb_img = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.float32)
-            # color = label.color 
-            # rgb_img[:, :, 0] = mask
-            # rgb_img[:, :, 1] = mask
-            # rgb_img[:, :, 2] = mask
-            # rgb_img = cv2.resize(rgb_img, (640,360))
-            # cv2.imshow(f"NuImages {label.name} {label.trainId}", rgb_img)
-            # cv2.waitKey(0)
         
         # Apply transforms if necessary
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert to RGB
         if self.transforms is not None:
             image, target = self.transforms(image, target)
 
         return image, target
 
-    def _show_mask(self, mask: torch.tensor):
-        mask = mask.numpy()
-        res_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    def target2image(self, target: Union[torch.tensor, np.ndarray]) -> np.ndarray:
+        """
+        Converts target (seg mask) into BGR image
+        - target: torch.tensor or numpy.ndarray (H, W)
+
+        returns BGR image!!!
+        """
+        if isinstance(target, torch.Tensor):
+            target = target.numpy()
+        
+        res_mask = np.zeros((target.shape[0], target.shape[1], 3), dtype=np.uint8)
         for token in self.nutoken2label:
             label = self.nutoken2label[token]
             color = label.color
 
-            bool_mask = [mask == label.trainId]
+            bool_mask = [target == label.trainId]
             s = np.sum(bool_mask)
             print(f"label {label.name} in mask: {s > 0}")
 
-            res_mask[mask == label.trainId] = color
+            res_mask[target == label.trainId] = color
 
         print(f"res_mask shape: {res_mask.shape}")
-
-        res_mask = cv2.cvtColor(res_mask, cv2.COLOR_RGB2BGR) # Convert to BGR
+        # Convert to BGR (for display with opencv)
+        res_mask = cv2.cvtColor(res_mask, cv2.COLOR_RGB2BGR) 
+        return res_mask
         res_mask = cv2.resize(res_mask, (640,360))
         cv2.imshow(f"NuImages Mask", res_mask)
-        cv2.waitKey(0)
-
-    def _show_image(self, image: torch.tensor):
-        image = image.numpy()
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # Convert to BGR
-        image = cv2.resize(image, (640,360))
-        cv2.imshow(f"NuImages Image", image)
         cv2.waitKey(0)
 
 
@@ -462,11 +460,9 @@ def _test():
     dataset = NuImagesBEVDataset(dataroot=path, 
                 openlabelroot='./data/NuImages/OpenLABEL', 
                 save_openlabel=True)
-    # dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     
     for i in range(1):
         image, target = dataset.__getitem__(i)
-
     
 
 if __name__ == "__main__":

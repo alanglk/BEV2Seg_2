@@ -1,6 +1,4 @@
 
-
-
 class NuLabel:
     # 'token',        category_token from NuImages Dataset (loaded at parsing)
     #                   Is the identifier of the annotation type
@@ -19,7 +17,7 @@ class NuLabel:
         vars(self).update(locals())
 
 nulabels = [
-    #       token   name                                    id      trainId    color
+    #       token   name                                    id      trainId    color RGB
     NuLabel(  None  , "animal"                              , 1     , 1       , (255, 0, 0) ),
     NuLabel(  None  , "human.pedestrian.adult"              , 2     , 2       , (220,  20,  60) ),
     NuLabel(  None  , "human.pedestrian.child"              , 3     , 3       , (220,  20,  60) ),
