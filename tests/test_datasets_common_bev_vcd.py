@@ -1,12 +1,12 @@
 import os
 import cv2
 from vcd import core, scl
-from common_test_utils import display_test_image
+from tests.utils import display_test_image
 
 from datasets.common import Dataset2BEV
 
 NUIMAGES_PATH   = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
-TMP_DIR         = "./tests/tmp/NuImages/OpenLABEL"
+TMP_DIR         = "./tests/tmp/BEVDataset"
 SAMPLE_IMAGE    = "samples/CAM_FRONT_RIGHT/n013-2018-08-27-14-41-26+0800__CAM_FRONT_RIGHT__1535352274870176.jpg"
 SAMPLE_TOKEN    = "0128b121887b4d0d86b8b1a43ac001e9"
 SAMPLE_CAM      = "CAM_FRONT_RIGHT" 

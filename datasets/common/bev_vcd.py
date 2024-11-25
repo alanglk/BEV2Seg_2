@@ -11,6 +11,8 @@ class Dataset2BEV():
 
         bev_aspect_ratio = bev_width / bev_heigh
         self.bev_x_range = (-1.0, bev_max_distance)
+        #self.bev_x_range = (- bev_max_distance, bev_max_distance)
+        #self.bev_x_range = (- 5.0, 10.0)
         self.bev_y_range = (-((self.bev_x_range[1] - self.bev_x_range[0]) / bev_aspect_ratio) / 2,
                         ((self.bev_x_range[1] - self.bev_x_range[0]) / bev_aspect_ratio) / 2)
         self.bev_parameters = draw.TopView.Params(
@@ -30,7 +32,8 @@ class Dataset2BEV():
 
     def _img2bev(self, image: np.ndarray, framenum: int = 0):
         print(f"DEBUG: image 2 bec image shape {image.shape}")
-        print(f"DEBUG: scene cameras: {self.scene.cameras}")
+        cam = self.scene.get_camera(camera_name=self.camera_name, frame_num=framenum)
+        print(f"DEBUG: camera distorsion: {cam.d_1xN}")
         self.drawer.add_images(imgs={f"{self.camera_name}": image}, 
                           frame_num=framenum)
         self.drawer.draw_bevs(_frame_num=framenum)

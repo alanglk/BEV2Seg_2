@@ -8,7 +8,7 @@ from nuimages.utils.utils import mask_decode
 
 # Utils from the same package
 from datasets.NuImages.nulabels import nulabels, nuname2label
-from datasets.common import Dataset2BEV
+from datasets.common import Dataset2BEV, progress_bar
 
 from vcd import core, types, scl, utils
 import numpy as np
@@ -18,14 +18,14 @@ import os
 from typing import Union
 
 class NuImagesOpenLABEL():
-    def __init__(self, nudataroot:str, openlabelroot, nuversion:str, sample_token:str):
+    def __init__(self, nudataroot:str, nuversion:str, sample_token:str, output_path: str = None, timestamp: str = None):
         """
         OpenLABEL class for one sample of the NuImages dataset
-        - nudataroot:     root path of the NuImages dataset
-        - openlabelroot:  path of the vcd output file
-        - nuversion:      version of the NuImages dataset
-        - sample_token:   token of the NuImages sample corresponding to this OpenLABEL file
-
+        - nudataroot:   root path of the NuImages dataset
+        - output_path:  path of the vcd output file
+        - nuversion:    version of the NuImages dataset
+        - sample_token: token of the NuImages sample corresponding to this OpenLABEL file
+        - timestamp:    timestamp del sample. default: None
         """
 
         self.vcd = core.VCD()
@@ -33,12 +33,14 @@ class NuImagesOpenLABEL():
             "nuImages_path":    nudataroot,
             "nuImages_version": nuversion,
             "sample_token":     sample_token,
+            "timestamp":        timestamp
             })
         
         # Add frame interval
         self.vcd.add_frame_properties(0)
         
-        self.output_path = os.path.join(openlabelroot, sample_token + ".json")
+        if output_path is not None:
+            self.output_path = os.path.join(output_path, sample_token + ".json")
 
     def add_coordinate_system(self):
         self.vcd.add_coordinate_system("odom", cs_type=types.CoordinateSystemType.scene_cs)
@@ -155,7 +157,9 @@ class NuImagesDataset(Dataset):
         """
         Parameters:
             - dataroot      -> root path of the dataset
-            - version       -> version of the dataset: ['mini', 'train', 'val', 'test']
+            - version       -> version of the dataset: 
+                            ['mini' (50 samples), 'train' (50 samples), 
+                                'val' (50 samples), 'test' (50 samples)]
             - transforms    -> transformations for the image data (Normalization, Scale...)
             - remove_empty  -> If it is a train set, remove entries with no annotations
         """
@@ -174,20 +178,30 @@ class NuImagesDataset(Dataset):
         # If training, remove any samples wich doesn't contain annotation data
         self.samples_indices = []
         if remove_empty and self.train:
+            total = len(self.nuim.object_ann) + len(self.nuim.surface_ann)
+            current = 0
+            print(f"[NuImagesDataset]   Loading {total} annotations...")
             sample_with_annotations = set()
             # Record which are the annotation tokens
             for o in self.nuim.object_ann:
                 token = o['sample_data_token']
                 sample_with_annotations.add(token)
+                current += 1
+                progress_bar(total, current)
             for s in self.nuim.surface_ann:
                 token = s['sample_data_token']
                 sample_with_annotations.add(token)
+                current += 1
+                progress_bar(total, current)
+
             # Add only indices of samples with annotations
+            total = len(self.nuim.sample)
+            print(f"[NuImagesDataset]   Loading {total} samples (with and without annotations)...")
             for i, sample in enumerate(self.nuim.sample):
                 sample_token = sample['key_camera_token']
                 if sample_token in sample_with_annotations:
                     self.samples_indices.append(i)
-    
+                progress_bar(total, i +1)
         else:
             # Add every sample index
             self.samples_indices = [ i for i in range(len(self.nuim.sample))]
@@ -242,9 +256,10 @@ class NuImagesDataset(Dataset):
         INPUT:
             Index of the current sample in the dataset
         OUTPUT:
-            image   -> torch.Tensor (H, W, 3)
+            image   -> torch.Tensor (H, W, 3) # BGR
             target  -> annotations of the image: {"mask": torch.Tensor ... } (H, W)
         """
+
         assert index < len(self)
 
         # Get the current sample and associated data
@@ -319,42 +334,55 @@ class NuImagesDataset(Dataset):
 
 
 class NuImagesBEVDataset(NuImagesDataset):
-    def __init__(self, dataroot = '/data/sets/nuimages', openlabelroot: str = None, save_openlabel = False, version = 'mini', transforms=None, remove_empty = True):
-        """
-        - openlabelroot: root of the OpenLABEL files of each sample. If not set, the OpenLABEL of each
+    """
+    Create BEVDataset from NuImages Dataset
+    """
+    def __init__(self, 
+                 dataroot = '/data/sets/nuimages',
+                 output_path: str = None, 
+                 save_bevdataset = False,
+                 version = 'mini', 
+                 transforms=None, 
+                 remove_empty = True):
+        """                
+        - output_path: root of the OpenLABEL files of each sample. If not set, the OpenLABEL of each
             sample will be generated on the loop and not saved.
-        - save_openlabel: Save the generated openlabel files
+        - save_bevdataset: Save the generated BEV Dataset files.
+        
+        > To load a previously generated BEVDataset see `datasets.BEV.BEVDataset` 
         
         Examples:
         ```
         # Generate BEV dataset directly from the 'mini' dataset
-        NuImagesBEVDataset(dataroot="/nuimages_dataset")
+        NuImagesBEVDataset(dataroot="/nuimages_dataset", version='mini')  
 
         # Generate BEV dataset directly from the 'mini' dataset 
-        # and save the OpenLABEL files into openlabelroot
+        # and save the OpenLABEL, images and masks files into output_path
         NuImagesBEVDataset(dataroot="/nuimages_dataset", 
-                           openlabelroot="/nuimages_vcd", 
-                           save_openlabel=True)
+                           output_path="/nuimages_vcd", 
+                           save_bevdataset=True)
 
-        # Generate BEV dataset by loading OpenLABEL files
+        # Generate BEV dataset by loading OpenLABEL files 
+        # with online conversion to BEV
         NuImagesBEVDataset(dataroot="/nuimages_dataset", 
-                           openlabelroot="/nuimages_vcd")
+                           output_path="/nuimages_vcd")
+        
         ```
 
         """
         super().__init__(dataroot, version, transforms, remove_empty)
 
-        self.openlabelroot = openlabelroot
-        self.save_openlabel = save_openlabel
+        self.output_path = output_path
+        self.save_bevdataset = save_bevdataset
         
-        # Load the OpenLABEL files if openlabelroot is set
+        # Load the OpenLABEL files if output_path is set
         vcd_list = [] 
-        if self.openlabelroot is not None and not self.save_openlabel:
-            if not os.path.isdir(self.openlabelroot):
-                raise Exception(f"{self.openlabelroot} must be a folder path")
+        if self.output_path is not None and not self.save_bevdataset:
+            if not os.path.isdir(self.output_path):
+                raise Exception(f"{self.output_path} must be a folder path")
                 
-            for of in os.listdir(self.openlabelroot):
-                of = os.path.join(self.openlabelroot, of)
+            for of in os.listdir(self.output_path):
+                of = os.path.join(self.output_path, of)
                 
                 # Check if it is a .json file
                 if os.path.isfile(of) and of.endswith('.json'):
@@ -376,26 +404,36 @@ class NuImagesBEVDataset(NuImagesDataset):
 
     
     def __getitem__(self, index):
+        """
+        INPUT:
+            Index of the current sample in the dataset
+        OUTPUT:
+            image   -> BEV torch.Tensor (H, W, 3) # BGR
+            target  -> BEV annotations of the image: {"mask": torch.Tensor ... } (H, W)
+        """
         assert index < len(self)
+        image, target = super().__getitem__(index)
 
         # Get the current sample and associated data
         sample = self.nuim.sample[self.samples_indices[index]]
         sample_token= sample['key_camera_token']
 
         cam_name = None
-        if self.openlabelroot is not None and not self.save_openlabel:
+        if self.output_path is not None and not self.save_bevdataset:
             # Generate BEV from OpenLABEL file
             vcd = self.token2vcd[sample_token]
             scene = scl.Scene(vcd)
             cam_name = list(vcd.get_root()["streams"].keys())[0]
 
         else:
-            # compute OpenLABEL file on the loop. I know this is redundant.
+            # compute OpenLABEL file on the loop. I know this is redundant 
+            # (It is also on the NuImagesDataset class).
             # Search for the sample_data
             sample_data = self.nuim.get('sample_data', sample_token)
             filename    = sample_data['filename']
             img_width   = sample_data['width']
             img_height  = sample_data['height']
+            timestamp   = sample_data['timestamp']
 
             # Sensor data
             sensor_token= sample_data['calibrated_sensor_token']
@@ -404,66 +442,62 @@ class NuImagesBEVDataset(NuImagesDataset):
             cam_name =  sensor['channel']
 
             # Create the OpenLABEL object
-            # TODO: Add more metadata info
-            nuol = NuImagesOpenLABEL(self.dataroot, self.openlabelroot, self.version, sample_token)
+            nuol = NuImagesOpenLABEL(self.dataroot, self.version, 
+                                     sample_token, output_path=self.output_path, 
+                                     timestamp=timestamp)
             nuol.add_coordinate_system()
             nuol.add_sensor(sensor, calibrated_sensor, img_width, img_height)
             nuol.add_frame(sensor['channel'], filename)
             
-            if self.save_openlabel:
+            if self.save_bevdataset:
                 nuol.save_openlabel()
             
             scene = scl.Scene(nuol.vcd)
 
-        image, target = super().__getitem__(index)
-        
         # Reproject to BEV
-        print(f"DEBUG: cam_name: {cam_name}")
-        print(f"DEBUG: scene.cameras: {scene}")
-        print(f"DEBUG: scene get_cam: {scene.get_camera(camera_name=cam_name, frame_num=0)}")
+        # print(f"DEBUG: cam_name: {cam_name}")
+        # print(f"DEBUG: scene.cameras: {scene}")
+        # print(f"DEBUG: scene get_cam: {scene.get_camera(camera_name=cam_name, frame_num=0)}")
+        
         d2bev = Dataset2BEV(cam_name=cam_name, scene=scene)
         image_bev, target_bev = d2bev.convert2bev(image, target)
+
+        if self.save_bevdataset:
+            raw_save_path       = os.path.join(self.output_path, sample_token + "_raw.png")
+            bev_save_path       = os.path.join(self.output_path, sample_token + "_bev.png")
+            color_save_path     = os.path.join(self.output_path, sample_token + "_color.png")
+            target_save_path    = os.path.join(self.output_path, sample_token + "_semantic.png")
+            
+            cv2.imwrite(raw_save_path, image)
+            cv2.imwrite(bev_save_path, image_bev)
+            cv2.imwrite(color_save_path, self.target2image(target_bev))
+            cv2.imwrite(target_save_path, target_bev)
+
         return image_bev, target_bev
 
-def generate_NuImages_OpenLABEL(dataset_path:str, out_path:str, version='mini'):
+def generate_BEVDataset_from_NuImages(dataset_path:str, out_path:str, version='mini'):
     """
-    Create the OpenLABEL files for each sample of a NuImages dataset and store
+    Create the OpenLABEL, BEVImage amd BEVMask files for each sample of a NuImages dataset and store
     them in an output folder.
 
     - dataset_path:   root directory path of the NuImages dataset
     - out_path:       desired output folder
     - version:        version of the NuImages dataset. ['mini', train', 'val', 'test']
     """
-    import sys
 
-    dataset = NuImagesBEVDataset(dataroot=dataset_path, version='mini')
-    # NuImagesBEVDataset(dataroot=dataset_path, 
-    #                    openlabelroot=out_path, 
-    #                    save_openlabel=True)
+    print("Generating BEVDataset from NuImages...")
+    dataset = NuImagesBEVDataset(dataroot=dataset_path, 
+                           output_path=out_path,
+                           version=version, 
+                           save_bevdataset=True)
     
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-
-    num_batches = len(dataloader)
-    bar_length = 40
-    for i, _ in enumerate(dataloader):
-        progress = (i + dataloader.batch_size) / num_batches
-        block = int(round(bar_length * progress))
-        progress_bar = f"Progress: [{'#' * block}{'-' * (bar_length - block)}] {progress * 100:.2f}%"
-        sys.stdout.write("\r" + progress_bar)  # Sobrescribe la línea anterior
-        sys.stdout.flush()  # Asegura que se imprima inmediatamente
-
-
-
-def _test():
-    path = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
-
-    dataset = NuImagesBEVDataset(dataroot=path, 
-                openlabelroot='./data/NuImages/OpenLABEL', 
-                save_openlabel=True)
+    total = len(dataset)
+    error_indexes = []
+    for i in range(total):
+        progress_bar(total, i +1)
+        try:
+            dataset.__getitem__(i)
+        except Exception as e:
+            error_indexes.append(error_indexes)
     
-    for i in range(1):
-        image, target = dataset.__getitem__(i)
-    
-
-if __name__ == "__main__":
-    _test()
+    print(f"Number of images not generated from dataset: {error_indexes}")

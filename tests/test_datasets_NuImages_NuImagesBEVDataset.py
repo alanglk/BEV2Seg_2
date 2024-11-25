@@ -1,26 +1,35 @@
 
 import os
-from common_test_utils import display_test_image ,display_test_images
+from tests.utils import display_test_image ,display_test_images
 
-from datasets.NuImages import NuImagesBEVDataset
+from datasets.NuImages import NuImagesBEVDataset, generate_BEVDataset_from_NuImages
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
-TMP_DIR = "./tests/tmp/NuImages/OpenLABEL"
+TMP_DIR = "./tests/tmp/BEVDataset"
 
-DISPLAY_IMAGES = True
+DISPLAY_IMAGES = False
 
 ######################## TESTS ########################
 def test_import_datasets():
     if not os.path.exists(TMP_DIR):
+        # Create the tmp folder
         os.makedirs(TMP_DIR)
+    else:
+        # Clear the tmp folder
+        files = os.listdir(TMP_DIR)
+        for f in files:
+            os.remove(os.path.join(TMP_DIR, f))
     assert os.path.exists(NUIMAGES_PATH)
     assert NuImagesBEVDataset is not None
 
 def test_generate_openlabel_one_sample():
+    """
+    Test for generating and saving one sample of BEVDataset from the NuImages Dataset
+    """
     dataset = NuImagesBEVDataset(
         dataroot=NUIMAGES_PATH, 
-        openlabelroot=TMP_DIR, 
-        save_openlabel=True)
+        output_path=TMP_DIR, 
+        save_bevdataset=True)
 
     for i in range(1):
         image, target = dataset.__getitem__(i)
@@ -32,10 +41,14 @@ def test_generate_openlabel_one_sample():
         display_test_images("test_generate_openlabel_one_sample", [image, target])
 
 def test_load_openlabel_one_sample():
+    """
+    Test for generating BEVDataset on the loop by reading previously
+    generated OpenLABEL files
+    """
     assert os.path.exists(TMP_DIR)
     dataset = NuImagesBEVDataset(
         dataroot=NUIMAGES_PATH, 
-        openlabelroot=TMP_DIR)
+        output_path=TMP_DIR)
       
     num_images = 0
     ex_found = False # no ex :D !!
@@ -54,3 +67,45 @@ def test_load_openlabel_one_sample():
     if DISPLAY_IMAGES:
         display_test_image("test_load_openlabel_one_sample", image)
         #display_test_image("TARGET test_load_openlabel_one_sample", image)
+
+from vcd import scl
+# import cv2 as cv
+# cv.getOptimalNewCameraMatrix(
+#                 self.K_3x3,
+#                 self.d_1xN,
+#                 self.img_size_dist,
+#                 alpha=0.0,
+#                 newImgSize=self.img_size_undist,
+#             )
+# 
+
+def test_distorsion_error_on_sample():
+    assert os.path.exists(TMP_DIR)
+    dataset = NuImagesBEVDataset(dataroot=NUIMAGES_PATH)
+    
+    item_index = 38
+    assert item_index < len(dataset)
+    # Con la instancia 38 en 'mini' siempre se genera error 
+    error = False
+    try:
+        image, target = dataset.__getitem__(item_index)
+    except:
+        error = True
+    assert not error
+
+def test_generate_BEVDataset():
+    """
+    Test for generating a complete BEVDataset from a NuImages dataset
+    """
+    assert os.path.exists(TMP_DIR)
+
+    generate_BEVDataset_from_NuImages(
+        dataset_path=NUIMAGES_PATH, 
+        out_path=TMP_DIR, 
+        version='mini')
+    
+    files = os.listdir(TMP_DIR)
+    samples = [os.path.splitext(f)[0] for f in files if files.endswith('.json')]
+
+    assert len(samples) == 50 # mini tiene 50 samples
+

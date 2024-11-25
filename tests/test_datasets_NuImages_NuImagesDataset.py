@@ -1,12 +1,12 @@
 
 import os
-from common_test_utils import display_test_image ,display_test_images
+from tests.utils import display_test_image ,display_test_images
 
 from datasets.NuImages import NuImagesDataset
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 
-DISPLAY_IMAGES = True
+DISPLAY_IMAGES = False
 
 ######################## TESTS ########################
 def test_import_datasets():
@@ -26,9 +26,10 @@ def test_get_one_sample():
         display_test_images("test_get_one_sample", [image, target])
 
 def test_get_multiple_samples():
-    dataset = NuImagesDataset(dataroot=NUIMAGES_PATH)
-
-    assert len(dataset) > 50 # just 50 samples??
+    dataset = NuImagesDataset(
+        dataroot=NUIMAGES_PATH, 
+        version='mini')
+    assert len(dataset) == 50 # just 50 on the mini dataset
     
     num_samples = len(dataset)
     i = 0
