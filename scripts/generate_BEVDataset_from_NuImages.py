@@ -8,6 +8,9 @@ La estructura resultante será:
     - token1_color.png
     - token1_semantic.png
     ...
+
+Ejemplo de uso:
+python3 srcipts/generate_BEVDataset_from_NuImages.py <nuimages_path> <output_path> --version <version> --cam_name "CAM_FRONT"
 """
 import os
 import argparse

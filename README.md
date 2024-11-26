@@ -43,7 +43,23 @@ donde version puede tomar los valores `['mini', 'train', 'val', 'test']` (por de
     ...
 ```
 
+## Docker image
 
+Generar un BEVDataset utilizando la imagen de Docker:
+```bash
+docker run -it -v ./data/BEVDataset:/data/output \
+            -v /run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages:/data/input:ro \
+            agarciaj/beg2seg_2 generate_BEVDataset_from_NuImages.py /data/input /data/output --version "mini" --cam_name "CAM_FRONT"
+```
+
+
+## High Performance Computing (HPC)
+
+```bash
+squeue # Ver la cola de Jobs de Slurm
+sbatch test.sl # Añadir un Job a la cola
+seff <job_id> # Mostrar la eficiencia de un job terminado
+```
 
 
 ## Datasets for Image Segmentation
