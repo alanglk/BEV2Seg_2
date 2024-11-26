@@ -68,24 +68,20 @@ def test_load_openlabel_one_sample():
         display_test_image("test_load_openlabel_one_sample", image)
         #display_test_image("TARGET test_load_openlabel_one_sample", image)
 
-from vcd import scl
-# import cv2 as cv
-# cv.getOptimalNewCameraMatrix(
-#                 self.K_3x3,
-#                 self.d_1xN,
-#                 self.img_size_dist,
-#                 alpha=0.0,
-#                 newImgSize=self.img_size_undist,
-#             )
-# 
-
 def test_distorsion_error_on_sample():
+    """
+    Con la instancia 38 en 'mini' siempre se genera error. 
+    Hay que arreglar esto en caso de que se quiera utilizar
+    NuImagesBEVDataset en un Dataloader de pytorch. Para la 
+    generación del BEVDataset se puede utilizar la función
+    generate_BEVDataset_from_NuImages()
+    """
+
     assert os.path.exists(TMP_DIR)
     dataset = NuImagesBEVDataset(dataroot=NUIMAGES_PATH)
     
     item_index = 38
     assert item_index < len(dataset)
-    # Con la instancia 38 en 'mini' siempre se genera error 
     error = False
     try:
         image, target = dataset.__getitem__(item_index)
@@ -99,13 +95,15 @@ def test_generate_BEVDataset():
     """
     assert os.path.exists(TMP_DIR)
 
-    generate_BEVDataset_from_NuImages(
-        dataset_path=NUIMAGES_PATH, 
-        out_path=TMP_DIR, 
-        version='mini')
+    num_generated, _ = generate_BEVDataset_from_NuImages(
+                        dataset_path=NUIMAGES_PATH, 
+                        out_path=TMP_DIR, 
+                        version='mini')
     
     files = os.listdir(TMP_DIR)
-    samples = [os.path.splitext(f)[0] for f in files if files.endswith('.json')]
 
-    assert len(samples) == 50 # mini tiene 50 samples
+    samples = [os.path.splitext(f)[0] for f in files if f.endswith('.json')]
+
+    assert num_generated == len(samples) 
+    assert num_generated == 49 # mini tiene 50 samples pero 1 da error
 

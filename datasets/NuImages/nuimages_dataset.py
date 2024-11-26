@@ -151,6 +151,7 @@ class NuImagesDataset(Dataset):
     def __init__(self, 
                  dataroot: str = '/data/sets/nuimages',  
                  version: str = 'mini',
+                 camera: str = None,
                  transforms = None,
                  remove_empty: bool = True
                  ):
@@ -158,8 +159,8 @@ class NuImagesDataset(Dataset):
         Parameters:
             - dataroot      -> root path of the dataset
             - version       -> version of the dataset: 
-                            ['mini' (50 samples), 'train' (50 samples), 
-                                'val' (50 samples), 'test' (50 samples)]
+                            ['mini' (50 samples), 'train' (50 samples), 'val' (50 samples), 'test' (50 samples)]
+            - camera        -> If set it will generate a Dataset just for the specific `camera` channel
             - transforms    -> transformations for the image data (Normalization, Scale...)
             - remove_empty  -> If it is a train set, remove entries with no annotations
         """
@@ -169,8 +170,9 @@ class NuImagesDataset(Dataset):
         self.version = self.DATASET_VERSIONS[version]
         self.nuim = NuImages(dataroot=self.dataroot, version= self.version, verbose=True, lazy=True)
         
+        self.camera = camera
         self.transforms = transforms
-
+        
         # Check if the dataset has annotated objects or surfaces
         # If not, it is the test dataset
         self.train = len(self.nuim.object_ann) != 0 and len(self.nuim.surface_ann) != 0
@@ -200,12 +202,16 @@ class NuImagesDataset(Dataset):
             for i, sample in enumerate(self.nuim.sample):
                 sample_token = sample['key_camera_token']
                 if sample_token in sample_with_annotations:
-                    self.samples_indices.append(i)
+                    
+                    # If self.camera is not set it will add all samples
+                    if self._is_sample_from_camera(sample_token):
+                        self.samples_indices.append(i)
+
                 progress_bar(total, i +1)
         else:
-            # Add every sample index
-            self.samples_indices = [ i for i in range(len(self.nuim.sample))]
-        
+            # Add every sample index. If self.camera is not set it will add all samples.
+            self.samples_indices = [ i for i, sample in enumerate(self.nuim.sample) if self._is_sample_from_camera(sample['key_camera_token'])]
+
         print(f"[NuImagesDataset]    {len(self.samples_indices)} remaining samples from {len(self.nuim.sample)}")
 
         # Create category_token to id map based on NuLabels        
@@ -247,6 +253,21 @@ class NuImagesDataset(Dataset):
                 self.samle2ann[sample_token] = []
             self.samle2ann[sample_token].append(s)
         print(f"[NuImagesDataset]    {len(self.samle2ann)} samples")
+
+    def _is_sample_from_camera(self, sample_token: str):
+        """
+        Function for checking if a sample is taken from a specific camera (channel)
+        INPUT: sample_token
+        OUTPUT: boolean
+        """
+
+        if self.camera is None:
+            return True
+        
+        sample_data         = self.nuim.get('sample_data', sample_token)
+        calibrated_sensor   = self.nuim.get('calibrated_sensor', sample_data['calibrated_sensor_token'])
+        sensor              = self.nuim.get('sensor', calibrated_sensor['sensor_token'])
+        return sensor['channel'] == self.camera
 
     def __len__(self):
         return len(self.samples_indices)
@@ -320,11 +341,8 @@ class NuImagesDataset(Dataset):
 
             bool_mask = [target == label.trainId]
             s = np.sum(bool_mask)
-            print(f"label {label.name} in mask: {s > 0}")
-
             res_mask[target == label.trainId] = color
 
-        print(f"res_mask shape: {res_mask.shape}")
         # Convert to BGR (for display with opencv)
         res_mask = cv2.cvtColor(res_mask, cv2.COLOR_RGB2BGR) 
         return res_mask
@@ -341,8 +359,9 @@ class NuImagesBEVDataset(NuImagesDataset):
                  dataroot = '/data/sets/nuimages',
                  output_path: str = None, 
                  save_bevdataset = False,
-                 version = 'mini', 
-                 transforms=None, 
+                 version: str = 'mini',
+                 camera: str = None,
+                 transforms = None, 
                  remove_empty = True):
         """                
         - output_path: root of the OpenLABEL files of each sample. If not set, the OpenLABEL of each
@@ -370,7 +389,7 @@ class NuImagesBEVDataset(NuImagesDataset):
         ```
 
         """
-        super().__init__(dataroot, version, transforms, remove_empty)
+        super().__init__(dataroot, version, camera, transforms, remove_empty)
 
         self.output_path = output_path
         self.save_bevdataset = save_bevdataset
@@ -419,6 +438,7 @@ class NuImagesBEVDataset(NuImagesDataset):
         sample_token= sample['key_camera_token']
 
         cam_name = None
+        nuol = None
         if self.output_path is not None and not self.save_bevdataset:
             # Generate BEV from OpenLABEL file
             vcd = self.token2vcd[sample_token]
@@ -449,9 +469,6 @@ class NuImagesBEVDataset(NuImagesDataset):
             nuol.add_sensor(sensor, calibrated_sensor, img_width, img_height)
             nuol.add_frame(sensor['channel'], filename)
             
-            if self.save_bevdataset:
-                nuol.save_openlabel()
-            
             scene = scl.Scene(nuol.vcd)
 
         # Reproject to BEV
@@ -460,6 +477,7 @@ class NuImagesBEVDataset(NuImagesDataset):
         # print(f"DEBUG: scene get_cam: {scene.get_camera(camera_name=cam_name, frame_num=0)}")
         
         d2bev = Dataset2BEV(cam_name=cam_name, scene=scene)
+        
         image_bev, target_bev = d2bev.convert2bev(image, target)
 
         if self.save_bevdataset:
@@ -473,23 +491,28 @@ class NuImagesBEVDataset(NuImagesDataset):
             cv2.imwrite(color_save_path, self.target2image(target_bev))
             cv2.imwrite(target_save_path, target_bev)
 
+            if nuol is not None:
+                nuol.save_openlabel()
+
         return image_bev, target_bev
 
-def generate_BEVDataset_from_NuImages(dataset_path:str, out_path:str, version='mini'):
+def generate_BEVDataset_from_NuImages(dataset_path:str, out_path:str, version='mini', cam_name = None) -> tuple:
     """
     Create the OpenLABEL, BEVImage amd BEVMask files for each sample of a NuImages dataset and store
     them in an output folder.
-
-    - dataset_path:   root directory path of the NuImages dataset
-    - out_path:       desired output folder
-    - version:        version of the NuImages dataset. ['mini', train', 'val', 'test']
+    INPUT:
+        - dataset_path:   root directory path of the NuImages dataset
+        - out_path:       desired output folder
+        - version:        version of the NuImages dataset. ['mini', train', 'val', 'test']
+        - cam_name:       name of the camera channel to generate the BEVDataset. It not set all the cameras will be generated.
+    OUTPUT: Number of correctly generated samples
     """
 
-    print("Generating BEVDataset from NuImages...")
     dataset = NuImagesBEVDataset(dataroot=dataset_path, 
                            output_path=out_path,
                            version=version, 
-                           save_bevdataset=True)
+                           save_bevdataset=True,
+                           camera=cam_name)
     
     total = len(dataset)
     error_indexes = []
@@ -497,7 +520,9 @@ def generate_BEVDataset_from_NuImages(dataset_path:str, out_path:str, version='m
         progress_bar(total, i +1)
         try:
             dataset.__getitem__(i)
+
         except Exception as e:
-            error_indexes.append(error_indexes)
+            error_indexes.append(i)
     
-    print(f"Number of images not generated from dataset: {error_indexes}")
+    total_generated = total - len(error_indexes)
+    return total_generated, error_indexes

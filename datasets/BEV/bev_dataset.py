@@ -10,7 +10,8 @@ class BEVDataset(Dataset):
     ´´´
     /dataroot/
         - token1.json
-        - token1.png
+        - token1_raw.png
+        - token1_color.png
         - token1_semantic.png
         ...
     ´´´

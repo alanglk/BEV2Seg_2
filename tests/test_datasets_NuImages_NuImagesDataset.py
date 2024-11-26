@@ -37,3 +37,26 @@ def test_get_multiple_samples():
         image, target = dataset.__getitem__(i)
     
     assert i == num_samples-1
+
+def test_generate_CAM_FRONT():
+    """
+    Generate samples from an specific channel (camera)
+    """
+    assert os.path.exists(NUIMAGES_PATH)
+
+    dataset = NuImagesDataset(
+        dataroot=NUIMAGES_PATH, 
+        version='mini',
+        camera='CAM_FRONT')
+    
+    num_samples = len(dataset)
+    i = 0
+    for i in range(num_samples):
+        image, target = dataset.__getitem__(i)
+
+        if DISPLAY_IMAGES:
+            target = dataset.target2image(target)
+            display_test_images("test_get_one_sample", [image, target])
+    
+    print(f"Num CAM_FRONT images: {num_samples}")
+    assert i == num_samples-1 # 'mini' has 8 CAM_FRONT images

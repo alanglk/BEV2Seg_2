@@ -31,9 +31,9 @@ class Dataset2BEV():
                               params=self.bev_parameters)
 
     def _img2bev(self, image: np.ndarray, framenum: int = 0):
-        print(f"DEBUG: image 2 bec image shape {image.shape}")
+        # print(f"DEBUG: image 2 bec image shape {image.shape}")
         cam = self.scene.get_camera(camera_name=self.camera_name, frame_num=framenum)
-        print(f"DEBUG: camera distorsion: {cam.d_1xN}")
+        # print(f"DEBUG: camera distorsion: {cam.d_1xN}")
         self.drawer.add_images(imgs={f"{self.camera_name}": image}, 
                           frame_num=framenum)
         self.drawer.draw_bevs(_frame_num=framenum)

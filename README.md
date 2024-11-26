@@ -19,6 +19,28 @@ beb2seg_2/
 
 `datasets` es un paquete que incluye varias facilidades para trabajar con datasets a la hora de entrenar los modelos tanto con imágenes _raw_ como reproyectadas en _BEV_. 
 
+## Scripts
+Setup del `PYTHONPATH` y el virtual env:
+```bash
+cd beb2seg_2
+
+export PYTHONPATH=.
+source .venv/bin/activate
+```
+
+Generar un _BEVDataset_ a partir de _NuImages_:
+```bash
+python3 srcipts/generate_BEVDataset_from_NuImages.py <nuimages_path> <output_path> --version <version> --cam_name "CAM_FRONT"
+```
+donde version puede tomar los valores `['mini', 'train', 'val', 'test']` (por defecto `'mini'`) y `cam_name` es opcional. La estructura resultante del _BEVDataset_ sería:
+```
+.../BEVDataset/
+    - token1.json
+    - token1_raw.png
+    - token1_color.png
+    - token1_semantic.png
+    ...
+```
 
 ## Datasets for Image Segmentation
 - [ApolloScape](https://apolloscape.auto/index.html)
