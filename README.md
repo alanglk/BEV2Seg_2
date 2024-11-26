@@ -28,6 +28,7 @@ export PYTHONPATH=.
 source .venv/bin/activate
 ```
 
+### BEVDataset from NuImages
 Generar un _BEVDataset_ a partir de _NuImages_:
 ```bash
 python3 srcipts/generate_BEVDataset_from_NuImages.py <nuimages_path> <output_path> --version <version> --cam_name "CAM_FRONT"
@@ -41,6 +42,9 @@ donde version puede tomar los valores `['mini', 'train', 'val', 'test']` (por de
     - token1_semantic.png
     ...
 ```
+
+
+
 
 ## Datasets for Image Segmentation
 - [ApolloScape](https://apolloscape.auto/index.html)
