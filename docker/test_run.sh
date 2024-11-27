@@ -1,5 +1,7 @@
 
 
+NUIMAGES_PATH="/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
+
 ARGS=$(cat <<EOF
     -it \
     -v $(pwd)/data/BEVDataset:/data/output \

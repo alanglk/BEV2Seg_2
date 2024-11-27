@@ -16,8 +16,7 @@ DOCKERFILE_DIR="docker"
 
 # Construir la imagen Docker
 echo "[SCRIPT]    Building Docker image ${IMAGE_TAG}..."
-docker build -t "${IMAGE_TAG}" -f "${DOCKERFILE_DIR}/Dockerfile" .
-docker build --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) -t "${IMAGE_TAG}" -f "${DOCKERFILE_DIR}/Dockerfile" .
+docker --debug build --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) -t "${IMAGE_TAG}" -f "${DOCKERFILE_DIR}/Dockerfile" .
 
 if [ $? -ne 0 ]; then
   echo "[SCRIPT]    Error: Unnexpected error building docker image."

@@ -1,11 +1,13 @@
 # Byte-compiled / optimized / DLL files
 *__pycache__/
+*.pytest_cache/
 *.py[cod]
 *$py.class
 
 # Folders
 .venv/
 tmp/
+*.egg-info/
 
 # Files
 *.mp4
