@@ -41,6 +41,7 @@ donde version puede tomar los valores `['mini', 'train', 'val', 'test', 'all']` 
 .../BEVDataset/
     mini/
         - token1.json
+        - token1_bev.png
         - token1_raw.png
         - token1_color.png
         - token1_semantic.png
