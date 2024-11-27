@@ -4,6 +4,9 @@ from vcd import core, types, utils, draw, scl
 from PIL import Image
 from typing import Union, List
 
+import os 
+import sys
+
 class Dataset2BEV():
     def __init__(self, cam_name: str, scene:scl.Scene, bev_max_distance = 30.0, bev_width = 1024, bev_heigh = 1024):
         self.camera_name = cam_name
@@ -34,8 +37,12 @@ class Dataset2BEV():
         # print(f"DEBUG: image 2 bec image shape {image.shape}")
         cam = self.scene.get_camera(camera_name=self.camera_name, frame_num=framenum)
         # print(f"DEBUG: camera distorsion: {cam.d_1xN}")
+        
+        sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
         self.drawer.add_images(imgs={f"{self.camera_name}": image}, 
                           frame_num=framenum)
+        sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
+        
         self.drawer.draw_bevs(_frame_num=framenum)
         return self.drawer.topView
 

@@ -54,4 +54,4 @@ nuname2label      = { label.name    : label for label in nulabels }
 
 # trainId to label object
 # nutrainId2label   = { label.trainId : label for label in reversed(nulabels) }
-
+nuid2name =  { label.trainId : label.name for label in nulabels }
