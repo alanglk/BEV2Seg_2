@@ -19,48 +19,89 @@ beb2seg_2/
 
 `datasets` es un paquete que incluye varias facilidades para trabajar con datasets a la hora de entrenar los modelos tanto con imágenes _raw_ como reproyectadas en _BEV_. 
 
-## Scripts
-Setup del `PYTHONPATH` y el virtual env:
+## Setup
+Setup del virtual enviroment:
 ```bash
 cd beb2seg_2
-
-export PYTHONPATH=.
 source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e ./datasets
 ```
+
+## Scripts
+En la carpeta `scripts` hay varias herramientas para automatizar la generación de datasets... Estas herramientas también están embebidas en una imagen de Docker para poder hacer el port a Singularity y ejecutarlas en el HPC.
 
 ### BEVDataset from NuImages
 Generar un _BEVDataset_ a partir de _NuImages_:
 ```bash
 python3 srcipts/generate_BEVDataset_from_NuImages.py <nuimages_path> <output_path> --version <version> --cam_name "CAM_FRONT"
 ```
-donde version puede tomar los valores `['mini', 'train', 'val', 'test']` (por defecto `'mini'`) y `cam_name` es opcional. La estructura resultante del _BEVDataset_ sería:
+donde version puede tomar los valores `['mini', 'train', 'val', 'test', 'all']` (por defecto `'mini'`) y `cam_name` es opcional. La estructura resultante del _BEVDataset_ sería:
 ```
 .../BEVDataset/
-    - token1.json
-    - token1_raw.png
-    - token1_color.png
-    - token1_semantic.png
-    ...
+    mini/
+        - token1.json
+        - token1_raw.png
+        - token1_color.png
+        - token1_semantic.png
+        ...
+    train/
+    test/
 ```
 
-## Docker image
-
-Generar un BEVDataset utilizando la imagen de Docker:
+### Docker image for scripts
+Generar una imagen de Docker con los scripts y librerías necesarias:
 ```bash
-docker run -it -v ./data/BEVDataset:/data/output \
-            -v /run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages:/data/input:ro \
-            agarciaj/beg2seg_2 generate_BEVDataset_from_NuImages.py /data/input /data/output --version "mini" --cam_name "CAM_FRONT"
+bash ./docker/build-dockerfile.sh <docker-image-version>
 ```
+
+Adicionalmente se creará un archivo `bev2seg_2_<version>.tar` que podrá ser utilizado para generar una imagen de Singularity con el comando:
+```bash
+scp docker/bev2seg_2_<version>.tar agarciaj@zegama002:/home/agarciaj/BEV2SEG_2
+singularity build bev2seg_2_<version>.sif docker-archive://bev2seg_2_<version>.tar # Desde Zegama
+```
+
+Para generar un BEVDataset a partir de NuImages con Docker se puede utilizar:
+```bash
+docker run $(cat <<EOF
+    -it \
+    -v $(pwd)/data/BEVDataset:/data/output \
+    -v $(pwd)/data/input:/data/input:ro \
+    beg2seg_2:<version> \
+    generate_BEVDataset_from_NuImages.py /data/input /data/output --version "mini" --cam_name "CAM_FRONT"
+EOF
+)
+```
+
+Si se quiere generar el BEVDataset en el HPC hay que utilizar la imagen de Singularity generada y ejecutarla ya sea en un job o en una interfaz interactiva:
 
 
 ## High Performance Computing (HPC)
-
 ```bash
 squeue # Ver la cola de Jobs de Slurm
-sbatch test.sl # Añadir un Job a la cola
+salloc --x11 -n 1 -c 1 --gres=gpu:t4:1 -t 01:00:00 # Iniciar una sesión interactiva
+sbatch test.slurm # Añadir un Job a la cola
 seff <job_id> # Mostrar la eficiencia de un job terminado
 ```
 
+Lanzar una imagen de Singularity en el HPC (codigo dentro del job test.slurm):
+
+```bash
+srun --pty singularity run --nv .bev2seg_2_v0.1.sif # --nv para acceso a GPU
+srun --pty singularity run --nv --bind /gpfs/VICOMTECH/.../data:/data .bev2seg_2_v0.1.sif
+```
+
+```bash
+srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/nuimages --bind /gpfs/VICOMTECH/home/agarciaj/BEV2SEG_2/BEVDataset/:/BEVDataset ./bev2seg_2_v0.1.sif $(cat <<EOF
+    python3 /scripts/generate_BEVDataset_from_NuImages.py \
+    /nuimages \
+    /BEVDataset \
+    --version "mini" \
+    --cam_name "CAM_FRONT"
+EOF
+)
+
+```
 
 ## Datasets for Image Segmentation
 - [ApolloScape](https://apolloscape.auto/index.html)

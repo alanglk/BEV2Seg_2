@@ -8,7 +8,7 @@ fi
 
 # Docker image name:tag
 VERSION=$1
-IMAGE_NAME="beg2seg_2"
+IMAGE_NAME="bev2seg_2"
 IMAGE_TAG="${IMAGE_NAME}:${VERSION}"
 
 # Dockerfile path: ./docker
