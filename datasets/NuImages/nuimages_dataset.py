@@ -7,8 +7,8 @@ from nuimages import NuImages
 from nuimages.utils.utils import mask_decode 
 
 # Utils from the same package
-from datasets.NuImages.nulabels import nulabels, nuname2label
-from datasets.common import Dataset2BEV, progress_bar
+from datasets.NuImages.nulabels import nulabels, nuname2label, nuid2name, nuid2color
+from datasets.common import Dataset2BEV, progress_bar, target2image
 
 from vcd import core, types, scl, utils
 import numpy as np
@@ -228,6 +228,9 @@ class NuImagesDataset(Dataset):
             assert l.token is not None # Check if all the labels have their tokens
         
         self.nutoken2label = { label.token      : label for label in nulabels }
+        self.id2color = nuid2color
+        self.id2label = nuid2name
+        self.label2id = { v : k for k, v in self.id2label.items() }
         print(f"[NuImagesDataset]    {len(self.nutoken2label)} different category tokens succesfully loaded")
 
         # Create sample to its annotations data map
@@ -331,24 +334,8 @@ class NuImagesDataset(Dataset):
 
         returns BGR image!!!
         """
-        if isinstance(target, torch.Tensor):
-            target = target.numpy()
-        
-        res_mask = np.zeros((target.shape[0], target.shape[1], 3), dtype=np.uint8)
-        for token in self.nutoken2label:
-            label = self.nutoken2label[token]
-            color = label.color
 
-            bool_mask = [target == label.trainId]
-            s = np.sum(bool_mask)
-            res_mask[target == label.trainId] = color
-
-        # Convert to BGR (for display with opencv)
-        res_mask = cv2.cvtColor(res_mask, cv2.COLOR_RGB2BGR) 
-        return res_mask
-        res_mask = cv2.resize(res_mask, (640,360))
-        cv2.imshow(f"NuImages Mask", res_mask)
-        cv2.waitKey(0)
+        return target2image(target, self.id2color)
 
 
 class NuImagesBEVDataset(NuImagesDataset):

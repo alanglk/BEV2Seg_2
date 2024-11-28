@@ -1,7 +1,6 @@
 
 import os
-from .utils import display_test_image ,display_test_images
-
+from datasets.common import display_image, display_images
 from datasets.NuImages import NuImagesBEVDataset, generate_BEVDataset_from_NuImages
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
@@ -38,7 +37,7 @@ def test_generate_openlabel_one_sample():
 
     if DISPLAY_IMAGES:
         target = dataset.target2image(target)
-        display_test_images("test_generate_openlabel_one_sample", [image, target])
+        display_images("test_generate_openlabel_one_sample", [image, target])
 
 def test_load_openlabel_one_sample():
     """
@@ -65,8 +64,7 @@ def test_load_openlabel_one_sample():
     assert num_images == 1 and ex_found
 
     if DISPLAY_IMAGES:
-        display_test_image("test_load_openlabel_one_sample", image)
-        #display_test_image("TARGET test_load_openlabel_one_sample", image)
+        display_image("test_load_openlabel_one_sample", image)
 
 def test_distorsion_error_on_sample():
     """

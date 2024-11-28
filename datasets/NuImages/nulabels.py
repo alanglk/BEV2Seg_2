@@ -49,9 +49,7 @@ nulabels = [
 # name to label object
 nuname2label      = { label.name    : label for label in nulabels }
 
-# token to label object
-# nutoken2label        = { label.token      : label for label in nulabels }
-
-# trainId to label object
-# nutrainId2label   = { label.trainId : label for label in reversed(nulabels) }
+# trainId to name and to color
 nuid2name =  { label.trainId : label.name for label in nulabels }
+nuid2color =  { label.trainId : label.color for label in nulabels }
+

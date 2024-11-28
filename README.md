@@ -82,7 +82,7 @@ Si se quiere generar el BEVDataset en el HPC hay que utilizar la imagen de Singu
 squeue # Ver la cola de Jobs de Slurm
 salloc --x11 -n 1 -c 1 --gres=gpu:t4:1 -t 01:00:00 # Iniciar una sesión interactiva
 sbatch test.slurm # Añadir un Job a la cola
-seff <job_id> # Mostrar la eficiencia de un job terminado
+seff <job_id> # 84510 Mostrar la eficiencia de un job terminado
 ```
 
 Lanzar una imagen de Singularity en el HPC (codigo dentro del job test.slurm):
@@ -101,7 +101,6 @@ srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabase
     --cam_name "CAM_FRONT"
 EOF
 )
-
 ```
 
 ## Datasets for Image Segmentation

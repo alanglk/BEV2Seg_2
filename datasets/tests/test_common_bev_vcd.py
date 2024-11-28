@@ -1,9 +1,8 @@
 import os
 import cv2
 from vcd import core, scl
-from .utils import display_test_image
 
-from datasets.common import Dataset2BEV
+from datasets.common import Dataset2BEV, display_image
 
 NUIMAGES_PATH   = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 TMP_DIR         = "./tests/tmp/BEVDataset"
@@ -36,4 +35,4 @@ def test_img2bev():
 
     # Display BEV image
     if DISPLAY_IMAGES:
-        display_test_image("test_img2bev", samble_bev)
+        display_image("test_img2bev", samble_bev)

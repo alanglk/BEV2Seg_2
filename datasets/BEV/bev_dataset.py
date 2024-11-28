@@ -1,8 +1,13 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
+import torchvision.transforms.functional as F
 
-from datasets.NuImages.nulabels import nuid2name
+from datasets.NuImages.nulabels import nuid2name, nuid2color
+from datasets.common import target2image
 
+from typing import Union
+
+import numpy as np
 from PIL import Image
 import cv2
 import os
@@ -25,14 +30,17 @@ class BEVDataset(Dataset):
     BEVDataset requires the following structure despite OpenLABEL files are not neccesary
     for training Networks.
     """
-    def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name):
+    def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color):
         """
+        BGR format!!!
+
         INPUT:
             - dataroot: root path of the BEVDataset
             - version: ['mini', 'train', 'val', 'test']
             - image_extension: extension of image files
             - transforms: torchvision transforms
             - id2label: {0: "road"...}. By default is the NuImages id2label
+            - id2color: {0: rgb, 1: rgb...}. By default is the NuImages id2color
         """
         super().__init__()
         dataroot = os.path.join(dataroot, version)
@@ -44,6 +52,8 @@ class BEVDataset(Dataset):
 
         # Save the id label mapping
         self.id2label = id2label
+        self.label2id = { v : k for k, v in self.id2label.items() }
+        self.id2color = id2color
 
         # Load all the tokens from the dataroot folder
         if os.path.isdir(self.dataroot):
@@ -55,13 +65,23 @@ class BEVDataset(Dataset):
     def __len__(self):
         return len(self.data_tokens)
     
-    def __getitem__(self, index):
+    def target2image(self, target: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
+        """
+        Converts target (seg mask) into BGR image
+        - target: torch.tensor or numpy.ndarray (H, W, 3)
+
+        returns BGR image!!!
+        """ 
+        #target_1C = target[:, :, 0] # Get just the first channel
+        return target2image(target, self.id2color)
+
+    def _get_item_paths(self, index):
         """
         INPUT:
             Index of the current sample in the dataset
         OUTPUT:
-            image   -> BEV torch.Tensor (H, W, 3) # BGR
-            target  -> BEV annotations of the image ("mask"): torch.Tensor (H, W)
+            bev_path    -> path of the bev image
+            target_path -> path of the annotations 
         """
         assert index < len(self)
         
@@ -75,9 +95,21 @@ class BEVDataset(Dataset):
 
         if not os.path.isfile(semantic_path):
             raise Exception(f"Semantic mask file not found: {semantic_path}")
-        
-        image   = torch.tensor( cv2.imread(bev_path) )      # BGR
-        target  = torch.tensor( cv2.imread(semantic_path) ) # BGR
+
+        return bev_path, semantic_path
+
+    def __getitem__(self, index):
+        """
+        INPUT:
+            Index of the current sample in the dataset
+        OUTPUT:
+            image   -> BEV torch.Tensor (H, W, 3) # BGR
+            target  -> BEV annotations of the image ("mask"): torch.Tensor (H, W)
+        """
+        bev_path, semantic_path = self._get_item_paths(index)
+
+        image   = torch.tensor( np.array(Image.open(bev_path)) )      # BGR
+        target  = torch.tensor( np.array(Image.open(semantic_path)) ) # BGR
 
         # Apply transforms if necessary
         if self.transforms is not None:
@@ -86,17 +118,40 @@ class BEVDataset(Dataset):
         return image, target
 
 class BEVFeatureExtractionDataset(BEVDataset):
-    """Image (semantic) segmentation dataset."""
+    """Image (semantic) segmentation dataset. BGR Format!!!"""
 
-    def __init__(self, dataroot, version, feature_extractor, image_extension='.png', transforms=None, id2label=...):
+    def __init__(self, dataroot, version, image_processor, image_extension='.png', transforms=None, id2label=nuid2name):
         super().__init__(dataroot, version, image_extension, transforms, id2label)
-        self.feature_extractor = feature_extractor
+        self.image_processor = image_processor
+        # IMPORTANTE:
+        #   Se considera que 0 es el background, pero en nuestro caso
+        #   no queremos la clase background. Cuando generamos el BEVDataset se
+        #   pone como 0 las regiones que no interesan así que hay que mappear los
+        #   0s a 255 ("ignore")
+
+        self.id2label[255] = 'ignore'
+        self.label2id['ignore'] = 255
+        # self.id2color[255] = (255, 255, 255)
     
     def __getitem__(self, index):
-        image, target = super().__getitem__(index)
+        """
+        INPUT:
+            Index of the current dataset sample
+        OUTPUT:
+            encoded bev image/target as follows:
+            encoded_inputs = {
+                "pixel_values": BGR image!!!
+                "labels": target
+            }
+        """
+        image, target = super().__getitem__(index)       
+        target[target == 0] = 255
 
-        encoded_inputs = self.feature_extractor(image, target, return_tensors="pt")
-
+        # Perform data preparation with image_processor 
+        # (it shoul be from transformers:SegformerImageProcessor)
+        encoded_inputs = self.image_processor(image, target, return_tensors="pt")
+        
+        # Remove the batch_dim from each sample
         for k,v in encoded_inputs.items():
           encoded_inputs[k].squeeze_()
 

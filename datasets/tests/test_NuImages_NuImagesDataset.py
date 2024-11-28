@@ -1,12 +1,12 @@
 
 import os
-from .utils import display_test_image ,display_test_images
 
+from datasets.common import display_images
 from datasets.NuImages import NuImagesDataset
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 
-DISPLAY_IMAGES = False
+DISPLAY_IMAGES = True
 
 ######################## TESTS ########################
 def test_import_datasets():
@@ -23,8 +23,8 @@ def test_get_one_sample():
 
     if DISPLAY_IMAGES:
         target = dataset.target2image(target)
-        display_test_images("test_get_one_sample", [image, target])
-
+        display_images("test_get_one_sample", [image, target])
+    
 def test_get_multiple_samples():
     dataset = NuImagesDataset(
         dataroot=NUIMAGES_PATH, 
@@ -56,7 +56,7 @@ def test_generate_CAM_FRONT():
 
         if DISPLAY_IMAGES:
             target = dataset.target2image(target)
-            display_test_images("test_get_one_sample", [image, target])
+            display_images("test_get_one_sample", [image, target])
     
     print(f"Num CAM_FRONT images: {num_samples}")
     assert i == num_samples-1 # 'mini' has 8 CAM_FRONT images
