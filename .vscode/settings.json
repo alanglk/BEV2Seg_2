@@ -8,7 +8,7 @@
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": false,
     "python.testing.pytestArgs": [
-        "datasets/tests",
+        "oldatasets/tests",
         "tests"
     ]
 }
