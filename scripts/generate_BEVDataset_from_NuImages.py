@@ -18,7 +18,7 @@ python3 srcipts/generate_BEVDataset_from_NuImages.py <nuimages_path> <output_pat
 """
 import os
 import argparse
-from datasets.NuImages import NuImagesDataset, generate_BEVDataset_from_NuImages
+from oldatasets.NuImages import NuImagesDataset, generate_BEVDataset_from_NuImages
 
 def prepare_output_folder(out_path):
     if not os.path.exists(out_path):
