@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 VERSION = "0.1"
 
 setup(
-    name="datasets",
+    name="openlabel-datasets",
     version=VERSION,
     packages=find_packages(),
     install_requires=[],

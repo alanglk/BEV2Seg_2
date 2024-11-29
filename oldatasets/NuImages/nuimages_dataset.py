@@ -7,8 +7,8 @@ from nuimages import NuImages
 from nuimages.utils.utils import mask_decode 
 
 # Utils from the same package
-from datasets.NuImages.nulabels import nulabels, nuname2label, nuid2name, nuid2color
-from datasets.common import Dataset2BEV, progress_bar, target2image
+from oldatasets.NuImages.nulabels import nulabels, nuname2label, nuid2name, nuid2color
+from oldatasets.common import Dataset2BEV, progress_bar, target2image
 
 from vcd import core, types, scl, utils
 import numpy as np

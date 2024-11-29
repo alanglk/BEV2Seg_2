@@ -1,7 +1,7 @@
 
 import os
-from datasets.common import display_image, display_images
-from datasets.NuImages import NuImagesBEVDataset, generate_BEVDataset_from_NuImages
+from oldatasets.common import display_image, display_images
+from oldatasets.NuImages import NuImagesBEVDataset, generate_BEVDataset_from_NuImages
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 TMP_DIR = "./tests/tmp/BEVDataset"

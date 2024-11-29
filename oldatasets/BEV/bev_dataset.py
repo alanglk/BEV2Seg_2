@@ -2,8 +2,8 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.transforms.functional as F
 
-from datasets.NuImages.nulabels import nuid2name, nuid2color
-from datasets.common import target2image
+from oldatasets.NuImages.nulabels import nuid2name, nuid2color
+from oldatasets.common import target2image
 
 from typing import Union
 

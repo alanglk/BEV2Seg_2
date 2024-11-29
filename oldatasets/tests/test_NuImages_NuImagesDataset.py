@@ -1,8 +1,8 @@
 
 import os
 
-from datasets.common import display_images
-from datasets.NuImages import NuImagesDataset
+from oldatasets.common import display_images
+from oldatasets.NuImages import NuImagesDataset
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 OUTPUT_PATH = "./tests/tmp/NuImages/mini"

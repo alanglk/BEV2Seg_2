@@ -2,7 +2,7 @@ import os
 import cv2
 from vcd import core, scl
 
-from datasets.common import Dataset2BEV, display_image
+from oldatasets.common import Dataset2BEV, display_image
 
 NUIMAGES_PATH   = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 TMP_DIR         = "./tests/tmp/BEVDataset"
