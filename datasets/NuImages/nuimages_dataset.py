@@ -153,7 +153,9 @@ class NuImagesDataset(Dataset):
                  version: str = 'mini',
                  camera: str = None,
                  transforms = None,
-                 remove_empty: bool = True
+                 remove_empty: bool = True,
+                 save_dataset = False,
+                 output_path: str = None
                  ):
         """
         Parameters:
@@ -173,6 +175,11 @@ class NuImagesDataset(Dataset):
         self.camera = camera
         self.transforms = transforms
         
+        self.save_dataset = save_dataset
+        self.output_path = output_path
+        if self.save_dataset and self.output_path is None:
+            raise Exception("[NuImagesDataset] save_dataset specified but no output_path provided!!")
+
         # Check if the dataset has annotated objects or surfaces
         # If not, it is the test dataset
         self.train = len(self.nuim.object_ann) != 0 and len(self.nuim.surface_ann) != 0
@@ -324,6 +331,16 @@ class NuImagesDataset(Dataset):
         # Apply transforms if necessary
         if self.transforms is not None:
             image, target = self.transforms(image, target)
+
+        # Save the dataset in output_folder
+        if self.save_dataset:
+            raw_save_path       = os.path.join(self.output_path, sample_token + "_raw.png")
+            color_save_path     = os.path.join(self.output_path, sample_token + "_color.png")
+            target_save_path    = os.path.join(self.output_path, sample_token + "_semantic.png")
+            
+            cv2.imwrite(raw_save_path, image)
+            cv2.imwrite(color_save_path, self.target2image(target))
+            cv2.imwrite(target_save_path, target)
 
         return image, target
 
