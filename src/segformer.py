@@ -13,7 +13,9 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 from tqdm import tqdm
+import argparse
 import os
+
 
 # Compute metrics
 def compute_metrics(metric: evaluate.EvaluationModule, predicted, labels, num_labels):
@@ -107,26 +109,20 @@ def save_checkpoint(model, output_path, model_name, epoch:int, overwrite=False):
  
 
 ########################## MAIN ##########################
-def main():
-
-  # config
-  MODEL_OUTPUT_PATH = "./tmp/models"
-  MODEL_NAME = "model1"
-  DATASET_ROOT_PATH = "./tmp/BEVDataset"
-  DATASET_VERSION = "mini"
-
+def main(model_output_path, model_name, dataset_root_path, dataset_version):
+  
   # Hyperparameters
   batch_size = 5
   epochs = 100
   learning_rate = 0.00006
 
   # Logger
-  logger = TrainingLogger(model_out_path=MODEL_OUTPUT_PATH, 
-                          model_name=MODEL_NAME, 
+  logger = TrainingLogger(model_out_path=model_output_path, 
+                          model_name=model_name, 
                           overwrite=True,
                           pretrained="",
-                          train_dataset=DATASET_ROOT_PATH,
-                          eval_dataset=DATASET_ROOT_PATH
+                          train_dataset=dataset_root_path,
+                          eval_dataset=dataset_version
                           )
   logger.set_hyperparams({
     "learning_rate": learning_rate,
@@ -140,9 +136,9 @@ def main():
   # Dataset and Dataloader
   image_processor = SegformerImageProcessor(reduce_labels=False)
 
-  train_dataset = BEVFeatureExtractionDataset(dataroot=DATASET_ROOT_PATH, version=DATASET_VERSION, image_processor=image_processor)
+  train_dataset = BEVFeatureExtractionDataset(dataroot=dataset_root_path, version=dataset_version, image_processor=image_processor)
   train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-  eval_dataset = BEVFeatureExtractionDataset(dataroot=DATASET_ROOT_PATH, version=DATASET_VERSION, image_processor=image_processor)
+  eval_dataset = BEVFeatureExtractionDataset(dataroot=dataset_root_path, version=dataset_version, image_processor=image_processor)
   eval_dataloader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=False)
 
   # Model
@@ -171,7 +167,7 @@ def main():
 
     # Save checkpoint and registed epoch data
     # if eval_metrics['loss'] < history_eval_loss:
-    checkpoint_path = save_checkpoint(model, MODEL_OUTPUT_PATH, MODEL_NAME)
+    checkpoint_path = save_checkpoint(model, model_output_path, model_name)
     
     logger.log_epoch(epoch=epoch,
       checkpoint_path=checkpoint_path,
@@ -183,4 +179,11 @@ def main():
 
 
 if __name__ == "__main__":
-  main()
+  parser = argparse.ArgumentParser(description="Script para procesar datos con diferentes versiones.")
+  parser.add_argument('model_output_path', type=str, help="Output path for runs of the model")
+  parser.add_argument('model_name', type=str, help="Name of the model")
+  parser.add_argument('dataset_root_path', type=str, help="Path of the dataset.")
+  parser.add_argument('dataset_version', type=str, help="Dataset version.")
+  args = parser.parse_args()
+
+  main(args.model_output_path, args.model_name, args.dataset_root_path, args.dataset_version)

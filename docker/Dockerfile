@@ -13,8 +13,8 @@ WORKDIR /libraries
 # Install python deppendencies and developed libraries
 COPY requirements.txt /libraries/
 RUN pip install --no-cache-dir -r requirements.txt
-COPY ./datasets /libraries/datasets
-RUN pip install --no-cache-dir -e datasets/
+COPY ./oldatasets /libraries/oldatasets
+RUN pip install --no-cache-dir -e oldatasets/
 ENV PYTHONPATH=/libraries
 
 # Copy the scripts folder
