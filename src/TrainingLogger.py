@@ -5,8 +5,9 @@ from datetime import datetime
 class TrainingLogger:
     def __init__(self, 
                  model_out_path:str, 
-                 model_name:str, 
+                 model_name:str,
                  overwrite:bool=False,
+                 pretrained:str=None,
                  train_dataset:str=None, 
                  eval_dataset:str=None):
         
@@ -26,8 +27,10 @@ class TrainingLogger:
             "metadata": {
                 "start-timestamp": None,
                 "finish-timestamp": None,
+                "pretrained": pretrained,
                 "train_dataset": train_dataset,
                 "eval_dataset": eval_dataset,
+
                 "hyperparams": None
             },
             "epochs": {}

@@ -123,9 +123,11 @@ def main():
   # Logger
   logger = TrainingLogger(model_out_path=MODEL_OUTPUT_PATH, 
                           model_name=MODEL_NAME, 
+                          overwrite=True,
+                          pretrained="",
                           train_dataset=DATASET_ROOT_PATH,
-                          eval_dataset=DATASET_ROOT_PATH,
-                          overwrite=True)
+                          eval_dataset=DATASET_ROOT_PATH
+                          )
   logger.set_hyperparams({
     "learning_rate": learning_rate,
     "batch_size": batch_size,
