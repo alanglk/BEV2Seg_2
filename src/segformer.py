@@ -13,9 +13,9 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 from tqdm import tqdm
+import numpy as np
 import argparse
 import os
-
 
 # Compute metrics
 def compute_metrics(metric: evaluate.EvaluationModule, predicted, labels, num_labels):
@@ -33,17 +33,16 @@ def compute_metrics(metric: evaluate.EvaluationModule, predicted, labels, num_la
 
 # Training Loop
 def train_loop(model, device: torch.device, optimizer:torch.optim, train_dataloader: DataLoader, metric: evaluate.EvaluationModule):
-  train_loss, train_iou, train_acc = [], [], []
+  train_loss, train_iou, train_acc = 0.0, 0.0, 0.0
 
   model.train()
   for idx, batch in enumerate(tqdm(train_dataloader)):
     # get the inputs;
     pixel_values = batch["pixel_values"].to(device)
-    labels = batch["labels"].to(device)
+    labels = batch["labels"].to(device)  
 
     # zero the parameter gradients
     optimizer.zero_grad()
-
     # forward + backward + optimize
     outputs = model(pixel_values=pixel_values, labels=labels)
     loss, logits = outputs.loss, outputs.logits
@@ -55,24 +54,21 @@ def train_loop(model, device: torch.device, optimizer:torch.optim, train_dataloa
     with torch.no_grad():
       upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False)
       predicted = upsampled_logits.argmax(dim=1)
-      metrics = compute_metrics(metric, predicted, labels, model.config.numlabels)
-      train_loss.append(loss.item())
-      train_iou.append(metrics["mean_iou"])
-      train_iou.append(metrics["mean_accuracy"])
-
-  train_loss = sum(train_loss)  / len(train_loss)
-  train_iou  = sum(train_iou)   / len(train_iou)
-  train_acc  = sum(train_acc)   / len(train_acc)
-
-  train_metrics = { "loss": train_loss, "mean_iou": train_iou, "mean_acc": train_acc }
+      metrics = compute_metrics(metric, predicted, labels, model.config.num_labels)
+      train_loss  += loss.item()
+      train_iou   += metrics["mean_iou"]
+      train_iou   += metrics["mean_accuracy"]
+  
+  n = len(train_dataloader)
+  train_metrics = { "loss": train_loss / n, "mean_iou": train_iou / n, "mean_acc": train_acc / n }
   return train_metrics
 
 
 # Evaluation Loop
 def evaluation_loop(model, device: torch.device, eval_dataloader: DataLoader, metric: evaluate.EvaluationModule):
-  eval_loss, eval_iou, eval_acc = [], [], []
+  eval_loss, eval_iou, eval_acc = 0.0, 0.0, 0.0
   with torch.no_grad():
-    for batch in enumerate(tqdm(eval_dataloader)):
+    for idx, batch in enumerate(tqdm(eval_dataloader)):
       pixel_values = batch["pixel_values"].to(device)
       labels = batch["labels"].to(device)
 
@@ -83,16 +79,13 @@ def evaluation_loop(model, device: torch.device, eval_dataloader: DataLoader, me
       predicted = upsampled_logits.argmax(dim=1)
 
       # Compute evaluation metrics
-      metrics = compute_metrics(metric, predicted, labels, model.config.numlabels)
-      eval_loss.append(loss.item())
-      eval_iou.append(metrics["mean_iou"])
-      eval_iou.append(metrics["mean_accuracy"])
+      metrics = compute_metrics(metric, predicted, labels, model.config.num_labels)
+      eval_loss  += loss.item()
+      eval_iou   += metrics["mean_iou"]
+      eval_iou   += metrics["mean_accuracy"]
   
-  eval_loss = sum(eval_loss)  / len(eval_loss)
-  eval_iou  = sum(eval_iou)   / len(eval_iou)
-  eval_acc  = sum(eval_acc)   / len(eval_acc)
-
-  eval_metrics = { "loss": eval_loss, "mean_iou": eval_iou, "mean_acc": eval_acc }
+  n = len(eval_dataloader)
+  eval_metrics = { "loss": eval_loss / n, "mean_iou": eval_iou / n, "mean_acc": eval_acc / n }
   return eval_metrics
 
 def save_checkpoint(model, output_path, model_name, epoch:int, overwrite=False):
@@ -112,7 +105,7 @@ def save_checkpoint(model, output_path, model_name, epoch:int, overwrite=False):
 def main(model_output_path, model_name, dataset_root_path, dataset_version):
   
   # Hyperparameters
-  batch_size = 5
+  batch_size = 10
   epochs = 100
   learning_rate = 0.00006
 
@@ -134,7 +127,7 @@ def main(model_output_path, model_name, dataset_root_path, dataset_version):
   metric = evaluate.load("mean_iou")
 
   # Dataset and Dataloader
-  image_processor = SegformerImageProcessor(reduce_labels=False)
+  image_processor = SegformerImageProcessor(reduce_labels=True)
 
   train_dataset = BEVFeatureExtractionDataset(dataroot=dataset_root_path, version=dataset_version, image_processor=image_processor)
   train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -148,7 +141,7 @@ def main(model_output_path, model_name, dataset_root_path, dataset_version):
                                                           label2id=train_dataset.label2id)
 
   # Move model to GPU
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   model.to(device)
 
   # AdamW optimizer
@@ -167,7 +160,7 @@ def main(model_output_path, model_name, dataset_root_path, dataset_version):
 
     # Save checkpoint and registed epoch data
     # if eval_metrics['loss'] < history_eval_loss:
-    checkpoint_path = save_checkpoint(model, model_output_path, model_name)
+    checkpoint_path = save_checkpoint(model, model_output_path, model_name, epoch, overwrite=True)
     
     logger.log_epoch(epoch=epoch,
       checkpoint_path=checkpoint_path,
