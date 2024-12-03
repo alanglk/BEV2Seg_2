@@ -6,11 +6,14 @@ import evaluate
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 from oldatasets.BEV import BEVFeatureExtractionDataset
 
 import argparse
+import toml
+import os
 
+import warnings
+warnings.filterwarnings("ignore")
 metric = evaluate.load("mean_iou")
 
 def compute_metrics(eval_pred):
@@ -30,88 +33,84 @@ def compute_metrics(eval_pred):
         predictions=pred_labels,
         references=labels,
         num_labels=num_labels,
-        ignore_index=0,
+        ignore_index=255,
         reduce_labels=False,
     )
     
-    # # add per category metrics as individual key-value pairs
-    # per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
-    # per_category_iou = metrics.pop("per_category_iou").tolist()
-
+    # add per category metrics as individual key-value pairs
+    per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
+    per_category_iou = metrics.pop("per_category_iou").tolist()
     # metrics.update({f"accuracy_{id2label[i]}": v for i, v in enumerate(per_category_accuracy)})
     # metrics.update({f"iou_{id2label[i]}": v for i, v in enumerate(per_category_iou)})
     
     return metrics
 
 ########################## MAIN ##########################
-def main(model_output_path, model_name, dataset_root_path, dataset_version):
+def main(config: dict):
+    output_path = config['model']['output_path']
+    model_name = config['model']['model_name']
+    
     # Hyperparams
-    initial_lr = 2e-5
-    batch_size = 16
-    train_epochs = 3
+    ls_steps        = 4     #Logging and Saving steps
+    batch_size      = config['training']['batch_size']
+    train_epochs    = config['training']['epochs']
+    initial_lr      = config['training']['learning_rate']
+    weight_decay    = config['training']['weight_decay']
 
     # Dataset and Dataloader
     image_processor = SegformerImageProcessor(reduce_labels=True)
+    
+    
+    if config['data']['type'] == 'BEVDataset':
+        if config['data']['testing'] == True:
+            train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
+            eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
+        else:
+            train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='train', image_processor=image_processor)
+            eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor)
 
-    train_dataset = BEVFeatureExtractionDataset(dataroot=dataset_root_path, version=dataset_version, image_processor=image_processor)
-    eval_dataset = BEVFeatureExtractionDataset(dataroot=dataset_root_path, version=dataset_version, image_processor=image_processor)
-    global num_labels
+    else:
+       raise Exception(f"Dataset type: {config['data']['type']} not supported")
+
+    
+    global num_labels, id2label
+    id2label = train_dataset.id2label
     num_labels = len(train_dataset.id2label)
 
     # Model
-    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/mit-b0",
+    model = SegformerForSemanticSegmentation.from_pretrained(config['model']['pretrained'],
                                                           num_labels=len(train_dataset.id2label),
                                                           id2label=train_dataset.id2label,
                                                           label2id=train_dataset.label2id)
     
-    
     # Training Args
     training_args = TrainingArguments(
-        # output_dir: directory where the model checkpoints will be saved.
-        output_dir=model_output_path,
-        # evaluation_strategy (default "no"):
-        # Possible values are:
-        # "no": No evaluation is done during training.
-        # "steps": Evaluation is done (and logged) every eval_steps.
-        # "epoch": Evaluation is done at the end of each epoch.
-        eval_strategy="epoch",
-        # logging_strategy (default: "steps"): The logging strategy to adopt during
-        # training (used to log training loss for example). Possible values are:
-        # "no": No logging is done during training.
-        # "epoch": Logging is done at the end of each epoch.
-        # "steps": Logging is done every logging_steps.
-        logging_strategy="epoch",
-        # save_strategy (default "steps"):
-        # The checkpoint save strategy to adopt during training. Possible values are:
-        # "no": No save is done during training.
-        # "epoch": Save is done at the end of each epoch.
-        # "steps": Save is done every save_steps (default 500).
-        save_strategy="epoch",
-        # learning_rate (default 5e-5): The initial learning rate for AdamW optimizer.
-        # Adam algorithm with weight decay fix as introduced in the paper
-        # Decoupled Weight Decay Regularization.
-        learning_rate=initial_lr,
-        # per_device_train_batch_size: The batch size per GPU/TPU core/CPU for training.
-        per_device_train_batch_size=batch_size,
-        # per_device_eval_batch_size: The batch size per GPU/TPU core/CPU for evaluation.
-        per_device_eval_batch_size=batch_size,
-        # num_train_epochs (default 3.0): Total number of training epochs to perform
-        # (if not an integer, will perform the decimal part percents of the last epoch
-        # before stopping training).
-        num_train_epochs=train_epochs,
-        # load_best_model_at_end (default False): Whether or not to load the best model
-        # found during training at the end of training.
-        load_best_model_at_end=True,
-        # metric_for_best_model:
-        # Use in conjunction with load_best_model_at_end to specify the metric to use
-        # to compare two different models. Must be the name of a metric returned by
-        # the evaluation with or without the prefix "eval_".
+        output_dir=os.path.join(output_path, model_name),
+        overwrite_output_dir = False,
+
+        # Evaluation config
+        eval_strategy="epoch",      # ["no", "steps", "epoch"]
+        #eval_steps=... (default: logging_steps if eval_strategy="steps" is set)
         metric_for_best_model="mean_accuracy",
-        # report_to:
-        # The list of integrations to report the results and logs to. Supported
-        # platforms are "azure_ml", "comet_ml", "mlflow", "tensorboard" and "wandb".
-        # Use "all" to report to all integrations installed, "none" for no integrations.
-        report_to="tensorboard"
+
+        # Checkpointing config
+        save_strategy="epoch",      # ["no", "steps", "epoch"]
+        # save_steps=ls_steps,      # (default: 500) only applied if save_strategy="steps" 
+        save_total_limit=5,         # save the best 4 checkpoints and the final model
+        load_best_model_at_end=True,
+        
+        # Logging config
+        logging_strategy="epoch",   # ["no", "steps", "epoch"]
+        logging_first_step=True,
+        # logging_steps=ls_steps,   # (default: 500) only applied if logging_strategy="steps" 
+        report_to="tensorboard",
+        
+        # Hyperparameters
+        learning_rate=initial_lr,
+        weight_decay = weight_decay, 
+        per_device_train_batch_size=batch_size, # The batch size per GPU/TPU core/CPU 
+        per_device_eval_batch_size=batch_size,
+        num_train_epochs=train_epochs,
     )
     
     trainer = Trainer(
@@ -124,11 +123,9 @@ def main(model_output_path, model_name, dataset_root_path, dataset_version):
     trainer.train()
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description="Script para procesar datos con diferentes versiones.")
-  parser.add_argument('model_output_path', type=str, help="Output path for runs of the model")
-  parser.add_argument('model_name', type=str, help="Name of the model")
-  parser.add_argument('dataset_root_path', type=str, help="Path of the dataset.")
-  parser.add_argument('dataset_version', type=str, help="Dataset version.")
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Script para procesar datos con diferentes versiones.")
+    parser.add_argument('config_file', type=str, help="Configuration .toml file")
+    args = parser.parse_args()
 
-  main(args.model_output_path, args.model_name, args.dataset_root_path, args.dataset_version)
+    config = toml.load(args.config_file)
+    main(config)
