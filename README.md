@@ -64,7 +64,8 @@ docker run -it \
 Para monitorizar el entrenamiento con tensorboard se puede utilizar el siguiente comando:
 
 ```bash
-docker run -v ./tmp/models/runs:/runs -p 6006:6006 tensorflow/tensorflow tensorboard --logdir /runs
+sshfs agarciaj@zegama002:/home/agarciaj/bev2seg_2/tmp/models /home/VICOMTECH/agarciaj/GitLab/bev2seg_2/tmp/models
+docker run -v ./tmp/models/<model_name>/runs:/runs -p 6006:6006 tensorflow/tensorflow tensorboard --logdir /runs
 ```
 
 ### Docker image for scripts
