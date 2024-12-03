@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J agarciaj_nuimages2bevdataset
+#SBATCH -J agarciaj_SegformerTraining
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=agarciaj@vicomtech.org
 #SBATCH --time=00-16:00:00
@@ -11,11 +11,11 @@
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
-srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/nuimages --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/BEVDataset ./bev2seg_2_v0.1.sif $(cat <<EOF
-    python3 /scripts/generate_BEVDataset_from_NuImages.py \
-    /nuimages \
-    /BEVDataset \
-    --version "all" \
-    --cam_name "CAM_FRONT"
+srun --pty singularity run --nv $(cat <<EOF
+    --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/BEVDataset \
+    --bind /home/agarciaj/bev2seg_2/models:/models \
+    --bind /home/agarciaj/bev2seg_2/config:/config \
+    ./bev2seg_2_v0.1.sif \
+    /scripts/train_segformer.py /config/segformer.toml
 EOF
 )
