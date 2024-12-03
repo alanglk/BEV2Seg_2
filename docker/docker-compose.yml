@@ -2,7 +2,7 @@ services:
   tensorboard:
     image: tensorflow/tensorflow
     volumes:
-      -../tmp/models/runs:/runs
+      - ../tmp/models/runs:/runs
     ports:
-      -6006:6006
+      - 6006:6006
     command: tensorboard --logdir /runs

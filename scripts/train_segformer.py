@@ -1,3 +1,11 @@
+#!/opt/conda/bin/python3
+"""
+Script para finetunear SegFormer.
+Ejemplo de uso:
+
+python3 srcipts/train_segformer.py <config_file_path>
+"""
+
 from transformers import SegformerImageProcessor
 from transformers import SegformerForSemanticSegmentation
 from transformers import TrainingArguments

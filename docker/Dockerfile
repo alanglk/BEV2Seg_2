@@ -1,7 +1,7 @@
 FROM pytorch/pytorch:latest
 
-# ARG USER_ID
-# ARG GROUP_ID
+ARG USER_ID
+ARG GROUP_ID
 
 # Install general dependencies
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
@@ -23,9 +23,12 @@ COPY ./scripts /scripts
 RUN chmod +x /scripts/*.py
 
 # # Create nonroot user
-# RUN groupadd -g ${GROUP_ID} user && useradd -m -u ${USER_ID} -g ${GROUP_ID} user
-# USER user
+RUN groupadd -g ${GROUP_ID} user && useradd -m -u ${USER_ID} -g ${GROUP_ID} user
+USER user
+
+# Define ENTRYPOINT para ejecutar scripts en /scripts
+# ENTRYPOINT ["/bin/bash", "-c", "/scripts/$1"]
 
 # CMD opcional para ejecutar un script específico por defecto (puede ser sobreescrito al correr el contenedor)
-CMD ["python3 /scripts/generate_BEVDataset_from_NuImages.py"]
+CMD ["/bin/bash"]
 

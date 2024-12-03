@@ -8,7 +8,7 @@ fi
 
 # Docker image name:tag
 VERSION=$1
-IMAGE_NAME="bev2seg_2"
+IMAGE_NAME="agarciaj/bev2seg_2"
 IMAGE_TAG="${IMAGE_NAME}:${VERSION}"
 
 # Dockerfile path: ./docker
@@ -24,7 +24,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Save Docker image as a .tar file for singularity conversion
-TAR_FILE="${DOCKERFILE_DIR}/${IMAGE_NAME}_${VERSION}.tar"
+TAR_FILE="${DOCKERFILE_DIR}/${IMAGE_NAME//\//_}_${VERSION}.tar"
 echo "[SCRIPT]    Saving Docker image as ${TAR_FILE}..."
 docker save -o "${TAR_FILE}" "${IMAGE_TAG}"
 

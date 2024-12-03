@@ -6,4 +6,7 @@ torch
 torchvision
 torchaudio
 transformers
+transformers[torch]
 evaluate
+toml
+tensorboard

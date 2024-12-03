@@ -50,6 +50,23 @@ donde version puede tomar los valores `['mini', 'train', 'val', 'test', 'all']` 
     test/
 ```
 
+### Train SegFormer
+```bash
+docker run -it \
+    --gpus '"device=0"' \
+    -v $(pwd)/tmp/BEVDataset:/BEVDataset \
+    -v $(pwd)/tmp/models:/models \
+    -v $(pwd)/config:/config \
+    agarciaj/bev2seg_2:v0.2 \
+    /scripts/train_segformer.py /config/segformer.toml
+```
+
+Para monitorizar el entrenamiento con tensorboard se puede utilizar el siguiente comando:
+
+```bash
+docker run -v ./tmp/models/runs:/runs -p 6006:6006 tensorflow/tensorflow tensorboard --logdir /runs
+```
+
 ### Docker image for scripts
 Generar una imagen de Docker con los scripts y librerías necesarias:
 ```bash
@@ -64,14 +81,12 @@ singularity build bev2seg_2_<version>.sif docker-archive://bev2seg_2_<version>.t
 
 Para generar un BEVDataset a partir de NuImages con Docker se puede utilizar:
 ```bash
-docker run $(cat <<EOF
+docker run -it \
     -it \
     -v $(pwd)/data/BEVDataset:/data/output \
     -v $(pwd)/data/input:/data/input:ro \
-    beg2seg_2:<version> \
-    generate_BEVDataset_from_NuImages.py /data/input /data/output --version "mini" --cam_name "CAM_FRONT"
-EOF
-)
+    agarciaj/beg2seg_2:v0.1 \
+    /scripts/generate_BEVDataset_from_NuImages.py /data/input /data/output --version "mini" --cam_name "CAM_FRONT"
 ```
 
 Si se quiere generar el BEVDataset en el HPC hay que utilizar la imagen de Singularity generada y ejecutarla ya sea en un job o en una interfaz interactiva:
