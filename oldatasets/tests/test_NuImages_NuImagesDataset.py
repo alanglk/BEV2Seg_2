@@ -99,7 +99,7 @@ def test_save_generated_CAM_FRONT():
 
 def test_segformer_feature_extraction_dataset():
     from transformers import SegformerImageProcessor
-    image_processor = SegformerImageProcessor(reduce_labels=False)
+    image_processor = SegformerImageProcessor(reduce_labels=True)
     
     dataset = NuImagesFeatureExtractionDataset(
         dataroot=NUIMAGES_PATH, 

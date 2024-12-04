@@ -128,7 +128,12 @@ class BEVFeatureExtractionDataset(BEVDataset):
         #   no queremos la clase background. Cuando generamos el BEVDataset se
         #   pone como 0 las regiones que no interesan así que hay que mappear los
         #   0s a 255 ("ignore")
-
+        
+        if image_processor.do_reduce_labels:
+            self.id2label = {k-1: v for k, v in self.id2label.items()}
+            self.label2id = {k: v-1 for k, v in self.label2id.items()}
+            self.id2color = {k-1: v for k, v in self.id2color.items()}
+        
         self.id2label[255] = 'ignore'
         self.label2id['ignore'] = 255
         # self.id2color[255] = (255, 255, 255)
@@ -144,8 +149,7 @@ class BEVFeatureExtractionDataset(BEVDataset):
                 "labels": target
             }
         """
-        image, target = super().__getitem__(index)       
-        target[target == 0] = 255
+        image, target = super().__getitem__(index)
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)

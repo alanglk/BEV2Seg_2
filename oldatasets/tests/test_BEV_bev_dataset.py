@@ -21,7 +21,7 @@ def test_load_bev_dataset():
 
 def test_segformer_feature_extraction_dataset():
     from transformers import SegformerImageProcessor
-    image_processor = SegformerImageProcessor(reduce_labels=False)
+    image_processor = SegformerImageProcessor(reduce_labels=True)
 
     dataset_bev = BEVDataset(TMP_DIR, 'mini')
     dataset_fe  = BEVFeatureExtractionDataset(TMP_DIR, 'mini', image_processor)
@@ -55,9 +55,8 @@ def test_segformer_feature_extraction_dataset():
             target_bev = dataset_bev.target2image(target_bev)
             target_fe = dataset_fe.target2image(encoded['labels'])
             display_images("Encoded Targets", [target_bev, target_fe])
-
+        
     
-
 
 
 
