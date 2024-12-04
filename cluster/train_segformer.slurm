@@ -4,10 +4,10 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=agarciaj@vicomtech.org
 #SBATCH --time=00-16:00:00
-#SBATCH --gres=gpu:0
+#SBATCH --gres=gpu:t4:2
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=8G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem-per-cpu=4G
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
