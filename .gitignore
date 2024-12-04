@@ -14,3 +14,5 @@ tmp/
 *.gz
 *.tar
 *.sif
+*.err
+*.out
