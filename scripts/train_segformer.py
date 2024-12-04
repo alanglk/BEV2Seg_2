@@ -15,6 +15,7 @@ import evaluate
 import torch
 import torch.nn.functional as F
 from oldatasets.BEV import BEVFeatureExtractionDataset
+from oldatasets.NuImages import NuImagesFeatureExtractionDataset
 
 import argparse
 import toml
@@ -66,7 +67,7 @@ def main(config: dict):
     weight_decay    = config['training']['weight_decay']
 
     # Dataset and Dataloader
-    image_processor = SegformerImageProcessor(reduce_labels=False)
+    image_processor = SegformerImageProcessor(reduce_labels=True)
     
     
     if config['data']['type'] == 'BEVDataset':
@@ -77,9 +78,13 @@ def main(config: dict):
             train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='train', image_processor=image_processor)
             eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor)
 
-    else:
-       raise Exception(f"Dataset type: {config['data']['type']} not supported")
-
+    elif config['data']['type'] == 'NuImages':
+        if config['data']['testing'] == True:
+            train_dataset   = NuImagesFeatureExtractionDataset( dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor, camera='CAM_FRONT' )
+            eval_dataset    = NuImagesFeatureExtractionDataset( dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor, camera='CAM_FRONT' )
+        else:
+            train_dataset   = NuImagesFeatureExtractionDataset( dataroot=config['data']['dataroot'], version='train', image_processor=image_processor, camera='CAM_FRONT' )
+            eval_dataset    = NuImagesFeatureExtractionDataset( dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor, camera='CAM_FRONT' )
     
     global num_labels, id2label
     id2label = train_dataset.id2label
