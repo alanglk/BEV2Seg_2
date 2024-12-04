@@ -2,7 +2,7 @@
 import os
 
 from oldatasets.common import display_images
-from oldatasets.NuImages import NuImagesDataset
+from oldatasets.NuImages import NuImagesDataset, NuImagesFeatureExtractionDataset
 
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 OUTPUT_PATH = "./tests/tmp/NuImages/mini"
@@ -95,3 +95,22 @@ def test_save_generated_CAM_FRONT():
     samples = [os.path.splitext(f)[0] for f in files if f.endswith('_raw.png')]
 
     assert len(samples) == 8 # Se han generado los 8 CAM_FRONT de mini
+
+
+def test_segformer_feature_extraction_dataset():
+    from transformers import SegformerImageProcessor
+    image_processor = SegformerImageProcessor(reduce_labels=False)
+    
+    dataset = NuImagesFeatureExtractionDataset(
+        dataroot=NUIMAGES_PATH, 
+        version='mini', 
+        image_processor= image_processor,
+        camera='CAM_FRONT')
+    
+    for i in range(len(dataset)):
+        encoded = dataset.__getitem__(i)
+        if DISPLAY_IMAGES:
+            image = encoded['pixel_values'].permute(1, 2, 0)
+            target = dataset.target2image(encoded['labels'])
+            display_images("test_featureExtractor_dataset", [image, target])
+    

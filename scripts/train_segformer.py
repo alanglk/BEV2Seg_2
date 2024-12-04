@@ -66,7 +66,7 @@ def main(config: dict):
     weight_decay    = config['training']['weight_decay']
 
     # Dataset and Dataloader
-    image_processor = SegformerImageProcessor(reduce_labels=True)
+    image_processor = SegformerImageProcessor(reduce_labels=False)
     
     
     if config['data']['type'] == 'BEVDataset':

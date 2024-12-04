@@ -2,9 +2,8 @@ from oldatasets.BEV import BEVDataset, BEVFeatureExtractionDataset
 from oldatasets.common import display_images
 
 import numpy as np
-from transformers import SegformerImageProcessor
 
-TMP_DIR = "./tests/tmp/BEVDataset"
+TMP_DIR = "./tmp/BEVDataset"
 DISPLAY_IMAGES = True
 
 def test_load_bev_dataset():
@@ -21,12 +20,11 @@ def test_load_bev_dataset():
             display_images("test_load_bev_dataset", [image, target])
 
 def test_segformer_feature_extraction_dataset():
-    # No se porqué a veces no coinciden labels distintos de 0 y 255
-
+    from transformers import SegformerImageProcessor
     image_processor = SegformerImageProcessor(reduce_labels=False)
 
-    dataset_bev = BEVDataset(TMP_DIR, '')
-    dataset_fe  = BEVFeatureExtractionDataset(TMP_DIR, '', image_processor)
+    dataset_bev = BEVDataset(TMP_DIR, 'mini')
+    dataset_fe  = BEVFeatureExtractionDataset(TMP_DIR, 'mini', image_processor)
 
     for i in range(len(dataset_bev)):
         image_bev, target_bev = dataset_bev[i]
@@ -58,9 +56,7 @@ def test_segformer_feature_extraction_dataset():
             target_fe = dataset_fe.target2image(encoded['labels'])
             display_images("Encoded Targets", [target_bev, target_fe])
 
-    assert False
     
-
 
 
 

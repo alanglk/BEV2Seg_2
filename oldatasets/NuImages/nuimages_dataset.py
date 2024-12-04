@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 # pip install nuscenes-devkit # Parser for NuImages dataset
 from nuimages import NuImages
@@ -330,7 +331,8 @@ class NuImagesDataset(Dataset):
         
         # Apply transforms if necessary
         if self.transforms is not None:
-            image, target = self.transforms(image, target)
+            image = self.transforms(image)
+            target = self.transforms(target)
 
         # Save the dataset in output_folder
         if self.save_dataset:
@@ -354,6 +356,52 @@ class NuImagesDataset(Dataset):
 
         return target2image(target, self.id2color)
 
+
+
+class NuImagesFeatureExtractionDataset(NuImagesDataset):
+    """Image (semantic) segmentation dataset. BGR Format!!!"""
+
+    def __init__(self, dataroot, version, image_processor, camera = None, transforms=None, remove_empty = True):
+        super().__init__(dataroot, version, camera, ToTensor(), remove_empty, False, None)
+        self.image_processor = image_processor
+        # IMPORTANTE:
+        #   Se considera que 0 es el background, pero en nuestro caso
+        #   no queremos la clase background. Cuando generamos el BEVDataset se
+        #   pone como 0 las regiones que no interesan así que hay que mappear los
+        #   0s a 255 ("ignore")
+
+        self.id2label[255] = 'ignore'
+        self.label2id['ignore'] = 255
+        # self.id2color[255] = (255, 255, 255)
+    
+    def __getitem__(self, index):
+        """
+        INPUT:
+            Index of the current dataset sample
+        OUTPUT:
+            encoded bev image/target as follows:
+            encoded_inputs = {
+                "pixel_values": BGR image!!!
+                "labels": target
+            }
+        """
+        image, target = super().__getitem__(index)
+        target[target == 0] = 255
+
+        # Perform data preparation with image_processor 
+        # (it shoul be from transformers:SegformerImageProcessor)
+        encoded_inputs = self.image_processor(image, target, return_tensors="pt")
+        
+        # Remove the batch_dim from each sample
+        for k,v in encoded_inputs.items():
+          encoded_inputs[k].squeeze_()
+
+        # encoded_inputs = {
+        #     'pixel_values': image,
+        #     'labels': target
+        # }
+
+        return encoded_inputs
 
 class NuImagesBEVDataset(NuImagesDataset):
     """
