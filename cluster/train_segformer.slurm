@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH -J agarciaj_SegformerTraining
+#SBATCH -J agarciaj_SegformerTraining_test
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=agarciaj@vicomtech.org
-#SBATCH --time=00-16:00:00
-#SBATCH --gres=gpu:2
+#SBATCH --time=00-1:00:00
+#SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=4G
+#SBATCH --cpus-per-task=2
+#SBATCH --mem-per-cpu=8G
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
