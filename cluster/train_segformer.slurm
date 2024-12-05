@@ -16,6 +16,6 @@ srun --pty singularity run --nv $(cat <<EOF
     --bind /home/agarciaj/bev2seg_2/tmp/models:/models \
     --bind /home/agarciaj/bev2seg_2/config:/config \
     ./bev2seg_2_v0.2.sif \
-    /scripts/train_segformer.py /config/segformer.toml
+    /scripts/train_segformer.py /config/segformer_bev.toml
 EOF
 )
