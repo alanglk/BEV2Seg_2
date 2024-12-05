@@ -6,7 +6,7 @@ testing = true      # if set, the 'mini' version of the dataset
 
 [model]
 output_path = "/models"
-model_name = "model1"
+model_name = "segformer_bev"
 pretrained = "nvidia/mit-b0"
 
 [training]
