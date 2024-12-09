@@ -38,6 +38,12 @@ def compute_metrics(eval_pred):
     ).argmax(dim=1)
 
     pred_labels = logits_tensor.detach().cpu().numpy()
+
+    print("PRED_LABELS")
+    print(pred_labels)
+    print("LABELS")
+    print(labels)
+
     metrics = metric.compute(
         predictions=pred_labels,
         references=labels,
