@@ -2,7 +2,14 @@ services:
   tensorboard:
     image: tensorflow/tensorflow
     volumes:
-      - ../tmp/models/runs:/runs
+      - ../models/segformer_bev/runs:/runs
     ports:
       - 6006:6006
-    command: tensorboard --logdir /runs
+    command: tensorboard --logdir /runs --port 6006 --bind_all
+    restart: on-failure:10
+    healthcheck:
+      test: curl --fail -s http://localhost:6006 || exit 1
+      interval: 60s
+      timeout: 6s
+      retries: 3
+      start_period: 30s
