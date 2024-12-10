@@ -72,26 +72,3 @@ class Dataset2BEV():
         image_bev = self._img2bev(image)
         target_bev = self._target2bev(target)
         return image_bev, target_bev
-
-
-def _test(camera_name, image_path, openlabel_path):
-    image = Image.open(image_path)
-    image = np.array(image.convert("RGB"))
-    
-    vcd = core.VCD()
-    vcd.load_from_file(openlabel_path)
-    scene = scl.Scene(vcd)
-    bev_g = Dataset2BEV(cam_name=camera_name, scene=scene)
-
-    bev_image = bev_g.src_img2bev(image)
-
-    cv2.namedWindow("BEV_vcd", cv2.WINDOW_NORMAL)
-    cv2.imshow("BEV_vcd", bev_image)
-    cv2.waitKey(0)
-
-
-if __name__ == "__main__":
-    _test(camera_name="camera_front", 
-         image_path="./data/images/setup1.png",
-         openlabel_path="./data/images/json/setup1.json"
-         )
