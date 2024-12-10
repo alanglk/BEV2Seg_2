@@ -21,31 +21,37 @@ import argparse
 import toml
 import os
 
+from PIL import Image
+
 import warnings
 warnings.filterwarnings("ignore")
 metric = evaluate.load("mean_iou")
 
-def compute_metrics(eval_pred):
-  with torch.no_grad():
-    logits, labels = eval_pred
-    logits_tensor = torch.from_numpy(logits)
+import datasets
+datasets.Image
+
+def preprocess_logits_for_metrics(logits, labels):
+    """
+    Original Trainer may have a memory leak. 
+    This is a workaround to avoid storing too many tensors that are not needed.
+    """
     # scale the logits to the size of the label
-    logits_tensor = F.interpolate(
-        logits_tensor,
+    pred_ids = F.interpolate(
+        logits,
         size=labels.shape[-2:],
         mode="bilinear",
         align_corners=False,
     ).argmax(dim=1)
+    return pred_ids
 
-    pred_labels = logits_tensor.detach().cpu().numpy()
+def compute_metrics(eval_pred):
+  with torch.no_grad():
+    logits, labels = eval_pred
+    if isinstance(logits, torch.Tensor):
+        logits = logits.detach().cpu().numpy()
 
-    print("PRED_LABELS")
-    print(pred_labels)
-    print("LABELS")
-    print(labels)
-
-    metrics = metric.compute(
-        predictions=pred_labels,
+    metrics = metric._compute(
+        predictions=logits,
         references=labels,
         num_labels=num_labels,
         ignore_index=255,
@@ -66,11 +72,12 @@ def main(config: dict):
     model_name = config['model']['model_name']
     
     # Hyperparams
-    ls_steps        = 4     #Logging and Saving steps
+    ls_steps        = config['training']['ls_steps']     # 100 Logging and Saving steps
     batch_size      = config['training']['batch_size']
     train_epochs    = config['training']['epochs']
     initial_lr      = config['training']['learning_rate']
     weight_decay    = config['training']['weight_decay']
+    val_acc_steps   = config['training']['val_acc_steps'] if 'val_acc_steps' in config['training'] else None
 
     # Dataset and Dataloader
     image_processor = SegformerImageProcessor(reduce_labels=True)
@@ -79,7 +86,7 @@ def main(config: dict):
     if config['data']['type'] == 'BEVDataset':
         if config['data']['testing'] == True:
             train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
-            eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
+            eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val', image_processor=image_processor)
         else:
             train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='train', image_processor=image_processor)
             eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor)
@@ -108,20 +115,22 @@ def main(config: dict):
         overwrite_output_dir = False,
 
         # Evaluation config
-        eval_strategy="epoch",      # ["no", "steps", "epoch"]
+        eval_strategy="steps",      # ["no", "steps", "epoch"]
         #eval_steps=... (default: logging_steps if eval_strategy="steps" is set)
         metric_for_best_model="mean_accuracy",
+        eval_accumulation_steps=val_acc_steps,
+        #metric_for_best_model="loss",
 
         # Checkpointing config
-        save_strategy="epoch",      # ["no", "steps", "epoch"]
-        # save_steps=ls_steps,      # (default: 500) only applied if save_strategy="steps" 
+        save_strategy="steps",      # ["no", "steps", "epoch"]
+        save_steps=ls_steps,        # (default: 500) only applied if save_strategy="steps" 
         save_total_limit=5,         # save the best 4 checkpoints and the final model
         load_best_model_at_end=True,
         
         # Logging config
-        logging_strategy="epoch",   # ["no", "steps", "epoch"]
+        logging_strategy="steps",   # ["no", "steps", "epoch"]
         logging_first_step=True,
-        # logging_steps=ls_steps,   # (default: 500) only applied if logging_strategy="steps" 
+        logging_steps=ls_steps,   # (default: 500) only applied if logging_strategy="steps" 
         report_to="tensorboard",
         
         # Hyperparameters
@@ -138,7 +147,9 @@ def main(config: dict):
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         compute_metrics=compute_metrics,
+        preprocess_logits_for_metrics=preprocess_logits_for_metrics
     )
+
     trainer.train()
 
 if __name__ == "__main__":
