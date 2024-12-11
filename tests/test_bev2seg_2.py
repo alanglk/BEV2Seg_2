@@ -2,7 +2,7 @@
 from src.bev2seg_2 import Raw_BEV2Seg#, Raw2Seg_BEV
 
 # NuImages color palette
-from oldatasets.NuImages.nulabels import nuid2color
+#from oldatasets.NuImages.nulabels import nuid2color
 
 from typing import List
 import numpy as np
@@ -47,13 +47,23 @@ def test_rawbev2seg():
     
     # Load image
     image = cv2.imread(test_image_path)
-    cv2.imshow("Input Image", image)
-    cv2.waitKey(0)
+    # cv2.imshow("Input Image", image)
+    # cv2.waitKey(0)
 
     # raw_seg2bev instance
     raw_seg2bev = Raw_BEV2Seg(RAW2SEG_MODEL_PATH, test_openlabel_path)
+    
     bev_mask = raw_seg2bev.generate_bev_segmentation(image, 'CAM_FRONT')
 
-    cv2.imshow("BEV Segmentation mask", raw_seg2bev.mask2image(bev_mask, nuid2color))
-    cv2.waitKey(0)
+    bev_labels = np.unique(bev_mask)
+    bev_labelnames = [ raw_seg2bev.id2label[l] for l in bev_labels ]
+    bev_color = raw_seg2bev.mask2image(bev_mask)
     
+    print(f"SegFormer id2label:\n{raw_seg2bev.id2label}")
+    print(f"SegFormer id2color: {raw_seg2bev.id2color}")
+    print(f"unique labels: {bev_labels}")
+    print(f"label names: {bev_labelnames}")
+
+    cv2.imshow("BEV Segmentation mask", bev_color)
+    cv2.waitKey(0)
+    assert False

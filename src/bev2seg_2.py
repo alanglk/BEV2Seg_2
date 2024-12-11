@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 from vcd import core, utils, draw, scl
 
+# NuImages color palette
+from oldatasets.NuImages.nulabels import nuid2color
 
 from typing import Union
 from abc import ABC, abstractmethod
@@ -28,10 +30,13 @@ class BEV2SEG_2_Interface(ABC):
 
     def __init__(self, model_path:str, openlabel_path: str):
         # SegFormer Model
-        self.image_processor = SegformerImageProcessor(reduce_labels=True)
+        self.image_processor = SegformerImageProcessor(reduce_labels=False)
         self.model_path = model_path
         self.model = SegformerForSemanticSegmentation.from_pretrained(self.model_path)
-        
+        self.label2id = self.model.config.label2id
+        self.id2label = self.model.config.id2label
+        self.id2color = {k-1: v for k, v in nuid2color.items()}
+        self.id2color[255] = (0, 0, 0)
 
         # BEV Parameters
         bev_aspect_ratio = self.BEV_WIDTH / self.BEV_HEIGH
@@ -86,7 +91,7 @@ class BEV2SEG_2_Interface(ABC):
 
         return encoded_inputs
     
-    def mask2image(self, mask: Union[torch.Tensor, np.ndarray], colormap: dict) -> np.ndarray:
+    def mask2image(self, mask: Union[torch.Tensor, np.ndarray], colormap: dict = None) -> np.ndarray:
         """
         Converts seg mask into BGR image!!!
         INPUT:
@@ -98,6 +103,9 @@ class BEV2SEG_2_Interface(ABC):
         if isinstance(mask, torch.Tensor):
             mask = mask.numpy()
         
+        if colormap is None:
+            colormap = self.id2color
+
         res_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
         for label, rgb_col in colormap.items():
             res_mask[mask == label] = rgb_col
@@ -153,7 +161,7 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
         """
         super().__init__(model_path, openlabel_path)
     
-    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None):
+    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None) -> np.ndarray:
         # IPM to BEV image
         bev_image = self.inverse_perspective_mapping(image, camera_name)
         # cv2.imshow("BEV image", bev_image)
