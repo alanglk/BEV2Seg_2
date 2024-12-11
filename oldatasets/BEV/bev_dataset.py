@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 import cv2
 import os
+import time
 
 class BEVDataset(Dataset):
     """
@@ -149,11 +150,19 @@ class BEVFeatureExtractionDataset(BEVDataset):
                 "labels": target
             }
         """
-        image, target = super().__getitem__(index)
+        # image, target = super().__getitem__(index)
+        
+        bev_path, semantic_path = self._get_item_paths(index)
+
+        image   = Image.open(bev_path)      # BGR
+        target  = Image.open(semantic_path) # BGR
+
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)
+        # time_prev = time.time_ns
         encoded_inputs = self.image_processor(image, target, return_tensors="pt")
+        #print(f"Ellapsed time: {time.time_ns- time_prev}")
         
         # Remove the batch_dim from each sample
         for k,v in encoded_inputs.items():
