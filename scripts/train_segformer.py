@@ -85,8 +85,8 @@ def main(config: dict):
     
     if config['data']['type'] == 'BEVDataset':
         if config['data']['testing'] == True:
-            train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
-            eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val', image_processor=image_processor)
+            train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val', image_processor=image_processor)
+            eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
         else:
             train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='train', image_processor=image_processor)
             eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor)
