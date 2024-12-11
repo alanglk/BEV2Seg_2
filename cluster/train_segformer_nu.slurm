@@ -3,7 +3,7 @@
 #SBATCH -J agarciaj_SegformerTraining_onNuImages
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=agarciaj@vicomtech.org
-#SBATCH --time=00-24:00:00
+#SBATCH --time=14-00:00:00
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
