@@ -1,6 +1,6 @@
 [data]
 type = "BEVDataset" # [NuImages, BEVDataset] 
-dataroot = "/BEVDataset"
+dataroot = "/dataset"
 testing = false     # if set, the 'mini' version of the dataset 
                     # will be taken as trainig and evaluation sets
 

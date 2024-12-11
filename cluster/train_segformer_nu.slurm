@@ -12,8 +12,8 @@
 #SBATCH --error=%x-%j.err
 
 srun --pty singularity run --nv $(cat <<EOF
-    --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/NuImages \
-    --bind /home/agarciaj/bev2seg_2/tmp/models:/models \
+    --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/dataset \
+    --bind /home/agarciaj/bev2seg_2/models:/models \
     --bind /home/agarciaj/bev2seg_2/config:/config \
     ./bev2seg_2_v0.2.sif \
     /scripts/train_segformer.py /config/segformer_nu.toml

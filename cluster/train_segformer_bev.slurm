@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J agarciaj_SegformerTraining_test_onNuImages15
+#SBATCH -J agarciaj_SegformerTraining_onBEVDataset
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=agarciaj@vicomtech.org
 #SBATCH --time=00-24:00:00
@@ -11,20 +11,10 @@
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
-# srun --pty singularity run --nv $(cat <<EOF
-#     --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/BEVDataset \
-#     --bind /home/agarciaj/bev2seg_2/tmp/models:/models \
-#     --bind /home/agarciaj/bev2seg_2/config:/config \
-#     ./bev2seg_2_v0.2.sif \
-#     /scripts/train_segformer.py /config/segformer_bev.toml
-# EOF
-# )
-# Lo mismo pero haciendo bind de scripts para desarrollar
 srun --pty singularity run --nv $(cat <<EOF
-    --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/BEVDataset \
-    --bind /home/agarciaj/bev2seg_2/tmp/models:/models \
+    --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/dataset \
+    --bind /home/agarciaj/bev2seg_2/models:/models \
     --bind /home/agarciaj/bev2seg_2/config:/config \
-    --bind /home/agarciaj/bev2seg_2/scripts:/scripts \
     ./bev2seg_2_v0.2.sif \
     /scripts/train_segformer.py /config/segformer_bev.toml
 EOF
