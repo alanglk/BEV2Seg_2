@@ -4,8 +4,11 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 # pip install nuscenes-devkit # Parser for NuImages dataset
-from nuimages import NuImages
-from nuimages.utils.utils import mask_decode 
+# from nuimages import NuImages
+# from nuimages.utils.utils import mask_decode
+
+from oldatasets.NuImages.nuimages_sdk.nuimages import NuImages
+from oldatasets.NuImages.nuimages_sdk.utils import mask_decode
 
 # Utils from the same package
 from oldatasets.NuImages.nulabels import nulabels, nuname2label, nuid2name, nuid2color

@@ -4,7 +4,7 @@ import os
 from oldatasets.common import display_images
 from oldatasets.NuImages import NuImagesDataset, NuImagesFeatureExtractionDataset
 
-NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
+NUIMAGES_PATH = "./tmp/NuImages"
 OUTPUT_PATH = "./tests/tmp/NuImages/mini"
 
 DISPLAY_IMAGES = True

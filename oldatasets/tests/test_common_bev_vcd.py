@@ -4,7 +4,7 @@ from vcd import core, scl
 
 from oldatasets.common import Dataset2BEV, display_image
 
-NUIMAGES_PATH   = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
+NUIMAGES_PATH   = "./tmp/NuImages"
 TMP_DIR         = "./tests/tmp/BEVDataset"
 SAMPLE_IMAGE    = "samples/CAM_FRONT_RIGHT/n013-2018-08-27-14-41-26+0800__CAM_FRONT_RIGHT__1535352274870176.jpg"
 SAMPLE_TOKEN    = "0128b121887b4d0d86b8b1a43ac001e9"
