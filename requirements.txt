@@ -1,5 +1,8 @@
 vcd
-nuscenes-devkit
+
+pyquaternion
+pycocotools
+
 opencv-python
 matplotlib
 torch
