@@ -11,7 +11,7 @@ pretrained = "nvidia/mit-b0"
 
 [training]
 batch_size = 4
-epochs = 1
+epochs = 100
 learning_rate = 0.001
 weight_decay = 0
 ls_steps = 5        # Logging/Saving steps

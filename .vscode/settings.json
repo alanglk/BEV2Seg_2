@@ -1,7 +1,7 @@
 {
-    "python.analysis.extraPaths": ["/opt/conda/bin/activate"],
+    "python.analysis.extraPaths": [".venv/bin/activate"],
     "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.defaultInterpreterPath": "/opt/conda/bin/python3",
+    "python.defaultInterpreterPath": "./.venv/bin/python3",
     "terminal.integrated.env.linux": {
         "PYTHONPATH": "${workspaceFolder}"
     },

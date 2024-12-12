@@ -65,6 +65,7 @@ Para monitorizar el entrenamiento con tensorboard se puede utilizar el siguiente
 
 ```bash
 #sshfs agarciaj@zegama002:/home/agarciaj/bev2seg_2/tmp/models /home/VICOMTECH/agarciaj/GitLab/bev2seg_2/tmp/models
+#sshfs agarciaj@zegama002:/gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages /workspaces/bev2seg_2/tmp/NuImages
 #docker run -v ./tmp/models/<model_name>/runs:/runs -p 6006:6006 tensorflow/tensorflow tensorboard --logdir /runs
 docker plugin install vieux/sshfs
 cd docker && docker compose up
@@ -94,6 +95,9 @@ docker run -it \
 
 Si se quiere generar el BEVDataset en el HPC hay que utilizar la imagen de Singularity generada y ejecutarla ya sea en un job o en una interfaz interactiva:
 
+´´´bash
+bash docker/train_segformer.sh -d ./tmp/BEVDataset/ -m ./models/ -c ./config/test.toml -g 2,3
+´´´
 
 ## High Performance Computing (HPC)
 ```bash

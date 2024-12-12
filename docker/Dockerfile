@@ -4,7 +4,7 @@ ARG USER_ID
 ARG GROUP_ID
 
 # Install general dependencies
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 sudo -y
 
 # /lib directory allocates all the libraries developed and
 #   necessary for the script's execution
@@ -23,7 +23,10 @@ COPY ./scripts /scripts
 RUN chmod +x /scripts/*.py
 
 # # Create nonroot user
-RUN groupadd -g ${GROUP_ID} user && useradd -m -u ${USER_ID} -g ${GROUP_ID} user
+RUN groupadd -g ${GROUP_ID} user && \
+    useradd -m -u ${USER_ID} -g ${GROUP_ID} user && \
+    echo 'user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-user && \
+    passwd -d user 
 USER user
 
 # Define ENTRYPOINT para ejecutar scripts en /scripts

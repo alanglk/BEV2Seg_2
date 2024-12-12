@@ -13,8 +13,8 @@ import os
 from PIL import Image
 
 BEV_DATASET_PATH    = "tmp/BEVDataset"
-RAW2SEG_MODEL_PATH  = "tmp/models/segformer_bev_test/checkpoint-9" # Change this
-BEV2SEG_MODEL_PATH  = "tmp/models/segformer_bev_test/checkpoint-9"
+RAW2SEG_MODEL_PATH  = "models/segformer_bev_test/overfitted_model" # Change this
+BEV2SEG_MODEL_PATH  = "models/segformer_bev_test/overfitted_model"
 
 def check_paths(paths: List[str]):
     for path in paths:

@@ -29,10 +29,15 @@ class BEV2SEG_2_Interface(ABC):
     BEV_HEIGH = 1024
 
     def __init__(self, model_path:str, openlabel_path: str):
-        # SegFormer Model
+        # Load Image Processor
         self.image_processor = SegformerImageProcessor(reduce_labels=False)
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        
+        # Load SegFormer Model
         self.model_path = model_path
         self.model = SegformerForSemanticSegmentation.from_pretrained(self.model_path)
+        self.model.to(self.device)
+        
         self.label2id = self.model.config.label2id
         self.id2label = self.model.config.id2label
         self.id2color = {k-1: v for k, v in nuid2color.items()}
@@ -152,7 +157,6 @@ class BEV2SEG_2_Interface(ABC):
 # 
 # 
 
-
 class Raw_BEV2Seg(BEV2SEG_2_Interface):
 
     def __init__(self, model_path: str, openlabel_path: str):
@@ -170,9 +174,10 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
         # Inference
         encoded = super().preprocess_image(bev_image)
         with torch.no_grad():
-            outputs = self.model( encoded['pixel_values'] )
+            outputs = self.model( encoded['pixel_values'].to(self.device) )
+            
         bev_mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[bev_image.shape[:2]])[0]
-        bev_mask = bev_mask.cpu().numpy()
+        bev_mask = bev_mask.deatach().cpu().numpy()
 
         # cv2.imshow("Segmentation mask", self.mask2image(bev_mask, nuid2color))
         # cv2.waitKey(0)

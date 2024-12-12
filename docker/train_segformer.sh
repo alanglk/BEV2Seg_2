@@ -77,7 +77,7 @@ ARGS=$(cat <<EOF
     -v ${DATAROOT_PATH}:/dataset:ro \
     -v ${CONFIG_DIR}:/config:ro \
     -v ${MODELS_PATH}:/models \
-    agarciaj/bev2seg_2:v0.2 \
+    agarciaj/bev2seg_2:v0.3 \
     bash -c "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES /scripts/train_segformer.py /config/${CONFIG_FILE}"
 EOF
 )

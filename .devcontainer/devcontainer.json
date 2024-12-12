@@ -1,18 +1,20 @@
 {
   "name": "bev2seg_2",
-  "image": "agarciaj/bev2seg_2:v0.2", //"python-sam2:latest", mcr.microsoft.com/devcontainers/python:3
+  "image": "agarciaj/bev2seg_2:v0.3", //"python-sam2:latest", mcr.microsoft.com/devcontainers/python:3
   //"forwardPorts": [3000],
   //"postCreateCommand": "",
   "customizations": {
     "vscode": {
-      "extensions": ["ms-python.python", "ms-python.debugpy", "ms-toolsai.jupyter", "tamasfe.even-better-toml"]
+      "extensions": ["ms-python.python", "ms-python.debugpy", "ms-toolsai.jupyter"]
     }
   },
   "runArgs": [
         "--net", "host", 
+        "--privileged",
         "-e", "DISPLAY=${env:DISPLAY}",
         "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
         "--gpus",
         "all"
   ]
+  // "remoteUser": "vscode"
 }
