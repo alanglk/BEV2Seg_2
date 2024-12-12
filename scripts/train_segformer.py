@@ -85,7 +85,7 @@ def main(config: dict):
     
     if config['data']['type'] == 'BEVDataset':
         if config['data']['testing'] == True:
-            train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val', image_processor=image_processor)
+            train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
             eval_dataset    = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
         else:
             train_dataset   = BEVFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='train', image_processor=image_processor)
@@ -108,7 +108,10 @@ def main(config: dict):
                                                           num_labels=len(train_dataset.id2label),
                                                           id2label=train_dataset.id2label,
                                                           label2id=train_dataset.label2id)
-    
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    print(f"USING DEVICE: {device}")
+    model.to(device)
+
     # Training Args
     training_args = TrainingArguments(
         output_dir=os.path.join(output_path, model_name),

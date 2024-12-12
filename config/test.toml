@@ -1,18 +1,18 @@
 [data]
 type = "BEVDataset" # [NuImages, BEVDataset] 
-dataroot = "tmp/BEVDataset"
+dataroot = "/dataset"
 testing = true     # if set, the 'mini' version of the dataset 
                     # will be taken as trainig and evaluation sets
 
 [model]
-output_path = "tmp/models"
+output_path = "/models"
 model_name = "segformer_bev_test"
 pretrained = "nvidia/mit-b0"
 
 [training]
-batch_size = 16
+batch_size = 4
 epochs = 1
 learning_rate = 0.001
 weight_decay = 0
 ls_steps = 5        # Logging/Saving steps
-val_acc_steps = 32  # (optional)
+# val_acc_steps = 32  # (optional)
