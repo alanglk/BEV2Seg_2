@@ -399,6 +399,8 @@ class NuImagesFeatureExtractionDataset(NuImagesDataset):
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)
+        print(f"Image shape: {image.shape}")
+        print(f"Target shape: {target.shape}")
         encoded_inputs = self.image_processor(image, target, return_tensors="pt")
         
         # Remove the batch_dim from each sample

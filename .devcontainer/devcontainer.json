@@ -5,7 +5,7 @@
   //"postCreateCommand": "",
   "customizations": {
     "vscode": {
-      "extensions": ["ms-python.python", "ms-python.debugpy", "ms-toolsai.jupyter"]
+      "extensions": ["ms-python.python", "ms-python.debugpy", "ms-toolsai.jupyter", "tamasfe.even-better-toml"]
     }
   },
   "runArgs": [

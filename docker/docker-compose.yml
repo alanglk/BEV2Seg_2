@@ -2,7 +2,7 @@ services:
   tensorboard:
     image: tensorflow/tensorflow
     volumes:
-      - ../models/segformer_bev_test/runs:/runs
+      - ../models/segformer_bev/runs:/runs
     ports:
       - 6006:6006
     user: "${UID}:${GID}"

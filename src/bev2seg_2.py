@@ -128,40 +128,39 @@ class BEV2SEG_2_Interface(ABC):
         """
         raise NotImplementedError
 
-# class Raw2Seg_BEV(BEV2SEG_2_Interface):
-# 
-#     def __init__(self, model_path: str, openlabel_path: str):
-#         """
-#         Semantic Segmentation on Raw image and then IPM to Bird's Eye View.
-#         """
-#         super().__init__(model_path, openlabel_path)
-#     
-#     def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None):
-#         
-#         # Inference
-#         encoded = super().preprocess_image(image)
-#         with torch.no_grad():
-#             outputs = self.model( encoded['pixel_values'] )
-#         raw_mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[image.size[::-1]])[0]
-#         raw_mask = raw_mask.cpu().numpy() # expected (batch_dim, height, width); received (H, W)
-#         print(raw_mask.shape)
-# 
-#         # Generate BEV mask
-#         # TODO: complete this
-#         raw_mask = np.expand_dims(raw_mask, 0).repeat(3, axis=0)
-#         raw_mask = np.moveaxis(raw_mask, 0, -1) # expected (batch_dim, H, W, 3)
-#         
-#         print(raw_mask.shape)
-#         bev_mask = self.inverse_perspective_mapping(raw_mask, camera_name)
-#         return bev_mask
-# 
-# 
+class Raw2Seg_BEV(BEV2SEG_2_Interface):
+
+    def __init__(self, model_path: str, openlabel_path: str):
+        """
+        Semantic Segmentation on Raw image and then IPM to Bird's Eye View.
+        Normal -> Segmentation -> BEV
+        """
+        super().__init__(model_path, openlabel_path)
+    
+    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None):
+        
+        # Inference
+        encoded = super().preprocess_image(image)
+        with torch.no_grad():
+            outputs = self.model( encoded['pixel_values'].to(self.device) )
+        mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[image.shape[:2]])[0]
+        mask = mask.detach().cpu().numpy()
+        return mask
+        cv2.imshow("Normal Segmentation mask", self.mask2image(mask, nuid2color))
+        cv2.waitKey(0)
+
+        # Generate BEV mask
+        # bev_mask = self.inverse_perspective_mapping(mask, camera_name)
+        # return bev_mask
+
+
 
 class Raw_BEV2Seg(BEV2SEG_2_Interface):
 
     def __init__(self, model_path: str, openlabel_path: str):
         """
-        IPM to Bird's Eye View and then Semantic Segmentation on the BEV Space
+        IPM to Bird's Eye View and then Semantic Segmentation on the BEV Space.
+        Normal -> BEV -> Segmentation
         """
         super().__init__(model_path, openlabel_path)
     
@@ -177,9 +176,9 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
             outputs = self.model( encoded['pixel_values'].to(self.device) )
             
         bev_mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[bev_image.shape[:2]])[0]
-        bev_mask = bev_mask.deatach().cpu().numpy()
+        bev_mask = bev_mask.detach().cpu().numpy()
 
-        # cv2.imshow("Segmentation mask", self.mask2image(bev_mask, nuid2color))
+        # cv2.imshow("BEV Segmentation mask", self.mask2image(bev_mask, nuid2color))
         # cv2.waitKey(0)
         return bev_mask
 

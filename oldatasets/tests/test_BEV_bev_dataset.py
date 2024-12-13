@@ -56,7 +56,7 @@ def test_segformer_feature_extraction_dataset():
             target_fe = dataset_fe.target2image(encoded['labels'])
             display_images("Encoded Targets", [target_bev, target_fe])
         
-    
+    assert False
 
 
 
