@@ -14,7 +14,7 @@
 srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/nuimages --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/NuImagesFormatted/:/NuImagesFormatted ./bev2seg_2_v0.3.sif $(cat <<EOF
     python3 /scripts/generate_NuImagesFormatted_from_NuImages.py \
     /nuimages \
-    /BEVDataset \
+    /NuImagesFormatted \
     --version "all" \
     --cam_name "CAM_FRONT"
 EOF
