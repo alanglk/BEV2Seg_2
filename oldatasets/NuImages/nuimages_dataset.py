@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, ToPILImage
 
 # pip install nuscenes-devkit # Parser for NuImages dataset
 # from nuimages import NuImages
@@ -18,6 +18,7 @@ from vcd import core, types, scl, utils
 import numpy as np
 import cv2
 import os
+from PIL import Image
 
 from typing import Union
 
@@ -286,6 +287,29 @@ class NuImagesDataset(Dataset):
     def __len__(self):
         return len(self.samples_indices)
     
+    def _get_imagepath_target(self, index):
+        """Chapuza que se llama desde NuImagesFeatureExtractor"""
+        assert index < len(self)
+
+        # Get the current sample and associated data
+        sample = self.nuim.sample[self.samples_indices[index]]        
+        sample_token= sample['key_camera_token']
+
+        sample_data             = self.nuim.get('sample_data', sample_token)
+        img_width, img_height   = ( sample_data['width'], sample_data['height'] )
+        filename                = sample_data['filename']
+        raw_img_path            = os.path.join(self.dataroot, filename)
+
+        # Annotations
+        anns = self.samle2ann[sample_token]
+        target = np.zeros((img_height, img_width)) # Semantic mask
+        for ann in anns:
+            mask = mask_decode(ann['mask'])
+            label = self.nutoken2label[ann['category_token']]
+            target[mask == 1] = label.trainId
+               
+        return raw_img_path, target
+
     def __getitem__(self, index):
         """
         INPUT:
@@ -394,13 +418,13 @@ class NuImagesFeatureExtractionDataset(NuImagesDataset):
                 "labels": target
             }
         """
+        # Image shape: torch.Size([3, 900, 1600])
+        # Target shape: torch.Size([1, 900, 1600])
         image, target = super().__getitem__(index)
         # target[target == 0] = 255
 
         # Perform data preparation with image_processor 
-        # (it shoul be from transformers:SegformerImageProcessor)
-        print(f"Image shape: {image.shape}")
-        print(f"Target shape: {target.shape}")
+        # (it shoul be from transformers:SegformerImageProcessor)         
         encoded_inputs = self.image_processor(image, target, return_tensors="pt")
         
         # Remove the batch_dim from each sample
@@ -558,6 +582,43 @@ class NuImagesBEVDataset(NuImagesDataset):
                 nuol.save_openlabel()
 
         return image_bev, target_bev
+
+def generate_NuImagesFormatted_from_NuImages(dataset_path:str, out_path:str, version='mini', cam_name = None) -> tuple:
+    """
+    Read the NuImages Dataset and write it on the desired format:
+    NuImagesFormatted/
+        - mini/
+            - image1_raw.png
+            - image1_semantic.png
+            - image1_color.png
+        ...
+    INPUT:
+        - dataset_path:   root directory path of the NuImages dataset
+        - out_path:       desired output folder
+        - version:        version of the NuImages dataset. ['mini', train', 'val', 'test']
+        - cam_name:       name of the camera channel to generate the BEVDataset. It not set all the cameras will be generated.
+    OUTPUT: Number of correctly generated samples
+    """
+
+    dataset = NuImagesDataset(
+                dataroot=dataset_path, 
+                version=version,
+                camera=cam_name,
+                save_dataset=True,
+                output_path=out_path)
+    
+    total = len(dataset)
+    error_indexes = []
+    for i in range(total):
+        progress_bar(total, i +1)
+        try:
+            dataset.__getitem__(i)
+
+        except Exception as e:
+            error_indexes.append(i)
+    
+    total_generated = total - len(error_indexes)
+    return total_generated, error_indexes
 
 def generate_BEVDataset_from_NuImages(dataset_path:str, out_path:str, version='mini', cam_name = None) -> tuple:
     """

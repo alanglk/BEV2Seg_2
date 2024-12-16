@@ -4,7 +4,7 @@ ARG USER_ID
 ARG GROUP_ID
 
 # Install general dependencies
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 sudo -y
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 sshfs sudo -y
 
 # /lib directory allocates all the libraries developed and
 #   necessary for the script's execution

@@ -154,11 +154,8 @@ class BEVFeatureExtractionDataset(BEVDataset):
         
         bev_path, semantic_path = self._get_item_paths(index)
 
-        image   = Image.open(bev_path)      # BGR
-        target  = Image.open(semantic_path) # BGR
-
-        print(f"Image shape: {np.array(image.convert('RGB')).shape}")
-        print(f"Target shape: {np.array(target.convert('RGB')).shape}")
+        image   = Image.open(bev_path)      # RGB (1024, 1024, 3)
+        target  = Image.open(semantic_path) # RGB (1024, 1024, 3)
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)

@@ -82,6 +82,20 @@ ARGS=$(cat <<EOF
 EOF
 )
 
+# Command for mounting the dataset inside the container
+# screen -dmS "train_segformer_nu.toml" bash -c "docker run $(cat <<EOF
+#     -it \
+#     --user root \
+#     --gpus all \
+#     --privileged \
+#     -v ./config:/config:ro \
+#     -v ./models:/models \
+#     agarciaj/bev2seg_2:v0.3 \
+#     bash -c "mkdir /dataset && sshfs agarciaj@zegama002:/gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages /dataset && CUDA_VISIBLE_DEVICES=2,3 /scripts/train_segformer.py /config/segformer_nu.toml"
+# EOF
+# ) | tee -a models/train_segformer_nu.toml_$(date +%s).log"
+
+
 # Imprimir el comando y ejecutarlo
 echo docker run $ARGS
 echo

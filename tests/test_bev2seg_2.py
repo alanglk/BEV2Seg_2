@@ -14,7 +14,7 @@ from PIL import Image
 
 BEV_DATASET_PATH    = "tmp/BEVDataset"
 RAW2SEG_MODEL_PATH  = "models/segformer_nu_test/overfitted_model"
-BEV2SEG_MODEL_PATH  = "models/segformer_bev_test/overfitted_model"
+BEV2SEG_MODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.1"
 
 def check_paths(paths: List[str]):
     for path in paths:
@@ -51,6 +51,7 @@ def test_raw2segbev():
 def test_rawbev2seg():
     """Test of the Raw -> Bev -> Seg pipeline"""
     image_id = "60d367ec0c7e445d8f92fbc4a993c67e"
+    # image_id = "2940ea9eda6c4cf6b6a30a47d579cd1c"
     test_image_path     = os.path.join(BEV_DATASET_PATH, "mini", image_id + "_raw.png") 
     test_openlabel_path = os.path.join(BEV_DATASET_PATH, "mini", image_id + ".json") 
     check_paths([BEV_DATASET_PATH, BEV2SEG_MODEL_PATH, test_image_path, test_openlabel_path])

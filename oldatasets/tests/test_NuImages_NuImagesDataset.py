@@ -2,7 +2,9 @@
 import os
 
 from oldatasets.common import display_images
-from oldatasets.NuImages import NuImagesDataset, NuImagesFeatureExtractionDataset
+from oldatasets.NuImages import NuImagesDataset, NuImagesFeatureExtractionDataset, generate_NuImagesFormatted_from_NuImages
+
+import cv2
 
 NUIMAGES_PATH = "./tmp/NuImages"
 OUTPUT_PATH = "./tests/tmp/NuImages/mini"
@@ -96,6 +98,24 @@ def test_save_generated_CAM_FRONT():
 
     assert len(samples) == 8 # Se han generado los 8 CAM_FRONT de mini
 
+def test_generate_NuImagesFormatted():
+    """
+    Test for generating a complete NuImagesFormatted from a NuImages dataset
+    """
+    assert os.path.exists(OUTPUT_PATH)
+
+    num_generated, _ = generate_NuImagesFormatted_from_NuImages(
+                        dataset_path=NUIMAGES_PATH, 
+                        out_path=OUTPUT_PATH, 
+                        version='mini')
+    
+    files = os.listdir(OUTPUT_PATH)
+
+    samples = [os.path.splitext(f)[0] for f in files if f.endswith('_raw.png')]
+
+    assert num_generated == len(samples)
+    assert num_generated == 50
+
 
 def test_segformer_feature_extraction_dataset():
     from transformers import SegformerImageProcessor
@@ -114,3 +134,4 @@ def test_segformer_feature_extraction_dataset():
             target = dataset.target2image(encoded['labels'])
             display_images("test_featureExtractor_dataset", [image, target])
     
+    assert False
