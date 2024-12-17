@@ -15,4 +15,5 @@ epochs = 100
 learning_rate = 0.001
 weight_decay = 0
 ls_steps = 100 # Logging/Saving steps
-val_acc_steps = 32 # (optional)
+# dataloader_num_workers = 4    # (optional)
+val_acc_steps = 32              # (optional)

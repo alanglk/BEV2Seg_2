@@ -77,6 +77,7 @@ def main(config: dict):
     train_epochs    = config['training']['epochs']
     initial_lr      = config['training']['learning_rate']
     weight_decay    = config['training']['weight_decay']
+    num_workers     = config['training']['dataloader_num_workers'] if 'dataloader_num_workers' in config['training'] else 0
     val_acc_steps   = config['training']['val_acc_steps'] if 'val_acc_steps' in config['training'] else None
 
     # Dataset and Dataloader
@@ -116,6 +117,7 @@ def main(config: dict):
     training_args = TrainingArguments(
         output_dir=os.path.join(output_path, model_name),
         overwrite_output_dir = False,
+        dataloader_num_workers=num_workers,
 
         # Evaluation config
         eval_strategy="steps",      # ["no", "steps", "epoch"]
