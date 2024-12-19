@@ -10,7 +10,8 @@ def test_load_formatted_dataset():
     """
     Test for loading a previously generated BEVDataset
     """
-    dataset = NuImagesFormattedDataset(dataroot=TMP_DIR, version='')
+    dataset = NuImagesFormattedDataset(dataroot=TMP_DIR, version='mini')
+    assert len(dataset) > 0
     
     for i in range(len(dataset)):
         image, target = dataset.__getitem__(i)
@@ -25,6 +26,9 @@ def test_segformer_feature_extraction_dataset():
 
     dataset_nu = NuImagesFormattedDataset(TMP_DIR, 'mini')
     dataset_fe  = NuImagesFormattedFeatureExtractionDataset(TMP_DIR, 'mini', image_processor)
+
+    assert len(dataset_nu) > 0
+    assert len(dataset_fe) > 0
 
     for i in range(len(dataset_nu)):
         image_bev, target_bev = dataset_nu[i]
@@ -56,7 +60,6 @@ def test_segformer_feature_extraction_dataset():
             target_fe = dataset_fe.target2image(encoded['labels'])
             display_images("Encoded Targets", [target_bev, target_fe])
         
-    assert False
 
 
 

@@ -51,7 +51,7 @@ class NuImagesFormattedDataset(Dataset):
         # Load all the tokens from the dataroot folder
         if os.path.isdir(self.dataroot):
             files = os.listdir(self.dataroot)
-            self.data_tokens = [os.path.splitext(f)[0] for f in files if f.endswith('.json')]
+            self.data_tokens = [os.path.splitext(f)[0].replace('_raw', '') for f in files if f.endswith('_raw' + self.image_extension)]
         else:
             raise Exception(f"NuImagesFormatted path not found: {self.dataroot}")
         

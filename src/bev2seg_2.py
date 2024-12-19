@@ -7,9 +7,9 @@ import numpy as np
 from vcd import core, utils, draw, scl
 
 # NuImages color palette
-from oldatasets.NuImages.nulabels import nuid2color
+from oldatasets.NuImages.nulabels import nuid2color, nuid2name
 
-from typing import Union
+from typing import Union, Tuple
 from abc import ABC, abstractmethod
 
 import sys
@@ -29,19 +29,25 @@ class BEV2SEG_2_Interface(ABC):
     BEV_HEIGH = 1024
 
     def __init__(self, model_path:str, openlabel_path: str):
-        # Load Image Processor
-        self.image_processor = SegformerImageProcessor(reduce_labels=False)
-        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        
         # Load SegFormer Model
         self.model_path = model_path
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        
         self.model = SegformerForSemanticSegmentation.from_pretrained(self.model_path)
         self.model.to(self.device)
         
         self.label2id = self.model.config.label2id
         self.id2label = self.model.config.id2label
-        self.id2color = {k-1: v for k, v in nuid2color.items()}
+        self.id2color = nuid2color
+        
+        # Load Image Processor
+        reduce_labels = not self.id2label[0] == nuid2name[0]
+        self.image_processor = SegformerImageProcessor(reduce_labels=reduce_labels)
+        
+        if self.image_processor.do_reduce_labels:
+            self.id2color = {k-1: v for k, v in self.id2color.items()}
         self.id2color[255] = (0, 0, 0)
+
 
         # BEV Parameters
         bev_aspect_ratio = self.BEV_WIDTH / self.BEV_HEIGH
@@ -74,13 +80,28 @@ class BEV2SEG_2_Interface(ABC):
     def inverse_perspective_mapping(self, image: np.ndarray, camera_name: str, frame_num: int = 0) -> np.ndarray:
         """IPM to BEV perspective
         INPUT: 
-        """        
+        """
         sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
         self.drawer.add_images(imgs = {f"{camera_name}": image}, frame_num = frame_num)
         sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
         
-        self.drawer.draw_bevs(_frame_num=frame_num)
-        return self.drawer.topView
+        # self.drawer.draw_bevs(_frame_num=frame_num)
+        # return self.drawer.topView
+    
+        map_x = self.drawer.images[camera_name]["mapX"]
+        map_y = self.drawer.images[camera_name]["mapY"]
+        bev = cv2.remap(image, map_x, map_y,
+            interpolation=cv2.INTER_NEAREST, # cv2.INTER_LINEAR, para que no haya interpolación
+            borderMode=cv2.BORDER_CONSTANT,
+        )
+
+        bev32 = np.array(bev, np.float32)
+        if "weights" in self.drawer.images[camera_name]:
+            cv2.multiply(self.drawer.images[camera_name]["weights"], bev32, bev32)
+
+        return bev32.astype(np.uint8)
+
+
 
     def preprocess_image(self, image: np.ndarray) -> torch.Tensor:
         """Image preprocess for inference"""
@@ -137,21 +158,21 @@ class Raw2Seg_BEV(BEV2SEG_2_Interface):
         """
         super().__init__(model_path, openlabel_path)
     
-    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None):
-        
+    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None) -> Tuple[np.ndarray, np.ndarray]:
         # Inference
         encoded = super().preprocess_image(image)
         with torch.no_grad():
             outputs = self.model( encoded['pixel_values'].to(self.device) )
         mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[image.shape[:2]])[0]
         mask = mask.detach().cpu().numpy()
-        return mask
-        cv2.imshow("Normal Segmentation mask", self.mask2image(mask, nuid2color))
-        cv2.waitKey(0)
+        mask = mask.astype(np.uint8)
 
+        # cv2.imshow("Normal Segmentation mask", self.mask2image(mask, nuid2color))
+        # cv2.waitKey(0)
+        
         # Generate BEV mask
-        # bev_mask = self.inverse_perspective_mapping(mask, camera_name)
-        # return bev_mask
+        bev_mask = self.inverse_perspective_mapping(mask, camera_name)
+        return mask, bev_mask
 
 
 
@@ -177,7 +198,9 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
             
         bev_mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[bev_image.shape[:2]])[0]
         bev_mask = bev_mask.detach().cpu().numpy()
+        bev_mask = bev_mask.astype(np.uint8)
 
+        
         # cv2.imshow("BEV Segmentation mask", self.mask2image(bev_mask, nuid2color))
         # cv2.waitKey(0)
         return bev_mask

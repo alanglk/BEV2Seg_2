@@ -133,7 +133,7 @@ class ScenePCD:
                                     -cam_2d_3d_coords_4x1[0, 0],  # Negate x for the second element
                                     -cam_2d_3d_coords_4x1[1, 0]]) 
                                                 
-                        # Fill aux array                            
+                        # Fill aux array 
                         aux_xyz_3d_coords[j, i][0] = cam_2d_to_lidar_3d_coords_4x1[0]
                         aux_xyz_3d_coords[j, i][1] = cam_2d_to_lidar_3d_coords_4x1[1]
                         aux_xyz_3d_coords[j, i][2] = cam_2d_to_lidar_3d_coords_4x1[2]
@@ -250,6 +250,7 @@ def main(data_folder):
 
     # Cluster PCDs
     cluster_PCD()
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Depth map estimation main script")
     parser.add_argument("--data_folder", type=str, default=f"data/", help="Path to the data folder")

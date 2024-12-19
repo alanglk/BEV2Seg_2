@@ -1,12 +1,12 @@
 [data]
-type = "NuImages"   # [NuImages, BEVDataset] 
+type = "NuImagesFormatted"   # [NuImages, NuImagesFormatted, BEVDataset] 
 dataroot = "/dataset"
 testing = false     # if set, the 'mini' version of the dataset 
                     # will be taken as trainig and evaluation sets
 
 [model]
 output_path = "/models"
-model_name = "segformer_nu"
+model_name = "segformer_nu_formatted"
 pretrained = "nvidia/mit-b0"
 
 [training]
@@ -15,5 +15,5 @@ epochs = 100
 learning_rate = 0.001
 weight_decay = 0
 ls_steps = 100 # Logging/Saving steps
-# dataloader_num_workers = 4    # (optional)
+dataloader_num_workers = 4      # (optional)
 val_acc_steps = 32              # (optional)

@@ -73,6 +73,7 @@ CONFIG_FILE=$(basename $CONFIG_PATH)
 # Construcción del comando docker
 ARGS=$(cat <<EOF
     -it \
+    --ipc=host \
     --gpus all \
     -v ${DATAROOT_PATH}:/dataset:ro \
     -v ${CONFIG_DIR}:/config:ro \

@@ -16,6 +16,7 @@ import torch
 import torch.nn.functional as F
 from oldatasets.BEV import BEVFeatureExtractionDataset
 from oldatasets.NuImages import NuImagesFeatureExtractionDataset
+from oldatasets.NuImages import NuImagesFormattedFeatureExtractionDataset
 
 import argparse
 import toml
@@ -81,7 +82,7 @@ def main(config: dict):
     val_acc_steps   = config['training']['val_acc_steps'] if 'val_acc_steps' in config['training'] else None
 
     # Dataset and Dataloader
-    image_processor = SegformerImageProcessor(reduce_labels=True)
+    image_processor = SegformerImageProcessor(reduce_labels=False)
     
     
     if config['data']['type'] == 'BEVDataset':
@@ -100,6 +101,14 @@ def main(config: dict):
             train_dataset   = NuImagesFeatureExtractionDataset( dataroot=config['data']['dataroot'], version='train', image_processor=image_processor, camera='CAM_FRONT' )
             eval_dataset    = NuImagesFeatureExtractionDataset( dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor, camera='CAM_FRONT' )
     
+    elif config['data']['type'] == 'NuImagesFormatted':
+        if config['data']['testing'] == True:
+            train_dataset   = NuImagesFormattedFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
+            eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='mini', image_processor=image_processor)
+        else:
+            train_dataset   = NuImagesFormattedFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='train', image_processor=image_processor)
+            eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=config['data']['dataroot'], version='val',   image_processor=image_processor)
+
     global num_labels, id2label
     id2label = train_dataset.id2label
     num_labels = len(train_dataset.id2label)
