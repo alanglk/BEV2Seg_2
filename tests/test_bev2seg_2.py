@@ -13,8 +13,9 @@ import os
 from PIL import Image
 
 BEV_DATASET_PATH    = "tmp/BEVDataset"
-RAW2SEG_MODEL_PATH  = "models/segformer_nu_test/overfitted_model"
-BEV2SEG_MODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.1"
+RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
+BEV2SEG_MODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.2"
+#BEV2SEG_MODEL_PATH  = "models/segformer_bev_test/overfitted_model_NoReduceLabels"
 
 def check_paths(paths: List[str]):
     for path in paths:
@@ -29,14 +30,15 @@ def test_raw2segbev():
     
     # Load image
     image = cv2.imread(test_image_path)
-    cv2.imshow("Input Image", image)
-    cv2.waitKey(0)
+    # cv2.imshow("Input Image", image)
+    # cv2.waitKey(0)
 
     # raw2seg_bev instance
     raw2seg_bev = Raw2Seg_BEV(RAW2SEG_MODEL_PATH, test_openlabel_path)
-    bev_mask = raw2seg_bev.generate_bev_segmentation(image, 'CAM_FRONT')
+    raw_mask, bev_mask = raw2seg_bev.generate_bev_segmentation(image, 'CAM_FRONT')
     bev_labels = np.unique(bev_mask)
     bev_labelnames = [ raw2seg_bev.id2label[l] for l in bev_labels ]
+    raw_color = raw2seg_bev.mask2image(raw_mask)
     bev_color = raw2seg_bev.mask2image(bev_mask)
 
     print(f"SegFormer id2label:\n{raw2seg_bev.id2label}")
@@ -44,7 +46,8 @@ def test_raw2segbev():
     print(f"unique labels: {bev_labels}")
     print(f"label names: {bev_labelnames}")
 
-    cv2.imshow("Segmentation mask", bev_color)
+    cv2.imshow("Normal Segmentation mask", raw_color)
+    cv2.imshow("BEV Segmentation mask", bev_color)
     cv2.waitKey(0)
     
 
@@ -77,4 +80,4 @@ def test_rawbev2seg():
 
     cv2.imshow("BEV Segmentation mask", bev_color)
     cv2.waitKey(0)
-    assert False
+    # assert False
