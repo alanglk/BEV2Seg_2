@@ -7,6 +7,7 @@ python3 srcipts/train_segformer.py <config_file_path>
 """
 
 from transformers import SegformerImageProcessor
+from transformers import SegformerConfig
 from transformers import SegformerForSemanticSegmentation
 from transformers import TrainingArguments
 from transformers import Trainer
@@ -69,8 +70,9 @@ def compute_metrics(eval_pred):
 
 ########################## MAIN ##########################
 def main(config: dict):
-    output_path = config['model']['output_path']
-    model_name = config['model']['model_name']
+    output_path     = config['model']['output_path']
+    model_name      = config['model']['model_name']
+    pretrained      = config['model']['pretrained']
     
     # Hyperparams
     ls_steps        = config['training']['ls_steps']     # 100 Logging and Saving steps
@@ -114,11 +116,14 @@ def main(config: dict):
     num_labels = len(train_dataset.id2label)
 
     # Model
-    model = SegformerForSemanticSegmentation.from_pretrained(config['model']['pretrained'],
-                                                          num_labels=len(train_dataset.id2label),
-                                                          id2label=train_dataset.id2label,
-                                                          label2id=train_dataset.label2id,
-                                                          id2color=train_dataset.id2color)
+    print(f"Loading pretrained model: {pretrained}")
+    segformer_config = SegformerConfig.from_pretrained(pretrained)
+    segformer_config.num_labels = len(train_dataset.id2label)
+    segformer_config.id2label = train_dataset.id2label
+    segformer_config.id2color = train_dataset.id2color
+    segformer_config.label2id = train_dataset.label2id
+
+    model = SegformerForSemanticSegmentation.from_pretrained(pretrained, config=segformer_config)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print(f"USING DEVICE: {device}")
     model.to(device)
