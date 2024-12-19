@@ -11,7 +11,7 @@
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
-srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/nuimages --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/BEVDataset ./bev2seg_2_v0.1.sif $(cat <<EOF
+srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages/:/nuimages --bind /gpfs/VICOMTECH/Databases/GeneralDatabases/BEVDataset/:/BEVDataset ./bev2seg_2_v0.3.sif $(cat <<EOF
     python3 /scripts/generate_BEVDataset_from_NuImages.py \
     /nuimages \
     /BEVDataset \
