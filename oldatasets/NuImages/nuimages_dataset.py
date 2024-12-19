@@ -237,7 +237,8 @@ class NuImagesDataset(Dataset):
             label_obj.token = cat['token']
 
         for l in nulabels:
-            assert l.token is not None # Check if all the labels have their tokens
+            if l.id != 0:
+                assert l.token is not None # Check if all the labels have their tokens (except the background)
         
         self.nutoken2label = { label.token      : label for label in nulabels }
         self.id2color = nuid2color

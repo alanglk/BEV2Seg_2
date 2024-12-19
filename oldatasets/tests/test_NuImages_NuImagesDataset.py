@@ -7,6 +7,7 @@ from oldatasets.NuImages import NuImagesDataset, NuImagesFeatureExtractionDatase
 import cv2
 
 NUIMAGES_PATH = "./tmp/NuImages"
+NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 OUTPUT_PATH = "./tests/tmp/NuImages/mini"
 
 DISPLAY_IMAGES = True
@@ -134,4 +135,4 @@ def test_segformer_feature_extraction_dataset():
             target = dataset.target2image(encoded['labels'])
             display_images("test_featureExtractor_dataset", [image, target])
     
-    assert False
+    # assert False

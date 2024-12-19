@@ -38,12 +38,12 @@ nulabels = [
     NuLabel(  None  , "vehicle.car"                         , 17    , 17      , (  0,   0, 142) ),
     NuLabel(  None  , "vehicle.construction"                , 18    , 18      , (255, 0, 0) ),
     NuLabel(  None  , "vehicle.emergency.ambulance"         , 19    , 19      , (255, 0, 0) ),
-    NuLabel(  None  , "vehicle.emergency.police"            , 21    , 21      , (255, 0, 0) ),
-    NuLabel(  None  , "vehicle.motorcycle"                  , 22    , 22      , (  0,   0, 230) ),
-    NuLabel(  None  , "vehicle.trailer"                     , 23    , 23      , (  0,   0, 110) ),
-    NuLabel(  None  , "vehicle.truck"                       , 24    , 24      , (  0,   0,  70) ),
-    NuLabel(  None  , "vehicle.ego"                         , 25    , 25      , (255, 255, 255) ),
-    NuLabel(  None  , "flat.driveable_surface"              , 26    , 26      , (128,  64, 128) ),
+    NuLabel(  None  , "vehicle.emergency.police"            , 20    , 20      , (255, 0, 0) ),      # antes 21
+    NuLabel(  None  , "vehicle.motorcycle"                  , 21    , 21      , (  0,   0, 230) ),  # antes 22
+    NuLabel(  None  , "vehicle.trailer"                     , 22    , 22      , (  0,   0, 110) ),  # antes 23
+    NuLabel(  None  , "vehicle.truck"                       , 23    , 23      , (  0,   0,  70) ),  # antes 24
+    NuLabel(  None  , "vehicle.ego"                         , 24    , 24      , (255, 255, 255) ),  # antes 25
+    NuLabel(  None  , "flat.driveable_surface"              , 25    , 25      , (128,  64, 128) ),  # antes 26
 ]
 
 

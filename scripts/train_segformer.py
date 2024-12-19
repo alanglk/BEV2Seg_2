@@ -117,7 +117,8 @@ def main(config: dict):
     model = SegformerForSemanticSegmentation.from_pretrained(config['model']['pretrained'],
                                                           num_labels=len(train_dataset.id2label),
                                                           id2label=train_dataset.id2label,
-                                                          label2id=train_dataset.label2id)
+                                                          label2id=train_dataset.label2id,
+                                                          id2color=train_dataset.id2color)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print(f"USING DEVICE: {device}")
     model.to(device)

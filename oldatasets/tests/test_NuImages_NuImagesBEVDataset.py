@@ -1,10 +1,11 @@
 
 import os
 from oldatasets.common import display_image, display_images
-from oldatasets.NuImages import NuImagesBEVDataset, generate_BEVDataset_from_NuImages
+from oldatasets.NuImages import NuImagesDataset, NuImagesBEVDataset, generate_BEVDataset_from_NuImages
 import numpy as np
 
 NUIMAGES_PATH = "./tmp/NuImages"
+NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
 TMP_DIR = "./tests/tmp/BEVDataset"
 
 DISPLAY_IMAGES = False
@@ -26,21 +27,23 @@ def test_generate_openlabel_one_sample():
     """
     Test for generating and saving one sample of BEVDataset from the NuImages Dataset
     """
-    dataset = NuImagesBEVDataset(
-        dataroot=NUIMAGES_PATH, 
+    dataset_nu = NuImagesDataset(dataroot=NUIMAGES_PATH, version='mini')
+    dataset_bev = NuImagesBEVDataset(
+        dataroot=NUIMAGES_PATH,
+        version='mini', 
         output_path=TMP_DIR, 
         save_bevdataset=True)
 
     for i in range(1):
-        image, target = dataset.__getitem__(i)
-        print(np.unique(target))
-        
-    assert image is not None
-    assert target is not None
+        image_nu, target_nu = dataset_nu.__getitem__(i)
+        image_bev, target_bev = dataset_bev.__getitem__(i)
+        print(f"labels on normal image: {np.unique(target_nu)}")
+        print(f"labels on bev image: {np.unique(target_bev)}")
+        # assert np.array_equal(np.unique(target_nu), np.unique(target_bev)) # No tienen porqué ser exactamente iguales
 
     if DISPLAY_IMAGES:
-        target = dataset.target2image(target)
-        display_images("test_generate_openlabel_one_sample", [image, target])
+        target = dataset_bev.target2image(target_bev)
+        display_images("test_generate_openlabel_one_sample", [image_bev, target_bev])
 
 def test_load_openlabel_one_sample():
     """

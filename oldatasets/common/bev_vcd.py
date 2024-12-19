@@ -57,7 +57,7 @@ class Dataset2BEV():
         map_x = self.drawer.images[self.camera_name]["mapX"]
         map_y = self.drawer.images[self.camera_name]["mapY"]
         bev = cv2.remap(target, map_x, map_y,
-            interpolation=cv2.INTER_LINEAR, # INTER_NEAREST
+            interpolation=cv2.INTER_NEAREST, # INTER_LINEAR
             borderMode=cv2.BORDER_CONSTANT,
         )
 
