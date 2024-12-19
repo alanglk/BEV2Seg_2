@@ -2,6 +2,7 @@
 import os
 from oldatasets.common import display_image, display_images
 from oldatasets.NuImages import NuImagesBEVDataset, generate_BEVDataset_from_NuImages
+import numpy as np
 
 NUIMAGES_PATH = "./tmp/NuImages"
 TMP_DIR = "./tests/tmp/BEVDataset"
@@ -32,6 +33,8 @@ def test_generate_openlabel_one_sample():
 
     for i in range(1):
         image, target = dataset.__getitem__(i)
+        print(np.unique(target))
+        
     assert image is not None
     assert target is not None
 

@@ -18,6 +18,7 @@ class NuLabel:
 
 nulabels = [
     #       token   name                                    id      trainId    color RGB
+    NuLabel(  None  , "background"                          , 0     , 0       , (0, 0, 0) ),
     NuLabel(  None  , "animal"                              , 1     , 1       , (255, 0, 0) ),
     NuLabel(  None  , "human.pedestrian.adult"              , 2     , 2       , (220,  20,  60) ),
     NuLabel(  None  , "human.pedestrian.child"              , 3     , 3       , (220,  20,  60) ),
