@@ -13,7 +13,8 @@ import os
 from PIL import Image
 
 BEV_DATASET_PATH    = "tmp/BEVDataset"
-RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
+RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted/raw2seg_bev_v0.1"
+#RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
 BEV2SEG_MODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.2"
 #BEV2SEG_MODEL_PATH  = "models/segformer_bev_test/overfitted_model_NoReduceLabels"
 

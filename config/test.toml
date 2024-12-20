@@ -1,12 +1,12 @@
 [data]
 type = "BEVDataset"   # [NuImages, NuImagesFormatted, BEVDataset] 
-dataroot = "/dataset"
+dataroot = "./tmp/BEVDataset"
 testing = true     # if set, the 'mini' version of the dataset 
                     # will be taken as trainig and evaluation sets
 
 [model]
 output_path = "./models"
-model_name = "segformer_bev_test"
+model_name = "quick_test"
 pretrained = "nvidia/mit-b0"
 
 [training]
