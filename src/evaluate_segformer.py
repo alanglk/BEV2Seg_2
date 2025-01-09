@@ -139,9 +139,9 @@ def main(bevdataset_path:str,
         inf_raw_mask = torch.tensor(inf_raw_mask, device=device)
         inf_bev_mask = torch.tensor(inf_bev_mask, device=device)
 
-        # iou_per_class, m_iou = calculate_iou(inf_raw_mask, real_raw_mask, num_labels)
-        # mean_iou_per_class['rawseg'] += iou_per_class.cpu().detach().numpy()
-        # mean_iou['rawseg'] += m_iou.cpu().detach().numpy()
+        iou_per_class, m_iou = calculate_iou(inf_raw_mask, real_raw_mask, num_labels)
+        mean_iou_per_class['rawseg'] += iou_per_class.cpu().detach().numpy()
+        mean_iou['rawseg'] += m_iou.cpu().detach().numpy()
          
         iou_per_class, m_iou = calculate_iou(inf_bev_mask, real_bev_mask, num_labels)
         mean_iou_per_class['raw2seg_bev'] += iou_per_class.cpu().detach().numpy()
@@ -178,25 +178,30 @@ def main(bevdataset_path:str,
     print(f"FINAL mean_iou: {mean_iou}")
 
     if save_results and results_path is not None:
-        with open(results_path, "w") as f:
+        with open(results_path, "wb") as f:
             pickle.dump({'mean_iou': mean_iou, 'mean_iou_per_class': mean_iou_per_class}, f)
 
     if plot_results:
-        # plot_mean_iou_per_class(mean_iou_per_class['rawseg'], 'RAW -> SEG mean_iou_per_class', labels_list=labels_list)
-        # plot_mean_iou_per_class(mean_iou_per_class['raw2seg_bev'], 'RAW -> SEG -> BEV mean_iou_per_class', labels_list=labels_list)
+        plot_mean_iou_per_class(mean_iou_per_class['rawseg'], 'RAW -> SEG mean_iou_per_class', labels_list=labels_list)
+        plot_mean_iou_per_class(mean_iou_per_class['raw2seg_bev'], 'RAW -> SEG -> BEV mean_iou_per_class', labels_list=labels_list)
         plot_mean_iou_per_class(mean_iou_per_class['raw2bev_seg'], 'RAW -> BEV -> SEG mean_iou_per_class', labels_list=labels_list)
 
 
 if __name__ == "__main__":
     BEVDATASET_PATH    = "tmp/BEVDataset"
     NUDATASET_PATH     = "tmp/NuImagesFormatted"
-    RAW2SEGMODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
-    BEV2SEGMODEL_PATH  = "models/segformer_bev_test/overfitted_model_NoReduceLabels"
-    BEV2SEGMODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.2"
+    #RAW2SEGMODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
+    #BEV2SEGMODEL_PATH  = "models/segformer_bev_test/overfitted_model_NoReduceLabels"
+    RAW2SEGMODEL_PATH  = "models/segformer_nu_formatted/raw2seg_bev_v0.2"
+    BEV2SEGMODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.3"
     
+    OUT_PATH = "./data/mean_iou.pt"
+
     main(BEVDATASET_PATH, 
          NUDATASET_PATH, 
          RAW2SEGMODEL_PATH, 
          BEV2SEGMODEL_PATH, 
-         dataset_versions='mini',
-         plot_results=True)
+         dataset_versions='val',
+         plot_results=False,
+         save_results=True,
+         results_path=OUT_PATH)

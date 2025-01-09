@@ -172,12 +172,6 @@ class Raw2Seg_BEV(BEV2SEG_2_Interface):
         mask = mask.detach().cpu().numpy()
         mask = mask.astype(np.uint8)
 
-        # TODO: CHAPUZA DE MANUAL. Esto es una puta mierda
-        shape = mask.shape
-        mask = mask.flatten()
-        mask[mask > 19] =  mask[mask > 19] - 1
-        mask = mask.reshape(shape)
-
         # cv2.imshow("Normal Segmentation mask", self.mask2image(mask, nuid2color))
         # cv2.waitKey(0)
         
@@ -210,12 +204,6 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
         bev_mask = self.image_processor.post_process_semantic_segmentation(outputs, target_sizes=[bev_image.shape[:2]])[0]
         bev_mask = bev_mask.detach().cpu().numpy()
         bev_mask = bev_mask.astype(np.uint8)
-
-        # TODO: CHAPUZA DE MANUAL. Esto es una puta mierda
-        shape = bev_mask.shape
-        bev_mask = bev_mask.flatten()
-        bev_mask[bev_mask > 19] =  bev_mask[bev_mask > 19] - 1
-        bev_mask = bev_mask.reshape(shape)
 
         # cv2.imshow("BEV Segmentation mask", self.mask2image(bev_mask, nuid2color))
         # cv2.waitKey(0)
