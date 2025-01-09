@@ -12,38 +12,39 @@ class NuLabel:
     # 'trainId',      label given to the train masks. 
     #                   By default is the same as id
     #                 
+    # 'dynamic',      The labeled object is dynamic
     # 'color'         color for each category
-    def __init__(self, token: str, name:str, id: int, trainId: int, color:tuple):
+    def __init__(self, token: str, name:str, id: int, trainId: int, dynamic: bool, color:tuple):
         vars(self).update(locals())
 
 nulabels = [
-    #       token   name                                    id      trainId    color RGB
-    NuLabel(  None  , "background"                          , 0     , 0       , (0, 0, 0) ),
-    NuLabel(  None  , "animal"                              , 1     , 1       , (255, 0, 0) ),
-    NuLabel(  None  , "human.pedestrian.adult"              , 2     , 2       , (220,  20,  60) ),
-    NuLabel(  None  , "human.pedestrian.child"              , 3     , 3       , (220,  20,  60) ),
-    NuLabel(  None  , "human.pedestrian.construction_worker", 4     , 4       , (220,  20,  60) ),
-    NuLabel(  None  , "human.pedestrian.personal_mobility"  , 5     , 5       , (220,  20,  60) ),
-    NuLabel(  None  , "human.pedestrian.police_officer"     , 6     , 6       , (220,  20,  60) ),
-    NuLabel(  None  , "human.pedestrian.stroller"           , 7     , 7       , (220,  20,  60) ),
-    NuLabel(  None  , "human.pedestrian.wheelchair"         , 8     , 8       , (220,  20,  60) ),
-    NuLabel(  None  , "movable_object.barrier"              , 9     , 9       , (190, 153, 153) ),
-    NuLabel(  None  , "movable_object.debris"               , 10    , 10      , (152, 251, 152) ),
-    NuLabel(  None  , "movable_object.pushable_pullable"    , 11    , 11      , (255, 0, 0) ),
-    NuLabel(  None  , "movable_object.trafficcone"          , 12    , 12      , (111,  74,    0) ),
-    NuLabel(  None  , "static_object.bicycle_rack"          , 13    , 13      , (255, 0, 0) ),
-    NuLabel(  None  , "vehicle.bicycle"                     , 14    , 14      , (119,  11,  32)  ),
-    NuLabel(  None  , "vehicle.bus.bendy"                   , 15    , 15      , (  0,  60, 100) ),
-    NuLabel(  None  , "vehicle.bus.rigid"                   , 16    , 16      , (  0,  60, 100) ),
-    NuLabel(  None  , "vehicle.car"                         , 17    , 17      , (  0,   0, 142) ),
-    NuLabel(  None  , "vehicle.construction"                , 18    , 18      , (255, 0, 0) ),
-    NuLabel(  None  , "vehicle.emergency.ambulance"         , 19    , 19      , (255, 0, 0) ),
-    NuLabel(  None  , "vehicle.emergency.police"            , 20    , 20      , (255, 0, 0) ),      # antes 21
-    NuLabel(  None  , "vehicle.motorcycle"                  , 21    , 21      , (  0,   0, 230) ),  # antes 22
-    NuLabel(  None  , "vehicle.trailer"                     , 22    , 22      , (  0,   0, 110) ),  # antes 23
-    NuLabel(  None  , "vehicle.truck"                       , 23    , 23      , (  0,   0,  70) ),  # antes 24
-    NuLabel(  None  , "vehicle.ego"                         , 24    , 24      , (255, 255, 255) ),  # antes 25
-    NuLabel(  None  , "flat.driveable_surface"              , 25    , 25      , (128,  64, 128) ),  # antes 26
+    #       token   name                                    id      trainId dynamic     color RGB
+    NuLabel(  None  , "background"                          , 0     , 0       , False   , (0, 0, 0) ),
+    NuLabel(  None  , "animal"                              , 1     , 1       , True    , (255, 0, 0) ),
+    NuLabel(  None  , "human.pedestrian.adult"              , 2     , 2       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "human.pedestrian.child"              , 3     , 3       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "human.pedestrian.construction_worker", 4     , 4       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "human.pedestrian.personal_mobility"  , 5     , 5       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "human.pedestrian.police_officer"     , 6     , 6       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "human.pedestrian.stroller"           , 7     , 7       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "human.pedestrian.wheelchair"         , 8     , 8       , True    , (220,  20,  60) ),
+    NuLabel(  None  , "movable_object.barrier"              , 9     , 9       , False   , (190, 153, 153) ),
+    NuLabel(  None  , "movable_object.debris"               , 10    , 10      , False   , (152, 251, 152) ),
+    NuLabel(  None  , "movable_object.pushable_pullable"    , 11    , 11      , False   , (255, 0, 0) ),
+    NuLabel(  None  , "movable_object.trafficcone"          , 12    , 12      , True    , (111,  74,    0) ),
+    NuLabel(  None  , "static_object.bicycle_rack"          , 13    , 13      , False   , (255, 0, 0) ),
+    NuLabel(  None  , "vehicle.bicycle"                     , 14    , 14      , True    , (119,  11,  32)  ),
+    NuLabel(  None  , "vehicle.bus.bendy"                   , 15    , 15      , True    , (  0,  60, 100) ),
+    NuLabel(  None  , "vehicle.bus.rigid"                   , 16    , 16      , True    , (  0,  60, 100) ),
+    NuLabel(  None  , "vehicle.car"                         , 17    , 17      , True    , (  0,   0, 142) ),
+    NuLabel(  None  , "vehicle.construction"                , 18    , 18      , True    , (255, 0, 0) ),
+    NuLabel(  None  , "vehicle.emergency.ambulance"         , 19    , 19      , True    , (255, 0, 0) ),
+    NuLabel(  None  , "vehicle.emergency.police"            , 20    , 20      , True    , (255, 0, 0) ),      # antes 21
+    NuLabel(  None  , "vehicle.motorcycle"                  , 21    , 21      , True    , (  0,   0, 230) ),  # antes 22
+    NuLabel(  None  , "vehicle.trailer"                     , 22    , 22      , True    , (  0,   0, 110) ),  # antes 23
+    NuLabel(  None  , "vehicle.truck"                       , 23    , 23      , True    , (  0,   0,  70) ),  # antes 24
+    NuLabel(  None  , "vehicle.ego"                         , 24    , 24      , True    , (255, 255, 255) ),  # antes 25
+    NuLabel(  None  , "flat.driveable_surface"              , 25    , 25      , False   , (128,  64, 128) ),  # antes 26
 ]
 
 
@@ -54,3 +55,4 @@ nuname2label      = { label.name    : label for label in nulabels }
 nuid2name =  { label.trainId : label.name for label in nulabels }
 nuid2color =  { label.trainId : label.color for label in nulabels }
 
+nuid2dynamic = { label.trainId : label.dynamic for label in nulabels }
