@@ -1,0 +1,15 @@
+vcd
+
+pyquaternion
+pycocotools
+
+opencv-python
+matplotlib
+torch
+torchvision
+torchaudio
+transformers
+transformers[torch]
+evaluate
+toml
+tensorboard

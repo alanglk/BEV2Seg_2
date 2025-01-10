@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 import sys
 import os
 
-# TODO: images from multiple types not only Pillow
+# TODO: images from multiple types
 # ImageInput = Union[
 #     "PIL.Image.Image", np.ndarray, "torch.Tensor", List["PIL.Image.Image"], List[np.ndarray], List["torch.Tensor"]
 # ]  # noqa
@@ -28,17 +28,22 @@ class BEV2SEG_2_Interface(ABC):
     BEV_WIDTH = 1024
     BEV_HEIGH = 1024
 
-    def __init__(self, model_path:str, openlabel_path: str):
+    def __init__(self, model_path:str, openlabel_path: str, device: torch.DeviceObjType = None):
         # Load SegFormer Model
         self.model_path = model_path
-        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        self.device = device
+        if self.device is None:
+            self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         
         self.model = SegformerForSemanticSegmentation.from_pretrained(self.model_path)
         self.model.to(self.device)
         
         self.label2id = self.model.config.label2id
         self.id2label = self.model.config.id2label
+
         self.id2color = nuid2color
+        if "id2color" in self.model.config:
+            self.id2color = self.model.config.id2color
         
         # Load Image Processor
         reduce_labels = not self.id2label[0] == nuid2name[0]
@@ -151,12 +156,12 @@ class BEV2SEG_2_Interface(ABC):
 
 class Raw2Seg_BEV(BEV2SEG_2_Interface):
 
-    def __init__(self, model_path: str, openlabel_path: str):
+    def __init__(self, model_path: str, openlabel_path: str, device: torch.DeviceObjType = None):
         """
         Semantic Segmentation on Raw image and then IPM to Bird's Eye View.
         Normal -> Segmentation -> BEV
         """
-        super().__init__(model_path, openlabel_path)
+        super().__init__(model_path, openlabel_path, device)
     
     def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None) -> Tuple[np.ndarray, np.ndarray]:
         # Inference
@@ -178,12 +183,12 @@ class Raw2Seg_BEV(BEV2SEG_2_Interface):
 
 class Raw_BEV2Seg(BEV2SEG_2_Interface):
 
-    def __init__(self, model_path: str, openlabel_path: str):
+    def __init__(self, model_path: str, openlabel_path: str, device: torch.DeviceObjType = None):
         """
         IPM to Bird's Eye View and then Semantic Segmentation on the BEV Space.
         Normal -> BEV -> Segmentation
         """
-        super().__init__(model_path, openlabel_path)
+        super().__init__(model_path, openlabel_path, device)
     
     def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None) -> np.ndarray:
         # IPM to BEV image
@@ -200,7 +205,6 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
         bev_mask = bev_mask.detach().cpu().numpy()
         bev_mask = bev_mask.astype(np.uint8)
 
-        
         # cv2.imshow("BEV Segmentation mask", self.mask2image(bev_mask, nuid2color))
         # cv2.waitKey(0)
         return bev_mask

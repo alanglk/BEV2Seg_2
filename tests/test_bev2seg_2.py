@@ -13,13 +13,15 @@ import os
 from PIL import Image
 
 BEV_DATASET_PATH    = "tmp/BEVDataset"
-RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
-BEV2SEG_MODEL_PATH  = "models/segformer_bev/raw2bevseg_v0.2"
+RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted/raw2seg_bev_mit-b0_v0.1"
+#RAW2SEG_MODEL_PATH  = "models/segformer_nu_formatted_test/overfitted_model_NoReduceLabels"
+BEV2SEG_MODEL_PATH  = "models/segformer_bev/raw2bevseg_mit-b0_v0.2"
 #BEV2SEG_MODEL_PATH  = "models/segformer_bev_test/overfitted_model_NoReduceLabels"
 
 def check_paths(paths: List[str]):
     for path in paths:
-        assert os.path.exists(path)
+        if not os.path.exists(path):
+            raise Exception(f"path: {path} doesnt exist")
 
 def test_raw2segbev():
     """Test of the Raw -> Seg -> Bev pipeline"""

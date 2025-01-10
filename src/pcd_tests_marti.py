@@ -1,8 +1,10 @@
 import os
 import re
 import argparse
-import YOLOPv2.run
+#import YOLOPv2.run
 import depth_pro
+from depth_pro.depth_pro import DepthProConfig
+
 import torch
 import numpy as np
 import cv2 as cv
@@ -52,9 +54,17 @@ class DepthEstimation:
         device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
         print(f"device: {device}")
         
-        model, transform = depth_pro.create_model_and_transforms(
-                                device=device, precision=torch.half,
-                            )
+        model_path  = "./models/ml_depth_pro/depth_pro.pt"
+        DEFAULT_MONODEPTH_CONFIG_DICT = DepthProConfig(
+            patch_encoder_preset="dinov2l16_384",
+            image_encoder_preset="dinov2l16_384",
+            checkpoint_uri=model_path,
+            decoder_features=256,
+            use_fov_head=True,
+            fov_encoder_preset="dinov2l16_384",
+        )
+        
+        model, transform = depth_pro.create_model_and_transforms(config=DEFAULT_MONODEPTH_CONFIG_DICT, device=device)
         model.eval()
 
         for image_name in tqdm(self.images_dataset, desc="Inferring images' depth", unit="image"):
