@@ -5,7 +5,9 @@ import sys
 import os
 import re
 from tqdm import tqdm
-
+import cv2
+from typing import List
+from vcd import core, scl, draw, utils
 
 #pcd = o3d.io.read_point_cloud(file_path)
 #points = np.asarray(pcd.points)
@@ -20,7 +22,8 @@ if len(sys.argv) > 1:
 else:
     print("No se ha proporcionado ningún path.")
 
-
+image_path      = os.path.join(data_folder, "input", "images")
+openlabel_path  = os.path.join(data_folder, "input", "openlabel")
 instances_path  = os.path.join(data_folder, "output", "pointcloud", "instances")
 semantic_path   = os.path.join(data_folder, "output", "pointcloud", "semantic")
 cluster_path    = os.path.join(data_folder, "output", "pointcloud", "cluster")
@@ -130,14 +133,60 @@ def get_pcd_of_semantic_label(semantic_pcd_path:str, image_token:str, semantic_l
     return pcds
 
 
+def visualize_cuboids_on_image(image_path, openlabel_path, image_token, instace_3dboxes: List[o3d.geometry.LineSet]):
+    image_path = os.path.join(image_path, f"{image_token}_raw.png")
+    openlabel_path = os.path.join(openlabel_path, f"{image_token}.json")
+    
+    image = cv2.imread(image_path)
+    img_h, img_w, _ = image.shape
+    # offset_1x3 = np.array([[-w, -h, 0]])
+    
+    camera_name = "CAM_FRONT"
+    vcd = core.OpenLABEL()
+    vcd.load_from_file(openlabel_path)
+    scene = scl.Scene(vcd=vcd)
+    camera = scene.get_camera(camera_name=camera_name, frame_num=0)
+
+    for inst_3dbox in instace_3dboxes:
+        vertices_3xN = np.asarray(inst_3dbox.points).T
+        edgesNx2 = np.asarray(inst_3dbox.lines) # pairs
+        vertices_4xN = utils.add_homogeneous_row(vertices_3xN)
+        vertices_proj_4xN, idx_valid = camera.project_points3d(points3d_4xN=vertices_4xN, remove_outside=False)
+
+        # Draw Vertices
+        _, N = vertices_proj_4xN.shape # N = 8
+        for i in range(0, N):
+            if idx_valid[i]:
+                if np.isnan(vertices_proj_4xN[0, i]) or np.isnan(vertices_proj_4xN[1, i]):
+                    continue
+                center = ( utils.round(vertices_proj_4xN[0, i]), utils.round(vertices_proj_4xN[1, i]))
+                
+                # if not utils.is_inside_image(img_w, img_h, center[0], center[1]):
+                #     continue
+
+                cv2.circle(image, (int(center[0]), int(center[1])), 1, (0, 0, 255), 2)
+        
+        # Draw Edges
+        for edge in edgesNx2:
+            p1 = (utils.round( vertices_proj_4xN[0, edge[0]] ), utils.round( vertices_proj_4xN[1, edge[0]] ))
+            p2 = (utils.round( vertices_proj_4xN[0, edge[1]] ), utils.round( vertices_proj_4xN[1, edge[1]] ))
+            cv2.line(image, p1, p2, (0, 255, 255), 1)
+
+        
+        print()
+
+    cv2.imshow("DEBUG Cuboids On Image", image)
+    cv2.waitKey(0)
+
 image_token     = "60d367ec0c7e445d8f92fbc4a993c67e" 
-image_token     = "0a1fca1d93d04f60a4b12961a22310bb" 
+# image_token     = "0a1fca1d93d04f60a4b12961a22310bb" 
 
 # Load Geometries
 bboxes = get_bboxes_of_semantic_label(instances_path, image_token, semantic_labels=["vehicle.car"])
 #pcds = get_pcd_of_semantic_label(cluster_path, image_token, semantic_labels=["vehicle.car", "flat.driveable_surface"])
 pcds = get_pcd_of_semantic_label(semantic_path, image_token, semantic_labels=["vehicle.car", "flat.driveable_surface"])
 
+visualize_cuboids_on_image(image_path, openlabel_path, image_token, bboxes)
 
 # Mostrar la nube de puntos
 all_geometries = pcds + bboxes
