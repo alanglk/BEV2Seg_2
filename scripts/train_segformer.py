@@ -82,6 +82,7 @@ def main(config: dict):
     weight_decay    = config['training']['weight_decay']
     num_workers     = config['training']['dataloader_num_workers'] if 'dataloader_num_workers' in config['training'] else 0
     val_acc_steps   = config['training']['val_acc_steps'] if 'val_acc_steps' in config['training'] else None
+    resume_from_checkpoint = config['training']['resume_from_checkpoint'] if 'resume_from_checkpoint' in config['training'] else False
 
     # Dataset and Dataloader
     image_processor = SegformerImageProcessor(reduce_labels=False)
@@ -170,7 +171,8 @@ def main(config: dict):
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
     )
 
-    trainer.train()
+
+    trainer.train(resume_from_checkpoint= resume_from_checkpoint)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script para procesar datos con diferentes versiones.")
