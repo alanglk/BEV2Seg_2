@@ -329,7 +329,7 @@ class InstanceScenePCD():
 
 
 class BEVDrawer():
-    BEV_MAX_DISTANCE = 30
+    BEV_MAX_DISTANCE = 50
     BEV_WIDTH = 1024
     BEV_HEIGH = 1024
 
@@ -396,7 +396,6 @@ class BEVDrawer():
         scene = scl.Scene(vcd)
 
         raw_image = cv2.imread(image_path)
-        cv2.imshow("debug", raw_image)
         semantic_mask = cv2.imread(semantic_path)[:, :, 0]
 
         alpha = 0.5
@@ -409,7 +408,8 @@ class BEVDrawer():
         drawer = draw.TopView(scene=scene, coordinate_system="vehicle-iso8855", params=self.bev_parameters)
         drawer.add_images({camera_name: blended_image}, frame_num=0)
         drawer.draw_bevs(_frame_num=0)
-        bev_image = drawer.topView        
+        bev_image = drawer.topView
+
         # cv2.imshow("debug bev", bev_image)
 
         # Draw cuboids on BEV
@@ -419,15 +419,92 @@ class BEVDrawer():
             
             if seg_pcd['label'] != "vehicle.car":
                 continue
+            
+            # Punto del pointcloud más cercano a la cámara con distancia Manhattan
+            reference_point = np.array([[0, 0, 0]])
+            refs = np.repeat(reference_point, seg_pcd['pcd'].shape[0], axis=0)
+            abs_ = np.abs(seg_pcd['pcd'] - refs)
+            distances = np.sum(abs_)
+            distances = np.linalg.norm(seg_pcd['pcd'] - refs, axis=1)
+            min_pcdpoint_3xN = seg_pcd['pcd'][np.argmin(distances), :].reshape((3, -1))
+            min_pcdpoint_4xN = utils.add_homogeneous_row(min_pcdpoint_3xN)
+            min_pcdpoint_4xN = scene.transform_points3d_4xN(min_pcdpoint_4xN, camera_name, "vehicle-iso8855", frame_num=0)
+            print(f"Nearest point to {reference_point} with Manhatan distance: {min_pcdpoint_4xN}")
+            print(min_pcdpoint_4xN)
 
+
+            aux = np.array([[1.0, 20.0, 3.5], 
+                            [1.0, 50.0, 3.5],
+                            [1.0, 2.0, 3.5]])
+            aux_refs = np.repeat(reference_point, aux.shape[0], axis=0)
+            aux_dists = np.linalg.norm(aux - aux_refs, axis=1)
+            print(f"np.argmin(aux_dists): {np.argmin(aux_dists)}")
+            
+
+            pcd = o3d.geometry.PointCloud()
+            colors = seg_pcd['pcd_colors']
+            min_x, max_x = np.min(seg_pcd['pcd'][:, 0]), np.max(seg_pcd['pcd'][:, 0])
+            min_y, max_y = np.min(seg_pcd['pcd'][:, 1]), np.max(seg_pcd['pcd'][:, 1])
+            min_z, max_z = np.min(seg_pcd['pcd'][:, 2]), np.max(seg_pcd['pcd'][:, 2])
+            # colors = np.array([
+            #     (seg_pcd['pcd'][:, 0] - min_x) / max_x, 
+            #     (seg_pcd['pcd'][:, 1] - min_y) / max_y, 
+            #     (seg_pcd['pcd'][:, 2] - min_z) / max_z ]).T # Nx3
+            colors[np.argmin(distances)] = np.array([0.0, 1.0, 0.0])
+            pcd.points = o3d.utility.Vector3dVector(seg_pcd['pcd'])
+            pcd.colors = o3d.utility.Vector3dVector(colors)
+            frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=np.array([0.0, 0.0, 0.0]))
+            
+            o3d.visualization.draw_geometries([frame, pcd], window_name="Debug")
+
+            # Puntos 3d en bev de la máscara semántica
+            mask_points = np.argwhere(semantic_mask == seg_pcd['label_id'])
+            n, _ = mask_points.shape
+            
+            mask2d_z0_3xN = np.array([mask_points[:, 1], mask_points[:, 0], np.ones(n)])
+            mask3d_z0_4xN, _ = scene.reproject_points2d_3xN_into_plane(mask2d_z0_3xN, [0, 0, 1, 0], cs_cam=camera_name, cs_dst="vehicle-iso8855", frame_num=0)
+            print(mask3d_z0_4xN)
+            # for idx in range(n):
+            #     example_point = (mask3d_z0_4xN[0, idx], mask3d_z0_4xN[1, idx])
+            #     cv2.circle(bev_image, drawer.point2pixel(example_point), 1, (0, 255, 0), 2)
+
+            # Punto más cercano a la cámara en x
+            min_x = np.min(mask3d_z0_4xN[0, :])
+            minx_points3d_z0_4xN = mask3d_z0_4xN[:, mask3d_z0_4xN[0, :] == min_x]
+            reference_point = np.array([0, 0, 0, 1])
+            print(f"Points with min x: {minx_points3d_z0_4xN}")
+            _, n = minx_points3d_z0_4xN.shape
+            for idx in range(n):
+                punto = (minx_points3d_z0_4xN[0, idx], minx_points3d_z0_4xN[1, idx])
+                print(f"punto: {punto} | drawer.point2pixel(punto): {drawer.point2pixel(punto)}")
+                cv2.circle(bev_image, drawer.point2pixel(punto), 1, (0, 0, 255), 2)
+
+            # Punto más cercano a la cámara con distancia Manhattan
+            reference_point = np.array([0, 0, 0, 1])
+            distances = np.sum(np.abs(mask3d_z0_4xN - reference_point[:, np.newaxis]), axis=0)
+            min_3dpoint_z0_4xN = mask3d_z0_4xN[:, np.argmin(distances)].reshape(4, -1)
+            print(f"Nearest point to {reference_point} with Manhatan distance: {min_3dpoint_z0_4xN}")
+            cv2.circle(bev_image, drawer.point2pixel((min_3dpoint_z0_4xN[0][0], min_3dpoint_z0_4xN[1][0])), 1, (255, 0, 255), 2)
+
+            # Calcular la matriz de traslación de la nube de puntos al top-view
+            T = min_3dpoint_z0_4xN - min_pcdpoint_4xN
+            ratio_3d2d = 2.1841948444444443
+            ratio_2d3d = 0.4578346123943684
+            print(f"ratio_2d3d: {ratio_2d3d} | ratio_3d2d: {ratio_3d2d} | T: {T}")
+
+
+
+            # Draw instance 3d cuboids on top-view
             for inst_3dbox in seg_pcd['instance_3dboxes']:
                 if inst_3dbox['inst_id'] == -1:
                     continue # skip if there is an unlabeled 3dbox
                 
+
                 # Transform cuboid center to vehicle frame
-                center_3x1 = np.array([inst_3dbox['center'] ]).T
+                center_3x1 = np.array([inst_3dbox['center'] ]).T * ratio_2d3d
                 center_4x1      = utils.add_homogeneous_row(center_3x1)
-                center_transformed_4x1      = scene.transform_points3d_4xN(center_4x1, camera_name, "vehicle-iso8855", frame_num=0)
+                center_transformed_4x1      = scene.transform_points3d_4xN(center_4x1, camera_name, "vehicle-iso8855", frame_num=0) # + T
+                print(f"center_transformed_4x1: {center_transformed_4x1}")
 
                 center_bev_3x1 =  np.array([center_transformed_4x1[0, 0], center_transformed_4x1[1, 0], 1.0])
                 print(f"BEFORE: center_bev_3x1.shape: {center_bev_3x1.shape} | center_bev_3x1: {center_bev_3x1}")
@@ -440,6 +517,9 @@ class BEVDrawer():
                 # Calc cuboid base vertices bev_image = on vehicle frame
                 cx, cy, cz, _ = center_transformed_4x1[:, 0]
                 w, h, d = inst_3dbox['dimensions']
+                w *= ratio_2d3d
+                h *= ratio_2d3d
+                d *= ratio_2d3d
                 vertices_Nx3 = np.array([
                     [cx - d/2, cy - w/2, cz - h/2],  # Vértice 0
                     [cx + d/2, cy - w/2, cz - h/2],  # Vértice 1
@@ -464,7 +544,7 @@ class BEVDrawer():
 
                 cv2.circle(bev_image, center_pixel, 2, color, thick)
                 cv2.circle(bev_image, center_bev_pixel, 1, (0, 255,255), thick)
-                cv2.circle(bev_image, drawer.point2pixel((19, 6)), 1, (255, 255,255), thick)
+                cv2.circle(bev_image, drawer.point2pixel((13, 11)), 1, (255, 255,255), thick)
 
                 cv2.circle(bev_image, cuboid_pixels[0], 1, color, thick)
                 cv2.circle(bev_image, cuboid_pixels[1], 1, color, thick)
