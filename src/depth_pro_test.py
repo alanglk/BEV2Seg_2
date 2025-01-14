@@ -6,7 +6,7 @@ import torch
 import open3d as o3d
 
 from PIL import Image
-from vcd import core, scl, draw, utils
+from vcd import core, scl, draw, utils, types
 import cv2
 import os
 import re
@@ -329,7 +329,7 @@ class InstanceScenePCD():
 
 
 class BEVDrawer():
-    BEV_MAX_DISTANCE = 50
+    BEV_MAX_DISTANCE = 30
     BEV_WIDTH = 1024
     BEV_HEIGH = 1024
 
@@ -339,7 +339,7 @@ class BEVDrawer():
 
         # BEV Parameters
         bev_aspect_ratio = self.BEV_WIDTH / self.BEV_HEIGH
-        bev_x_range = (-1.0, self.BEV_MAX_DISTANCE)
+        bev_x_range = (0.0, self.BEV_MAX_DISTANCE)
         bev_y_range = (-((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2,
                         ((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2)
         
@@ -408,67 +408,81 @@ class BEVDrawer():
         # Compute BEV image
         drawer = draw.TopView(scene=scene, coordinate_system="vehicle-iso8855", params=self.bev_parameters)
         drawer.add_images({camera_name: blended_image}, frame_num=0)
-        map_x = drawer.images[camera_name]["mapX"]
-        map_y = drawer.images[camera_name]["mapY"]
-        bev = cv2.remap(blended_image, map_x, map_y, interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT)
-        bev32 = np.array(bev, np.float32)
-        if "weights" in drawer.images[camera_name]:
-            cv2.multiply(drawer.images[camera_name]["weights"], bev32, bev32)
-        bev_image = bev32.astype(np.uint8)
-        cv2.imshow("debug bev", bev_image)
+        drawer.draw_bevs(_frame_num=0)
+        bev_image = drawer.topView        
+        # cv2.imshow("debug bev", bev_image)
 
         # Draw cuboids on BEV
         for seg_pcd in semantic_pointclouds:
             if not seg_pcd['dynamic']:
                 continue # skip non dynamic objects
+            
+            if seg_pcd['label'] != "vehicle.car":
+                continue
 
             for inst_3dbox in seg_pcd['instance_3dboxes']:
                 if inst_3dbox['inst_id'] == -1:
                     continue # skip if there is an unlabeled 3dbox
                 
-                cx, cy, cz = inst_3dbox['center']
+                # Transform cuboid center to vehicle frame
+                center_3x1 = np.array([inst_3dbox['center'] ]).T
+                center_4x1      = utils.add_homogeneous_row(center_3x1)
+                center_transformed_4x1      = scene.transform_points3d_4xN(center_4x1, camera_name, "vehicle-iso8855", frame_num=0)
+
+                center_bev_3x1 =  np.array([center_transformed_4x1[0, 0], center_transformed_4x1[1, 0], 1.0])
+                print(f"BEFORE: center_bev_3x1.shape: {center_bev_3x1.shape} | center_bev_3x1: {center_bev_3x1}")
+
+                center_bev_3x1 = self.bev_parameters.S.dot(center_bev_3x1.T).T
+                
+                print(f"AFTER: center_bev_3x1.shape: {center_bev_3x1.shape} | center_bev_3x1: {center_bev_3x1}")
+                center_bev_pixel = ( int(round(center_bev_3x1[0])), int(round(center_bev_3x1[1])))
+
+                # Calc cuboid base vertices bev_image = on vehicle frame
+                cx, cy, cz, _ = center_transformed_4x1[:, 0]
                 w, h, d = inst_3dbox['dimensions']
-                cy +=h/2 # center on cuboid base
-                cz *= -1
-                center_3d = (cx, cy, cz)
-                vertices_3d = np.array([
-                    [cx - w/2, cy, cz - d/2],  # Vértice 0
-                    [cx + w/2, cy, cz - d/2],  # Vértice 1
-                    [cx + w/2, cy, cz + d/2],  # Vértice 2
-                    [cx - w/2, cy, cz + d/2],  # Vértice 3
+                vertices_Nx3 = np.array([
+                    [cx - d/2, cy - w/2, cz - h/2],  # Vértice 0
+                    [cx + d/2, cy - w/2, cz - h/2],  # Vértice 1
+                    [cx + d/2, cy + w/2, cz - h/2],  # Vértice 2
+                    [cx - d/2, cy + w/2, cz - h/2],  # Vértice 3
                 ])
 
-                center_pixel = drawer.point2pixel((center_3d[0], center_3d[2]))
+                # Project points to top-view pixels
+                center_pixel = drawer.point2pixel((center_transformed_4x1[0, 0], center_transformed_4x1[1, 0]))
                 cuboid_pixels = []
-                for vert_3d in vertices_3d:
-                    vert_2d = (vert_3d[0], vert_3d[2])
-                    cuboid_pixels.append(drawer.point2pixel(vert_2d))
+                for vert_3x1 in vertices_Nx3:
+                    vx, vy, vz = vert_3x1[0], vert_3x1[1], vert_3x1[2]
+                    cuboid_pixels.append(drawer.point2pixel((vx, vy)))
                 
-                print(cuboid_pixels)
+                # Draw grid on Top-View base
+                drawer.draw_topview_base()
+                bev_image = drawer.topView
 
+                # Draw cuboid base and center on top-view image
                 thick = 2
                 color = (0, 255, 0)
 
-                cv2.circle(bev_image, center_pixel, 1, color, thick)
+                cv2.circle(bev_image, center_pixel, 2, color, thick)
+                cv2.circle(bev_image, center_bev_pixel, 1, (0, 255,255), thick)
+                cv2.circle(bev_image, drawer.point2pixel((19, 6)), 1, (255, 255,255), thick)
 
                 cv2.circle(bev_image, cuboid_pixels[0], 1, color, thick)
                 cv2.circle(bev_image, cuboid_pixels[1], 1, color, thick)
                 cv2.circle(bev_image, cuboid_pixels[2], 1, color, thick)
                 cv2.circle(bev_image, cuboid_pixels[3], 1, color, thick)
 
-                cv2.line(bev_image, cuboid_pixels[0], cuboid_pixels[1], color, thick)
-                cv2.line(bev_image, cuboid_pixels[1], cuboid_pixels[2], color, thick)
-                cv2.line(bev_image, cuboid_pixels[2], cuboid_pixels[3], color, thick)
-                cv2.line(bev_image, cuboid_pixels[3], cuboid_pixels[0], color, thick)
-
-                
+                cv2.line(bev_image, cuboid_pixels[0], cuboid_pixels[1], color, 1)
+                cv2.line(bev_image, cuboid_pixels[1], cuboid_pixels[2], color, 1)
+                cv2.line(bev_image, cuboid_pixels[2], cuboid_pixels[3], color, 1)
+                cv2.line(bev_image, cuboid_pixels[3], cuboid_pixels[0], color, 1)
+                print()
 
         return bev_image
 
 # MAIN
 def main(data_folder, model_path):
     image_token     = "60d367ec0c7e445d8f92fbc4a993c67e" 
-    image_token     = "0a1fca1d93d04f60a4b12961a22310bb" 
+    # image_token     = "0a1fca1d93d04f60a4b12961a22310bb" 
     
     device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
