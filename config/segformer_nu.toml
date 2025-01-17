@@ -12,7 +12,7 @@ pretrained = "nvidia/mit-b2"
 [training]
 batch_size = 16
 epochs = 100
-learning_rate = 0.01
+learning_rate = 0.001
 weight_decay = 0.001
 ls_steps = 100 # Logging/Saving steps
 dataloader_num_workers = 4      # (optional)

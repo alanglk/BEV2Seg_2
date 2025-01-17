@@ -24,7 +24,7 @@ import os
 # TODO: check the types
 
 class BEV2SEG_2_Interface(ABC):
-    BEV_MAX_DISTANCE = 30
+    BEV_MAX_DISTANCE = 30.0
     BEV_WIDTH = 1024
     BEV_HEIGH = 1024
 
@@ -62,7 +62,7 @@ class BEV2SEG_2_Interface(ABC):
         self.bev_parameters = draw.TopView.Params(
             color_map           =   utils.COLORMAP_1, # In the case the OpenLABEL has defined objects
             topview_size        =   (self.BEV_WIDTH, self.BEV_HEIGH),
-            background_color    =   0,
+            background_color    =   255,
             range_x             =   bev_x_range,
             range_y             =   bev_y_range,
             step_x              =   1.0,
@@ -142,8 +142,7 @@ class BEV2SEG_2_Interface(ABC):
 
         res_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
         for label, rgb_col in colormap.items():
-            res_mask[mask == label] = rgb_col
-
+            res_mask[mask == int(label)] = rgb_col
         # Convert to BGR (for display with opencv)
         res_mask = cv2.cvtColor(res_mask, cv2.COLOR_RGB2BGR)
         return res_mask

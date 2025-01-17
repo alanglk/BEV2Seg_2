@@ -10,6 +10,7 @@
   },
   "runArgs": [
         "--net", "host", 
+        "--name", "agarciaj/bev2seg_2:v0.3_devcontainer",
         "--privileged",
         "-e", "DISPLAY=${env:DISPLAY}",
         "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
