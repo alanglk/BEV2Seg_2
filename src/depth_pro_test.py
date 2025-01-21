@@ -480,8 +480,10 @@ class BEVDrawer():
                 cv2.circle(bev_image, drawer.point2pixel(punto), 1, (0, 0, 255), 2)
 
             # Punto más cercano a la cámara con distancia Manhattan
-            reference_point = np.array([0, 0, 0, 1])
-            distances = np.sum(np.abs(mask3d_z0_4xN - reference_point[:, np.newaxis]), axis=0)
+            reference_point = np.array([[0, 0, 0, 1]])
+            refs = np.repeat(reference_point, mask3d_z0_4xN.shape[1], axis=0).reshape(4, -1)
+            # distances = np.sum(np.abs(mask3d_z0_4xN - reference_point[:, np.newaxis]), axis=0) # Manhattan
+            distances = np.linalg.norm((mask3d_z0_4xN.T - refs.T), axis=1)
             min_3dpoint_z0_4xN = mask3d_z0_4xN[:, np.argmin(distances)].reshape(4, -1)
             print(f"Nearest point to {reference_point} with Manhatan distance: {min_3dpoint_z0_4xN}")
             cv2.circle(bev_image, drawer.point2pixel((min_3dpoint_z0_4xN[0][0], min_3dpoint_z0_4xN[1][0])), 1, (255, 0, 255), 2)
@@ -501,9 +503,9 @@ class BEVDrawer():
                 
 
                 # Transform cuboid center to vehicle frame
-                center_3x1 = np.array([inst_3dbox['center'] ]).T * ratio_2d3d
+                center_3x1 = np.array([inst_3dbox['center'] ]).T #* ratio_2d3d
                 center_4x1      = utils.add_homogeneous_row(center_3x1)
-                center_transformed_4x1      = scene.transform_points3d_4xN(center_4x1, camera_name, "vehicle-iso8855", frame_num=0) # + T
+                center_transformed_4x1      = scene.transform_points3d_4xN(center_4x1, camera_name, "vehicle-iso8855", frame_num=0) + T
                 print(f"center_transformed_4x1: {center_transformed_4x1}")
 
                 center_bev_3x1 =  np.array([center_transformed_4x1[0, 0], center_transformed_4x1[1, 0], 1.0])
