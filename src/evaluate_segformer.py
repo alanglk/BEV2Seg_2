@@ -150,7 +150,7 @@ def main(bevdataset_path:str,
 
         # Raw -> BEV -> Seg | Comparar inf_bev_mask con real_bev_mask  
         raw_seg2bev.set_openlabel(vcd)
-        inf_bev_mask = raw_seg2bev.generate_bev_segmentation(raw_image, 'CAM_FRONT')
+        _, inf_bev_mask = raw_seg2bev.generate_bev_segmentation(raw_image, 'CAM_FRONT')
         inf_bev_mask = torch.tensor(inf_bev_mask, device=device)
 
         iou_per_class, m_iou = calculate_iou(inf_bev_mask, real_bev_mask, num_labels)

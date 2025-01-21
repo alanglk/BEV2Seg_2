@@ -24,7 +24,7 @@ import os
 # TODO: check the types
 
 class BEV2SEG_2_Interface(ABC):
-    BEV_MAX_DISTANCE = 30
+    BEV_MAX_DISTANCE = 30.0
     BEV_WIDTH = 1024
     BEV_HEIGH = 1024
 
@@ -62,7 +62,7 @@ class BEV2SEG_2_Interface(ABC):
         self.bev_parameters = draw.TopView.Params(
             color_map           =   utils.COLORMAP_1, # In the case the OpenLABEL has defined objects
             topview_size        =   (self.BEV_WIDTH, self.BEV_HEIGH),
-            background_color    =   0,
+            background_color    =   255,
             range_x             =   bev_x_range,
             range_y             =   bev_y_range,
             step_x              =   1.0,
@@ -86,9 +86,9 @@ class BEV2SEG_2_Interface(ABC):
         """IPM to BEV perspective
         INPUT: 
         """
-        sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
+        # sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
         self.drawer.add_images(imgs = {f"{camera_name}": image}, frame_num = frame_num)
-        sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
+        # sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
         
         # self.drawer.draw_bevs(_frame_num=frame_num)
         # return self.drawer.topView
@@ -96,7 +96,7 @@ class BEV2SEG_2_Interface(ABC):
         map_x = self.drawer.images[camera_name]["mapX"]
         map_y = self.drawer.images[camera_name]["mapY"]
         bev = cv2.remap(image, map_x, map_y,
-            interpolation=cv2.INTER_NEAREST, # cv2.INTER_LINEAR, para que no haya interpolación
+            interpolation=cv2.INTER_NEAREST, # cv2.INTER_LINEAR, para que haya interpolación
             borderMode=cv2.BORDER_CONSTANT,
         )
 
@@ -134,19 +134,21 @@ class BEV2SEG_2_Interface(ABC):
         if isinstance(mask, torch.Tensor):
             mask = mask.numpy()
         
+        if len(mask.shape) > 2:
+            mask = mask[:, :, 0]
+
         if colormap is None:
             colormap = self.id2color
 
         res_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
         for label, rgb_col in colormap.items():
-            res_mask[mask == label] = rgb_col
-
+            res_mask[mask == int(label)] = rgb_col
         # Convert to BGR (for display with opencv)
         res_mask = cv2.cvtColor(res_mask, cv2.COLOR_RGB2BGR)
         return res_mask
 
     @abstractmethod
-    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL) -> None:
+    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL, frame_num:int = 0) -> None:
         """
         INPUT: Raw Image and corresponding OpenLABEL with intrinsic and extrinsic
         parameters.
@@ -163,7 +165,10 @@ class Raw2Seg_BEV(BEV2SEG_2_Interface):
         """
         super().__init__(model_path, openlabel_path, device)
     
-    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None) -> Tuple[np.ndarray, np.ndarray]:
+    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None, frame_num:int = 0) -> Tuple[np.ndarray, np.ndarray]:
+        if openlabel is not None:
+            self.set_openlabel(openlabel)
+
         # Inference
         encoded = super().preprocess_image(image)
         with torch.no_grad():
@@ -176,7 +181,7 @@ class Raw2Seg_BEV(BEV2SEG_2_Interface):
         # cv2.waitKey(0)
         
         # Generate BEV mask
-        bev_mask = self.inverse_perspective_mapping(mask, camera_name)
+        bev_mask = self.inverse_perspective_mapping(mask, camera_name, frame_num=frame_num)
         return mask, bev_mask
 
 
@@ -190,7 +195,10 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
         """
         super().__init__(model_path, openlabel_path, device)
     
-    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None) -> np.ndarray:
+    def generate_bev_segmentation(self, image: np.ndarray, camera_name:str, openlabel: core.OpenLABEL = None, frame_num:int = 0) -> Tuple[np.ndarray, np.ndarray]:
+        if openlabel is not None:
+            self.set_openlabel(openlabel)
+        
         # IPM to BEV image
         bev_image = self.inverse_perspective_mapping(image, camera_name)
         # cv2.imshow("BEV image", bev_image)
@@ -207,7 +215,7 @@ class Raw_BEV2Seg(BEV2SEG_2_Interface):
 
         # cv2.imshow("BEV Segmentation mask", self.mask2image(bev_mask, nuid2color))
         # cv2.waitKey(0)
-        return bev_mask
+        return bev_image, bev_mask
 
 
 

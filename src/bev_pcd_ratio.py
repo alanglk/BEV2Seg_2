@@ -200,6 +200,8 @@ def main(data_folder,  image_token, cam_name, output_json_path):
 
 if __name__ == "__main__":
     
+    # python3 src/bev_pcd_ratio.py --data_folder ./data --output_json_path ./data/bev_pcd_ratio.json --image_token 60d367ec0c7e445d8f92fbc4a993c67e
+
     # Definir los argumentos
     parser = argparse.ArgumentParser(description="Calcular distancias métricas en BEV.")
     parser.add_argument('--data_folder', type=str, required=True, help='Path a la carpeta de datos.')
