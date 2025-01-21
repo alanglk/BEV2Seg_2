@@ -314,17 +314,27 @@ class InstanceScenePCD():
         ]
     }
 
-    def __init__(self, dbscan_samples:int = 50, dbscan_eps:int = 1, merge_semantic_labels:bool = False, label2id:dict = None):
+    def __init__(self, 
+                 dbscan_samples:int = 50, 
+                 dbscan_eps:int = 1, 
+                 dbscan_jobs:int = None,
+                 min_samples:int = None,
+                 merge_semantic_labels:bool = False, 
+                 label2id:dict = None):
         """
         INPUT
             - dbscan_samples:
             - dbscan_eps:
+            - dbscan_jobs:
             - merge_semantic_labels: if set to true semantic labels are merged with DEFAULT_MERGE_DICT. 
                 label2id is required.
         """
         self.dbscan_samples = dbscan_samples
-        self.dbscan_eps = dbscan_eps
-        
+        self.dbscan_eps     = dbscan_eps
+        self.dbscan_jobs    = dbscan_jobs
+        self.min_samples    = min_samples 
+
+
         self.merge_semantic_labels = merge_semantic_labels
         self.label2id = label2id
         if self.merge_semantic_labels:
@@ -410,7 +420,7 @@ class InstanceScenePCD():
                 continue
             
             # Compute Clusters
-            db = DBSCAN(eps=self.dbscan_eps, min_samples=self.dbscan_samples).fit(seg_pcd['pcd'])
+            db = DBSCAN(eps=self.dbscan_eps, min_samples=self.dbscan_samples, n_jobs=self.dbscan_jobs).fit(seg_pcd['pcd'])
             color_map = self._get_cluster_colormap(db.labels_)
             clusters = defaultdict(list)
             for label, point_xyz in zip(db.labels_, seg_pcd['pcd']):
@@ -420,6 +430,9 @@ class InstanceScenePCD():
             seg_pcd['instance_pcds'] = []
             seg_pcd['instance_3dboxes'] = []
             for inst_id, pcd in clusters.items():
+                if self.min_samples is not None and len(pcd) < self.min_samples:
+                    continue # Skip cluster
+
                 inst_pcd = np.array(pcd)
                 data = {'inst_id': inst_id, 
                         'pcd': inst_pcd, 
@@ -711,7 +724,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     print(f"Using device: {device}")
     
     # Create instances
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': True})
     
     raw2seg_bev = Raw2Seg_BEV(raw2segmodel_path, None, device=device)
     raw_seg2bev = Raw_BEV2Seg(bev2segmodel_path, None, device=device)
@@ -720,7 +733,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
-    ISP = InstanceScenePCD(merge_semantic_labels=True, label2id=raw_seg2bev.label2id)
+    ISP = InstanceScenePCD(dbscan_samples=5, dbscan_eps = 1.0, dbscan_jobs=4, merge_semantic_labels=True, label2id=raw_seg2bev.label2id)
     IBD = InstanceBEVDrawer(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
     IRD = InstanceRAWDrawer(scene=scene)
 
@@ -735,15 +748,17 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
 
         # ##############################################################
         # Load input image #############################################
+        print(f"# Load input image {'#'*45}")
         raw_image = cv2.imread(raw_image_path)
 
 
         # ##############################################################
         # Generate semantic masks ######################################
+        print(f"# Generate semantic masks {'#'*38}")
         if BMM.gen_flags['all'] or BMM.gen_flags['semantic']: 
             raw_mask, bev_mask_sb  = raw2seg_bev.generate_bev_segmentation(raw_image,camera_name, frame_num=fk)
             bev_image, bev_mask_bs = raw_seg2bev.generate_bev_segmentation(raw_image, camera_name, frame_num=fk)
-            # BMM.save_semantic_images(image_name=raw_image_path, images=[raw_mask, bev_mask_sb, bev_mask_bs])
+            BMM.save_semantic_images(image_name=raw_image_path, images=[raw_mask, bev_mask_sb, bev_mask_bs])
         else:
             bev_image = raw_seg2bev.inverse_perspective_mapping(raw_image, camera_name=camera_name, frame_num=fk)
             raw_mask, bev_mask_sb, bev_mask_bs = BMM.load_semantic_images(image_name=raw_image_path)
@@ -755,23 +770,26 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         
         # ##############################################################
         # Depth estimation #############################################
+        print(f"# Depth estimation {'#'*45}")
         if BMM.gen_flags['all'] or BMM.gen_flags['depth']:
             depth_dmap = DE.run(raw_image_path)
-            # BMM.save_depth_image(raw_image_path, depth_dmap)
+            BMM.save_depth_image(raw_image_path, depth_dmap)
         else:
             depth_dmap = BMM.load_depth_image(raw_image_path)
 
         # ##############################################################
-        # Generate pointcloud  #########################################
+        # Generate pointcloud ##########################################
+        print(f"# Generate pointcloud {'#'*42}")
         if BMM.gen_flags['all'] or BMM.gen_flags['pointcloud']:
             blended_image = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
             pcd = SP.run(depth_dmap, camera_name, color_image=blended_image)
-            # BMM.save_pointcloud(raw_image_path, pcd)
+            BMM.save_pointcloud(raw_image_path, pcd)
         else:
             pcd = BMM.load_pointcloud(raw_image_path)
 
         # ##############################################################
         # Generate panoptic pointcloud dict ############################
+        print(f"# Generate panoptic pointcloud dict {'#'*28}")
         if BMM.gen_flags['all'] or BMM.gen_flags['instances']:
             instance_pcds = ISP.run(pcd, raw_mask, camera_name, lims=(np.inf, np.inf, np.inf))
             BMM.save_instance_pcds(raw_image_path, instance_pcds)
@@ -784,6 +802,31 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
 
         # ##############################################################
         # Draw cuboids on RAW image ####################################
+        print(f"# Draw cuboids on RAW image {'#'*36}")
+        def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max_distance:float = 15.0):
+            for semantic_pcd in instance_pcds:
+                if not semantic_pcd['dynamic']:
+                    continue # Skip if non dynamic
+                
+                # Remove noise pcds from list
+                for i, aux in enumerate(semantic_pcd['instance_pcds']):
+                    if aux['inst_id'] == -1:
+                            semantic_pcd['instance_pcds'].pop(i)
+                assert len(semantic_pcd['instance_pcds']) == len(semantic_pcd['instance_3dboxes'])
+
+                # Remove far bboxes and pcds with few points
+                for i in range(len(semantic_pcd['instance_pcds'])):
+                    print(f"i: {i} | {semantic_pcd['instance_pcds'][i]['pcd'].shape}")
+                    if semantic_pcd['instance_pcds']['pcd'].shape < min_samples_per_instance:
+                        # Check number of samples in pcd
+                        semantic_pcd['instance_pcds'].pop(i)
+                        semantic_pcd['instance_3dboxes'].pop(i)
+                    elif np.linalg.norm( semantic_pcd['instance_3dboxes'][i]['center'] ) > max_distance:
+                        # Check distance of centroid
+                        semantic_pcd['instance_pcds'].pop(i)
+                        semantic_pcd['instance_3dboxes'].pop(i)
+
+        instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=150, max_distance=30.0)
         blended_image = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
         raw_image_cuboids = IRD.run_on_image(blended_image, instance_pcds, frame_num=fk)
         pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
@@ -792,13 +835,13 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # ##############################################################
         # Visualization ################################################
         all_geometries = pcd_semantic + pcd_cuboids
-        cv2.imshow("DEBUG", blended_image)
+        cv2.imshow("DEBUG", raw_image_cuboids)
         
         print()
         # Check for a key press (if a key is pressed, it returns the ASCII code)
         if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
             break
-        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
+        # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
 
     # Release resources
     cv2.destroyAllWindows()
