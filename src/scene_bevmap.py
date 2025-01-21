@@ -724,7 +724,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     print(f"Using device: {device}")
     
     # Create instances
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': True})
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
     
     raw2seg_bev = Raw2Seg_BEV(raw2segmodel_path, None, device=device)
     raw_seg2bev = Raw_BEV2Seg(bev2segmodel_path, None, device=device)
@@ -815,18 +815,22 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
                 assert len(semantic_pcd['instance_pcds']) == len(semantic_pcd['instance_3dboxes'])
 
                 # Remove far bboxes and pcds with few points
+                removing_indices = []
                 for i in range(len(semantic_pcd['instance_pcds'])):
-                    print(f"i: {i} | {semantic_pcd['instance_pcds'][i]['pcd'].shape}")
-                    if semantic_pcd['instance_pcds']['pcd'].shape < min_samples_per_instance:
-                        # Check number of samples in pcd
-                        semantic_pcd['instance_pcds'].pop(i)
-                        semantic_pcd['instance_3dboxes'].pop(i)
-                    elif np.linalg.norm( semantic_pcd['instance_3dboxes'][i]['center'] ) > max_distance:
-                        # Check distance of centroid
-                        semantic_pcd['instance_pcds'].pop(i)
-                        semantic_pcd['instance_3dboxes'].pop(i)
+                    num_samples = semantic_pcd['instance_pcds'][i]['pcd'].shape[0]
+                    distance = np.linalg.norm( semantic_pcd['instance_3dboxes'][i]['center'] )
+                    print(f"instance: {semantic_pcd['instance_pcds'][i]['inst_id']} with index {i} has {num_samples} samples and it's {distance}m away")
 
-        instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=150, max_distance=30.0)
+                    if  num_samples < min_samples_per_instance or distance > max_distance:
+                        removing_indices.append(i)
+                
+                print(f"removing indices: {removing_indices}")
+                semantic_pcd['instance_pcds']       = [valor for idx, valor in enumerate(semantic_pcd['instance_pcds'])     if idx not in removing_indices]
+                semantic_pcd['instance_3dboxes']    = [valor for idx, valor in enumerate(semantic_pcd['instance_3dboxes'])  if idx not in removing_indices]
+            
+            return instance_pcds
+        
+        instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=150, max_distance=50.0)
         blended_image = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
         raw_image_cuboids = IRD.run_on_image(blended_image, instance_pcds, frame_num=fk)
         pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
@@ -836,12 +840,14 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # Visualization ################################################
         all_geometries = pcd_semantic + pcd_cuboids
         cv2.imshow("DEBUG", raw_image_cuboids)
+        # cv2.imwrite(os.path.join(scene_path, "debug",f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.png"), raw_image_cuboids)
         
+    
         print()
         # Check for a key press (if a key is pressed, it returns the ASCII code)
         if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
             break
-        # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
+        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
 
     # Release resources
     cv2.destroyAllWindows()
