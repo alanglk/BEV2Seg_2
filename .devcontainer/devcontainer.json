@@ -8,14 +8,14 @@
       "extensions": ["ms-python.python", "ms-python.debugpy", "ms-toolsai.jupyter", "tamasfe.even-better-toml"]
     }
   },
-  "runArgs": [
-        "--net", "host", 
-        "--name", "agarciaj/bev2seg_2:v0.3_devcontainer",
-        "--privileged",
-        "-e", "DISPLAY=${env:DISPLAY}",
-        "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-        "--gpus",
-        "all"
+    "runArgs": [
+      "--net", "host", 
+      "--privileged",
+      "-e", "DISPLAY=${env:DISPLAY}",
+      "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+      "--gpus",
+      "all",
+      "--name", "agarciaj-bev2seg2v03-devcontainer"
   ]
   // "remoteUser": "vscode"
 }
