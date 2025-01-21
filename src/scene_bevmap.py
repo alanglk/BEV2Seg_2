@@ -559,6 +559,139 @@ class InstanceBEVDrawer():
         return bev_image
 
 
+class InstanceRAWDrawer():
+    DEFAULT_DRAWING_LABELS = ['vehicle.car']
+
+    def __init__(self, scene:scl.Scene, drawing_semantic_labels:List[str]=None):
+        self.scene = scene
+        self.drawing_semantic_labels = drawing_semantic_labels if drawing_semantic_labels is not None else self.DEFAULT_DRAWING_LABELS  
+
+    def create_cuboid_edges(self, center, dims, color = (0.0, 1.0, 0.0)):
+        # Desglosamos el centro y las dimensiones
+        cx, cy, cz = center # x, y, z
+        w, h, d = dims # width, height, depth
+        
+        # Definimos los vértices de un cuboide centrado en 'center' con dimensiones 'width', 'height', 'depth'
+        vertices = np.array([
+            [cx - w/2, cy - h/2, cz - d/2],  # Vértice 0
+            [cx + w/2, cy - h/2, cz - d/2],  # Vértice 1
+            [cx + w/2, cy + h/2, cz - d/2],  # Vértice 2
+            [cx - w/2, cy + h/2, cz - d/2],  # Vértice 3
+            [cx - w/2, cy - h/2, cz + d/2],  # Vértice 4
+            [cx + w/2, cy - h/2, cz + d/2],  # Vértice 5
+            [cx + w/2, cy + h/2, cz + d/2],  # Vértice 6
+            [cx - w/2, cy + h/2, cz + d/2]   # Vértice 7
+        ])
+
+        # Definir las aristas del cuboide, donde cada par de índices representa una línea
+        edges = np.array([
+            [0, 1], [1, 2], [2, 3], [3, 0],  # Aristas de la cara inferior
+            [4, 5], [5, 6], [6, 7], [7, 4],  # Aristas de la cara superior
+            [0, 4], [1, 5], [2, 6], [3, 7]   # Aristas verticales
+        ])
+
+        # Crear un objeto LineSet para dibujar las aristas
+        line_set = o3d.geometry.LineSet()
+        line_set.points = o3d.utility.Vector3dVector(vertices)
+        line_set.lines = o3d.utility.Vector2iVector(edges)
+        line_set.paint_uniform_color(color)
+        line_set.colors = o3d.utility.Vector3dVector([color] * len(edges))
+
+        cube = o3d.geometry.TriangleMesh.create_box(width=0.005, height=0.005, depth=0.005)
+        cube.translate([cx, cy, cz])
+        cube.paint_uniform_color([0,0,0])
+
+        return line_set
+
+    def run_on_image(self, raw_image:np.ndarray, instance_pcds:dict, frame_num:int, edge_color: tuple = (0, 255, 255), vert_color:tuple = (0, 0, 255)):
+        """
+        INPUT:
+            instance_pcds: 
+                [{  'label': str, 
+                    'label_id': int,
+                    'camera_name': str,
+                    'dynamic': bool, 
+                    'pcd': np.ndarray, 
+                    'pcd_colors': np.ndarray,
+                    'instance_pcds': [{
+                        'inst_id': int, 
+                        'pcd': np.ndarray, 
+                        'pcd_colors': np.ndarray
+                    }],
+                    'instance_3dboxes':[{
+                        'inst_id': int, 
+                        'center': (x_pos, y_pos, z_pos), 
+                        'dimensions': (bbox_width, bbox_height, bbox_depth)  
+                    }]
+                }]
+        """
+        
+        # Draw cuboids on RAW image
+        for semantic_pcd in instance_pcds:
+            # skip non dynamic objects
+            if not semantic_pcd['dynamic']:
+                continue 
+            # skip non selected semantic classes
+            if semantic_pcd['label'] not in self.drawing_semantic_labels:
+                continue
+            
+            camera = self.scene.get_camera(semantic_pcd['camera_name'], frame_num=frame_num)
+
+            # Read 3d cuboids data on image frame
+            for bbox in semantic_pcd['instance_3dboxes']:
+                inst_3dbox = self.create_cuboid_edges(bbox['center'], bbox['dimensions'])
+                
+                vertices_3xN = np.asarray(inst_3dbox.points).T
+                edgesNx2 = np.asarray(inst_3dbox.lines) # pairs
+
+                # Draw Vertices
+                vertices_4xN = utils.add_homogeneous_row(vertices_3xN)
+                vertices_proj_4xN, idx_valid = camera.project_points3d(points3d_4xN=vertices_4xN, remove_outside=False)
+                _, N = vertices_proj_4xN.shape # N = 8
+                for i in range(0, N):
+                    if idx_valid[i]:
+                        if np.isnan(vertices_proj_4xN[0, i]) or np.isnan(vertices_proj_4xN[1, i]):
+                            continue
+                        center = ( utils.round(vertices_proj_4xN[0, i]), utils.round(vertices_proj_4xN[1, i]))
+                        
+                        # if not utils.is_inside_image(img_w, img_h, center[0], center[1]):
+                        #     continue
+
+                        cv2.circle(raw_image, (int(center[0]), int(center[1])), 1, vert_color, 2)
+                
+                # Draw Edges
+                for edge in edgesNx2:
+                    p1 = (utils.round( vertices_proj_4xN[0, edge[0]] ), utils.round( vertices_proj_4xN[1, edge[0]] ))
+                    p2 = (utils.round( vertices_proj_4xN[0, edge[1]] ), utils.round( vertices_proj_4xN[1, edge[1]] ))
+                    cv2.line(raw_image, p1, p2, edge_color, 1)
+
+        return raw_image
+
+    def run_on_pointcloud(self, instance_pcds:dict, edge_color:tuple = (0.0, 1.0, 0.0)):
+        selected_pcds = []
+        all_bboxes = []
+        
+        # Draw cuboids on Pointcoud
+        for semantic_pcd in instance_pcds:
+            # skip non dynamic objects
+            if not semantic_pcd['dynamic']:
+                continue 
+            # skip non selected semantic classes
+            if semantic_pcd['label'] not in self.drawing_semantic_labels:
+                continue
+            
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(semantic_pcd['pcd'])
+            pcd.colors = o3d.utility.Vector3dVector(semantic_pcd['pcd_colors'])
+            selected_pcds.append(pcd)
+
+            # Read 3d_bboxes
+            for bbox_data in semantic_pcd['instance_3dboxes']:
+                inst_3dbox = self.create_cuboid_edges(bbox_data['center'], bbox_data['dimensions'], color=edge_color)
+                all_bboxes.append(inst_3dbox) 
+                
+        return selected_pcds, all_bboxes
+
 def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     # Paths
     scene_openlabel_path = os.path.join(scene_path, "nuscenes_openlabel_complete_sequence.json")
@@ -581,7 +714,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     print(f"Using device: {device}")
     
     # Create instances
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': True, 'pointcloud': False, 'instances': False})
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
     
     raw2seg_bev = Raw2Seg_BEV(raw2segmodel_path, None, device=device)
     raw_seg2bev = Raw_BEV2Seg(bev2segmodel_path, None, device=device)
@@ -590,8 +723,9 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
-    ISP = InstanceScenePCD(model_debug=raw_seg2bev, label2id=raw_seg2bev.label2id)
+    ISP = InstanceScenePCD(label2id=raw_seg2bev.label2id)
     IBD = InstanceBEVDrawer(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
+    IRD = InstanceRAWDrawer(scene=scene)
 
     # Scene frame iteration
     frame_keys = vcd.data['openlabel']['frames'].keys()
@@ -650,15 +784,28 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
 
         # ##############################################################
         # Draw cuboids on BEV image ####################################
-        bev_image_cuboids = IBD.run(bev_image, instance_pcds, frame_num=fk)
-        cv2.imshow(window_bev_cuboid_name, bev_image_cuboids)
+        # bev_image_cuboids = IBD.run(bev_image, instance_pcds, frame_num=fk)
 
+        # ##############################################################
+        # Draw cuboids on RAW image ####################################
+        raw_image_cuboids = IRD.run_on_image(raw_image, instance_pcds, frame_num=fk)
+        pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
+        
+        
+        # ##############################################################
+        # Visualization ################################################
+        all_geometries = pcd_semantic + pcd_cuboids
 
-        # Check for a key press (if a key is pressed, it returns the ASCII code)
-        cv2.waitKey(0)
+        cv2.imshow("DEBUG", raw_image_cuboids)
+        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
+        
+
         print()
-        # if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
-        #     break
+        cv2.waitKey(0)
+        
+        # Check for a key press (if a key is pressed, it returns the ASCII code)
+        if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
+            break
 
     # Release resources
     cv2.destroyAllWindows()
