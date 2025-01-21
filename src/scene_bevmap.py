@@ -1,5 +1,5 @@
 from vcd import core, scl, draw, utils
-### Add this to vcd.scl line 1636 for compatibility with non dynamic camera intrinsics
+### Add this to vcd.scl line 1641 for compatibility with non dynamic camera intrinsics
 # intrinsic_types = ["intrinsics_pinhole" "intrinsics_fisheye", "intrinsics_cylindrical", "intrinsics_orthographic", "intrinsics_cubemap"]
 # sp = vcd_frame["frame_properties"]["streams"][camera_name]["stream_properties"]
 # for it in intrinsic_types:
@@ -101,18 +101,15 @@ def check_paths(paths: List[str]) -> List[bool]:
 
     return flag_list
 
-def get_blended_image(image_a, image_b:np.ndarray, alpha:float=0.5):
+def get_blended_image(image_a:np.ndarray, image_b:np.ndarray, alpha:float=0.5):
     """
-    INPUT: raw_image is image_a and semantic mask is image_b 
+    INPUT: raw_image is image_a and semantic mask colored is image_b 
     OUPUT: blended image
     """
-    if len(image_b.shape) > 2:
-        image_b = image_b[:, :, 0]
-
-    image_a_float = image_a.astype(np.float32)
-    semantic_mask_rgb = target2image(image_b, nuid2color)
-    semantic_mask_rgb_float = semantic_mask_rgb.astype(np.float32)
-    blended_image = cv2.addWeighted(image_a_float, 1 - alpha, semantic_mask_rgb_float, alpha, 0)
+    if image_a.shape != image_b.shape:
+        raise ValueError("Las imágenes deben tener las mismas dimensiones y número de canales.")
+    
+    blended_image = cv2.addWeighted(image_a, alpha, image_b, 1 - alpha, 0)
     return blended_image
 
 class BEVMapManager():
@@ -723,7 +720,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
-    ISP = InstanceScenePCD(label2id=raw_seg2bev.label2id)
+    ISP = InstanceScenePCD(merge_semantic_labels=True, label2id=raw_seg2bev.label2id)
     IBD = InstanceBEVDrawer(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
     IRD = InstanceRAWDrawer(scene=scene)
 
@@ -756,7 +753,6 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # cv2.imshow(window_sb_name,  raw2seg_bev.mask2image(bev_mask_sb))
         # cv2.imshow(window_bs_name,  raw_seg2bev.mask2image(bev_mask_bs))
         
-        print(f"raw_mask.shape: {raw_mask.shape}")
         # ##############################################################
         # Depth estimation #############################################
         if BMM.gen_flags['all'] or BMM.gen_flags['depth']:
@@ -768,7 +764,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # ##############################################################
         # Generate pointcloud  #########################################
         if BMM.gen_flags['all'] or BMM.gen_flags['pointcloud']:
-            blended_image = get_blended_image(raw_image, raw_mask)
+            blended_image = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
             pcd = SP.run(depth_dmap, camera_name, color_image=blended_image)
             # BMM.save_pointcloud(raw_image_path, pcd)
         else:
@@ -788,24 +784,21 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
 
         # ##############################################################
         # Draw cuboids on RAW image ####################################
-        raw_image_cuboids = IRD.run_on_image(raw_image, instance_pcds, frame_num=fk)
+        blended_image = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
+        raw_image_cuboids = IRD.run_on_image(blended_image, instance_pcds, frame_num=fk)
         pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
         
         
         # ##############################################################
         # Visualization ################################################
         all_geometries = pcd_semantic + pcd_cuboids
-
-        cv2.imshow("DEBUG", raw_image_cuboids)
-        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
+        cv2.imshow("DEBUG", blended_image)
         
-
         print()
-        cv2.waitKey(0)
-        
         # Check for a key press (if a key is pressed, it returns the ASCII code)
         if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
             break
+        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
 
     # Release resources
     cv2.destroyAllWindows()
