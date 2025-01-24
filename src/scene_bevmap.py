@@ -112,6 +112,200 @@ def get_blended_image(image_a:np.ndarray, image_b:np.ndarray, alpha:float=0.5):
     blended_image = cv2.addWeighted(image_a, alpha, image_b, 1 - alpha, 0)
     return blended_image
 
+def get_pcds_of_semantic_label(instance_pcds:dict, semantic_labels:list = None):
+    pcds = []
+    for semantic_pcd in instance_pcds:
+        # skip if semantic_label is set and is not equal to the object label
+        if semantic_labels is not None and semantic_pcd['label'] not in semantic_labels:
+            continue 
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(semantic_pcd['pcd'])
+        pcd.colors = o3d.utility.Vector3dVector(semantic_pcd['pcd_colors'])
+        pcds.append(pcd)
+    return pcds
+
+
+def intersection_factor(mask1, mask2):
+    """
+    Jaccard index based 
+    """
+    mask1 = mask1.astype(bool)
+    mask2 = mask2.astype(bool)
+    
+    intersection = np.logical_and(mask1, mask2).sum()
+    union = np.logical_or(mask1, mask2).sum()
+    
+    if union == 0:
+        return 0 # If there is no union 
+        return 1.0 if intersection == 0 else 0.0
+    
+    return intersection / union
+
+def merge_semantic_labels(semantic_mask, label2id, merge_dict:dict = None):
+    DEFAULT_MERGE_DICT = {
+        'vehicle.car': [
+            "vehicle.bus.bendy", 
+            "vehicle.bus.rigid", 
+            "vehicle.car", 
+            "vehicle.construction", 
+            "vehicle.emergency.ambulance", 
+            "vehicle.emergency.police", 
+            "vehicle.trailer", 
+            "vehicle.truck"
+        ],
+        "vehicle.motorcycle":[
+            "vehicle.bicycle",
+            "vehicle.motorcycle"
+        ]
+    }
+    if merge_dict is None:
+        merge_dict = DEFAULT_MERGE_DICT
+
+    # Merge labels
+    for k, vals in merge_dict.items():
+        to_id   = label2id[k]
+        for v in vals:
+            from_id = label2id[v]
+            semantic_mask[semantic_mask == from_id] = to_id
+    return semantic_mask
+
+
+def AABB_intersect(A: dict, B:dict) -> bool:
+    class AABB:
+        def __init__(self, center: tuple, dims: tuple):
+            self.minX = center[0] - dims[0]
+            self.maxX = center[0] + dims[0]
+            self.minY = center[1] - dims[1]
+            self.maxY = center[1] + dims[1]
+            self.minZ = center[2] - dims[2]
+            self.maxZ = center[2] + dims[2]
+    A = AABB(A['center'], A['dimensions'])
+    B = AABB(B['center'], B['dimensions'])
+    return A.minX <= B.maxX and A.maxX >= B.minX and A.minY <= B.maxY and A.maxY >= B.minY and A.minZ <= B.maxZ and A.maxZ >= B.minZ
+
+def AABB_A_bigger_than_B(A: dict, B:dict) -> bool:
+    A_dims = A['dimensions']
+    B_dims = B['dimensions']
+    return A_dims[0] * A_dims[1] * A_dims[2] >= B_dims[0] * B_dims[1] * B_dims[2]
+
+def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max_distance:float = 15.0, max_height:float = 2.0):
+            for semantic_pcd in instance_pcds:
+                if not semantic_pcd['dynamic']:
+                    continue # Skip if non dynamic
+                
+                # Remove noise pcds from list
+                for i, aux in enumerate(semantic_pcd['instance_pcds']):
+                    if aux['inst_id'] == -1:
+                            semantic_pcd['instance_pcds'].pop(i)
+                assert len(semantic_pcd['instance_pcds']) == len(semantic_pcd['instance_3dboxes'])
+
+                # Remove far bboxes and pcds with few points
+                added_AABBs = []
+                removing_indices = []
+                for i in range(len(semantic_pcd['instance_pcds'])):
+                    num_samples = semantic_pcd['instance_pcds'][i]['pcd'].shape[0]
+                    A = semantic_pcd['instance_3dboxes'][i] # Cuboid for instance pcd
+                    height = abs(A['center'][1])
+                    
+                    # Do not add the instance if it has few samples or the y position is above threshold
+                    if num_samples < min_samples_per_instance or height > max_height:
+                        removing_indices.append(i)
+                        continue
+                    
+                    # Do not add the instance if it is far away
+                    distance = np.linalg.norm( A['center'] )
+                    if distance > max_distance:
+                        removing_indices.append(i)
+                        continue
+
+                    # Do not add the instance if it's cuboid A intersects with an already added instance B 
+                    # Check if A is bigger than B. If its the case, remove B and add A
+                    replace_index = None
+                    for bbox_index in added_AABBs:
+                        B = semantic_pcd['instance_3dboxes'][bbox_index]
+                        if AABB_intersect(A, B):
+                            if AABB_A_bigger_than_B(A, B):
+                                replace_index = bbox_index # Replace B with A
+                            replace_index = -1 # Dont add A
+                            break
+
+                    # The instance has an intersection
+                    if replace_index is not None:
+                        if replace_index == -1:
+                            # Do not add the current instance
+                            removing_indices.append(i)
+                            continue
+                        # Remove the B instance
+                        removing_indices.append(replace_index)
+                        added_AABBs.pop( added_AABBs.index(replace_index) )
+                            
+                    # Add the instance
+                    added_AABBs.append(i)
+
+                print(f"class: {semantic_pcd['label']} removing indices: {removing_indices}")
+                semantic_pcd['instance_pcds']       = [valor for idx, valor in enumerate(semantic_pcd['instance_pcds'])     if idx not in removing_indices]
+                semantic_pcd['instance_3dboxes']    = [valor for idx, valor in enumerate(semantic_pcd['instance_3dboxes'])  if idx not in removing_indices]
+            
+            return instance_pcds
+
+def create_cuboid_edges(center, dims, color = (0.0, 1.0, 0.0)):
+        # Desglosamos el centro y las dimensiones
+        cx, cy, cz = center # x, y, z
+        w, h, d = dims # width, height, depth
+        
+        # Definimos los vértices de un cuboide centrado en 'center' con dimensiones 'width', 'height', 'depth'
+        vertices = np.array([
+            [cx - w/2, cy - h/2, cz - d/2],  # Vértice 0
+            [cx + w/2, cy - h/2, cz - d/2],  # Vértice 1
+            [cx + w/2, cy + h/2, cz - d/2],  # Vértice 2
+            [cx - w/2, cy + h/2, cz - d/2],  # Vértice 3
+            [cx - w/2, cy - h/2, cz + d/2],  # Vértice 4
+            [cx + w/2, cy - h/2, cz + d/2],  # Vértice 5
+            [cx + w/2, cy + h/2, cz + d/2],  # Vértice 6
+            [cx - w/2, cy + h/2, cz + d/2]   # Vértice 7
+        ])
+
+        # Definir las aristas del cuboide, donde cada par de índices representa una línea
+        edges = np.array([
+            [0, 1], [1, 2], [2, 3], [3, 0],  # Aristas de la cara inferior
+            [4, 5], [5, 6], [6, 7], [7, 4],  # Aristas de la cara superior
+            [0, 4], [1, 5], [2, 6], [3, 7]   # Aristas verticales
+        ])
+
+        # Crear un objeto LineSet para dibujar las aristas
+        line_set = o3d.geometry.LineSet()
+        line_set.points = o3d.utility.Vector3dVector(vertices)
+        line_set.lines = o3d.utility.Vector2iVector(edges)
+        line_set.paint_uniform_color(color)
+        line_set.colors = o3d.utility.Vector3dVector([color] * len(edges))
+
+        cube = o3d.geometry.TriangleMesh.create_box(width=0.005, height=0.005, depth=0.005)
+        cube.translate([cx, cy, cz])
+        cube.paint_uniform_color([0,0,0])
+
+        return line_set
+
+def create_plane_at_y(y, size:int = 5):
+    vertices = np.array([
+        [-size, -y, -size],
+        [size,  -y, -size],
+        [-size, -y,  size],
+        [size,  -y,  size]])
+    faces = np.array([
+        [0, 1, 2],
+        [2, 1, 0],
+        [3, 2, 1],
+        [1, 2, 3]])
+    
+    # Crear la malla de triángulos
+    plane = o3d.geometry.TriangleMesh()
+    plane.vertices = o3d.utility.Vector3dVector(vertices)
+    plane.triangles = o3d.utility.Vector3iVector(faces)
+    plane.paint_uniform_color([0.5, 0.5, 0.5])
+    
+    return plane
+
+
 class BEVMapManager():
     GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances']
     
@@ -295,32 +489,12 @@ class ScenePCD():
         
         return pcd
 
-
 class InstanceScenePCD():
-    DEFAULT_MERGE_DICT = {
-        'vehicle.car': [
-            "vehicle.bus.bendy", 
-            "vehicle.bus.rigid", 
-            "vehicle.car", 
-            "vehicle.construction", 
-            "vehicle.emergency.ambulance", 
-            "vehicle.emergency.police", 
-            "vehicle.trailer", 
-            "vehicle.truck"
-        ],
-        "vehicle.motorcycle":[
-            "vehicle.bicycle",
-            "vehicle.motorcycle"
-        ]
-    }
-
     def __init__(self, 
                  dbscan_samples:int = 50, 
                  dbscan_eps:int = 1, 
                  dbscan_jobs:int = None,
-                 min_samples:int = None,
-                 merge_semantic_labels:bool = False, 
-                 label2id:dict = None):
+                 min_samples:int = None):
         """
         INPUT
             - dbscan_samples:
@@ -334,21 +508,7 @@ class InstanceScenePCD():
         self.dbscan_jobs    = dbscan_jobs
         self.min_samples    = min_samples 
 
-
-        self.merge_semantic_labels = merge_semantic_labels
-        self.label2id = label2id
-        if self.merge_semantic_labels:
-            assert self.label2id is not None
-
     def _get_segmented_pcds(self, pcd: np.ndarray, pcd_colors: np.ndarray, seg_mask:np.ndarray, camera_name:str, id2label:dict = nuid2name, id2dynamic: dict = nuid2dynamic):
-        # Merge labels
-        if self.merge_semantic_labels is not None:
-            for k, vals in self.DEFAULT_MERGE_DICT.items():
-                to_id   = self.label2id[k]
-                for v in vals:
-                    from_id = self.label2id[v]
-                    seg_mask[seg_mask == from_id] = to_id
-        
         pcds = []
         labels = np.unique(seg_mask)
         # Compute segmented pcd
@@ -459,13 +619,16 @@ class InstanceScenePCD():
                 seg_pcd['instance_3dboxes'].append(data)
         return segmented_pointclouds
 
-class InstanceBEVDrawer():
-    DEFAULT_DRAWING_LABELS = ['vehicle.car']
+class InstanceBEVMasks():
+    DEFAULT_SELECTED_LABELS = ['vehicle.car']
 
-    def __init__(self, scene:scl.Scene, bev_parameters:draw.TopView.Params, drawing_semantic_labels:List[str]=None):
+    def __init__(self, scene:scl.Scene, bev_parameters:draw.TopView.Params, selected_semantic_labels:List[str]=None):
+        """
+            Get the instance Occupancy/Oclussion masks on the BEV domain.
+        """
         self.scene = scene
         self.bev_parameters = bev_parameters
-        self.drawing_semantic_labels = drawing_semantic_labels if drawing_semantic_labels is not None else self.DEFAULT_DRAWING_LABELS  
+        self.selected_semantic_labels = selected_semantic_labels if selected_semantic_labels is not None else self.DEFAULT_SELECTED_LABELS  
     
     def point2pixel(self, point: tuple[int, int]) -> tuple[int, int]:
         pixel = (
@@ -474,9 +637,23 @@ class InstanceBEVDrawer():
         )
         return pixel
 
-    def run(self, bev_image:np.ndarray, instance_pcds:dict, frame_num:int):
+    def run(self,
+            bev_mask: np.ndarray,
+            instance_pcds:dict, 
+            frame_num:int, 
+            bev_image:np.ndarray = None,
+            edge_color: tuple = (0, 255, 255), 
+            vert_color:tuple = (0, 0, 255),
+            base_color:tuple = (0, 255, 255),
+            ):
         """
         INPUT:
+            - bev_mask: (H, W, C) where C is going to be ignored
+            - instance_pcds: dict of panoptic segmentation of the pointcloud
+            - frame_num: frame number
+            - bev_image: (H, W, C) if provided, the instance bboxes are going to be drawed on it
+            - edge_color: if 
+        OUTPUT:
             instance_pcds: 
                 [{  'label': str, 
                     'label_id': int,
@@ -493,81 +670,118 @@ class InstanceBEVDrawer():
                         'inst_id': int, 
                         'center': (x_pos, y_pos, z_pos), 
                         'dimensions': (bbox_width, bbox_height, bbox_depth)  
+                    }],
+                    'instance_bev_mask':[{
+                        'inst_id': int,
+                        'occupancy_mask': (H, W) binary mask,
+                        'oclussion_mask': (H, W) binary mask
                     }]
                 }]
         """
         
-        # Draw cuboids on BEV image
+        if len(bev_mask.shape) > 2:
+            bev_mask = bev_mask[:, :, 0] # Get the first channel
+
+        # Compute cuboids on BEV image
         for semantic_pcd in instance_pcds:
             # skip non dynamic objects
             if not semantic_pcd['dynamic']:
                 continue 
             # skip non selected semantic classes
-            if semantic_pcd['label'] not in self.drawing_semantic_labels:
+            if semantic_pcd['label'] not in self.selected_semantic_labels:
                 continue
             
-            # Compute pseudo-pcd to bev_image ratio
-            camera_name = semantic_pcd['camera_name']
-            pcd         = semantic_pcd['pcd']
-            ratio_3d2d = 2.1841948444444443
-            ratio_2d3d = 1 # 0.4578346123943684
-            print(f"ratio_2d3d: {ratio_2d3d} | ratio_3d2d: {ratio_3d2d}")
+            # Find connected components on semantic mask
+            semantic_mask = (bev_mask == semantic_pcd['label_id']).astype(np.uint8) 
+            num_ccomps, semantic_ccomps = cv2.connectedComponents(semantic_mask, connectivity=8)
+            intersection_factors = {}
 
-            # Draw instance 3d cuboids on top-view
-            for inst_3dbox in semantic_pcd['instance_3dboxes']:
-                if inst_3dbox['inst_id'] == -1:
-                    continue # skip if there is an unlabeled 3dbox
+            # Read 3d cuboids data on image frame
+            camera = self.scene.get_camera(semantic_pcd['camera_name'], frame_num)
+            semantic_pcd['instance_bev_mask'] = []
+            for bbox_index, bbox in enumerate(semantic_pcd['instance_3dboxes']):
+                inst_3dbox = create_cuboid_edges(bbox['center'], bbox['dimensions'])
+                vertices_3xN = np.asarray(inst_3dbox.points).T
 
-                # Transform cuboid center to vehicle frame
-                center_3x1 = np.array([inst_3dbox['center'] ]).T * ratio_2d3d
-                center_4x1 = utils.add_homogeneous_row(center_3x1)
-                center_transformed_4x1 = self.scene.transform_points3d_4xN(center_4x1, camera_name, "vehicle-iso8855", frame_num=frame_num) # + T
+                # Get only base points and edges
+                base_verts = [2, 3, 7, 6]
+                base_edges = [ [2, 3], [3, 7], [7, 6], [6, 2] ]
+                base_poly = []
 
-                center_bev_3x1 =  np.array([center_transformed_4x1[0, 0], center_transformed_4x1[1, 0], 1.0])
-                center_bev_3x1 = self.bev_parameters.S.dot(center_bev_3x1.T).T
-                center_bev_pixel = ( int(round(center_bev_3x1[0])), int(round(center_bev_3x1[1])))
+                # Transform vertices to BEV
+                vertices_4xN = utils.add_homogeneous_row(vertices_3xN)
+                vertices_2d_3xN, idx = camera.project_points3d(vertices_4xN, remove_outside=False)
+                vertices3d_4xN, idx_valid = self.scene.reproject_points2d_3xN_into_plane(vertices_2d_3xN, [0, 0, 1, 0], semantic_pcd['camera_name'], "vehicle-iso8855", frame_num=frame_num)
+                _, N = vertices3d_4xN.shape # N = 8
 
-                # Calc cuboid base vertices bev_image = on vehicle frame
-                cx, cy, cz, _ = center_transformed_4x1[:, 0]
-                w, h, d = inst_3dbox['dimensions']
-                w *= ratio_2d3d
-                h *= ratio_2d3d
-                d *= ratio_2d3d
-                vertices_Nx3 = np.array([
-                    [cx - d/2, cy - w/2, cz - h/2],  # Vértice 0
-                    [cx + d/2, cy - w/2, cz - h/2],  # Vértice 1
-                    [cx + d/2, cy + w/2, cz - h/2],  # Vértice 2
-                    [cx - d/2, cy + w/2, cz - h/2],  # Vértice 3
-                ])
-
-                # Project points to top-view pixels
-                center_pixel = self.point2pixel((center_transformed_4x1[0, 0], center_transformed_4x1[1, 0]))
-                cuboid_pixels = []
-                for vert_3x1 in vertices_Nx3:
-                    vx, vy, vz = vert_3x1[0], vert_3x1[1], vert_3x1[2]
-                    cuboid_pixels.append(self.point2pixel((vx, vy)))
+                pixels = []
+                for i in range(N):
+                    if idx[i] and idx_valid[i]:
+                        if np.isnan(vertices3d_4xN[0, i]) or np.isnan(vertices3d_4xN[1, i]):
+                            continue
+                        pixel = self.point2pixel((vertices3d_4xN[0, i], vertices3d_4xN[1, i]))
+                        pixels.append(pixel)
+                        # Draw points
+                        if bev_image is not None and i in base_verts:
+                            cv2.circle(bev_image, pixel, 1, vert_color, 2)
                 
-                # Draw cuboid base and center on top-view image
-                thick = 2
-                color = (0, 255, 0)
+                base_poly = np.array([pixels[i] for i in base_verts]).reshape((-1, 1, 2))
+                
+                # Draw Edges and fill base
+                if bev_image is not None:
+                    for edge in base_edges:
+                        cv2.line(bev_image, pixels[edge[0]], pixels[edge[1]], edge_color, 1)
+                    
+                    mask = np.ones(bev_image.shape, dtype=np.uint8)
+                    mask = cv2.fillPoly(mask, [base_poly], base_color)
+                    bev_image = get_blended_image(bev_image, mask, alpha=0.9)
 
-                cv2.circle(bev_image, center_pixel, 2, color, thick)
-                cv2.circle(bev_image, center_bev_pixel, 1, (0, 255,255), thick)
-                cv2.circle(bev_image, self.point2pixel((13, 11)), 1, (255, 255,255), thick)
+                # Compute instance mask and save it as occupancy mask
+                instance_mask = np.zeros(bev_mask.shape, dtype=np.uint8)
+                cv2.fillPoly(instance_mask, [base_poly], 1) # Binary mask
+                semantic_pcd['instance_bev_mask'].append({
+                    'inst_id': bbox['inst_id'], 
+                    'occupancy_mask': instance_mask, 
+                    'oclussion_mask': np.zeros((bev_mask.shape[0], bev_mask.shape[1]), dtype=np.uint8)
+                    })
+                assert len(semantic_pcd['instance_bev_mask']) == bbox_index +1 # Just to make sure
 
-                cv2.circle(bev_image, cuboid_pixels[0], 1, color, thick)
-                cv2.circle(bev_image, cuboid_pixels[1], 1, color, thick)
-                cv2.circle(bev_image, cuboid_pixels[2], 1, color, thick)
-                cv2.circle(bev_image, cuboid_pixels[3], 1, color, thick)
+                # Compute intersection factor between the instance_mask and all the semantic components
+                intersection_factors[bbox_index] = [None] # M0 is the background
+                for c in range(1, num_ccomps):
+                    ccomp_mask = np.zeros(semantic_ccomps.shape, dtype=np.uint8)
+                    ccomp_mask[semantic_ccomps == c] = 1
+                    factor = intersection_factor(instance_mask, ccomp_mask)
+                    intersection_factors[bbox_index].append(factor)
+            
+            # Compute Oclusion masks based on the intersection factors
+            for j in range(1, num_ccomps):
+                max_val = 0
+                max_i_index = -1
+                # Iterate each cuboid and get the greatest i-cuboid/j-semantic_component factor
+                for i in range(0, len(semantic_pcd['instance_bev_mask'])):
+                    f = intersection_factors[i][j]
+                    if f > max_val:
+                        max_i_index = i 
+                        max_val = f
+                # If the max_val is not 0, add the j component mask to the i cuboid oclussion mask  
 
-                cv2.line(bev_image, cuboid_pixels[0], cuboid_pixels[1], color, 1)
-                cv2.line(bev_image, cuboid_pixels[1], cuboid_pixels[2], color, 1)
-                cv2.line(bev_image, cuboid_pixels[2], cuboid_pixels[3], color, 1)
-                cv2.line(bev_image, cuboid_pixels[3], cuboid_pixels[0], color, 1)
-                print()
-
-        return bev_image
-
+                if max_val > 0:
+                    ccomp_mask = np.zeros(semantic_ccomps.shape, dtype=np.uint8)
+                    ccomp_mask[semantic_ccomps == j] = 1
+                    oc_mask = semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask']
+                    semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask'] = oc_mask | ccomp_mask
+                    cv2.imshow("DEBUG", semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask'] * 255)
+                    cv2.waitKey(0)
+            # Draw Occupancy/Oclussion masks
+            if bev_image is not None:
+                for inst_bev_mask in semantic_pcd['instance_bev_mask']:
+                    occupancy = (inst_bev_mask['occupancy_mask'][:, :, None] * np.array([0, 255, 0])).astype(np.uint8)
+                    oclussion = (inst_bev_mask['oclussion_mask'][:, :, None] * np.array([0, 255, 0])).astype(np.uint8)
+                    bev_image = get_blended_image(bev_image, occupancy, alpha=0.9)
+                    bev_image = get_blended_image(bev_image, oclussion, alpha=0.9)
+                
+        return instance_pcds
 
 class InstanceRAWDrawer():
     DEFAULT_DRAWING_LABELS = ['vehicle.car']
@@ -575,43 +789,6 @@ class InstanceRAWDrawer():
     def __init__(self, scene:scl.Scene, drawing_semantic_labels:List[str]=None):
         self.scene = scene
         self.drawing_semantic_labels = drawing_semantic_labels if drawing_semantic_labels is not None else self.DEFAULT_DRAWING_LABELS  
-
-    def create_cuboid_edges(self, center, dims, color = (0.0, 1.0, 0.0)):
-        # Desglosamos el centro y las dimensiones
-        cx, cy, cz = center # x, y, z
-        w, h, d = dims # width, height, depth
-        
-        # Definimos los vértices de un cuboide centrado en 'center' con dimensiones 'width', 'height', 'depth'
-        vertices = np.array([
-            [cx - w/2, cy - h/2, cz - d/2],  # Vértice 0
-            [cx + w/2, cy - h/2, cz - d/2],  # Vértice 1
-            [cx + w/2, cy + h/2, cz - d/2],  # Vértice 2
-            [cx - w/2, cy + h/2, cz - d/2],  # Vértice 3
-            [cx - w/2, cy - h/2, cz + d/2],  # Vértice 4
-            [cx + w/2, cy - h/2, cz + d/2],  # Vértice 5
-            [cx + w/2, cy + h/2, cz + d/2],  # Vértice 6
-            [cx - w/2, cy + h/2, cz + d/2]   # Vértice 7
-        ])
-
-        # Definir las aristas del cuboide, donde cada par de índices representa una línea
-        edges = np.array([
-            [0, 1], [1, 2], [2, 3], [3, 0],  # Aristas de la cara inferior
-            [4, 5], [5, 6], [6, 7], [7, 4],  # Aristas de la cara superior
-            [0, 4], [1, 5], [2, 6], [3, 7]   # Aristas verticales
-        ])
-
-        # Crear un objeto LineSet para dibujar las aristas
-        line_set = o3d.geometry.LineSet()
-        line_set.points = o3d.utility.Vector3dVector(vertices)
-        line_set.lines = o3d.utility.Vector2iVector(edges)
-        line_set.paint_uniform_color(color)
-        line_set.colors = o3d.utility.Vector3dVector([color] * len(edges))
-
-        cube = o3d.geometry.TriangleMesh.create_box(width=0.005, height=0.005, depth=0.005)
-        cube.translate([cx, cy, cz])
-        cube.paint_uniform_color([0,0,0])
-
-        return line_set
 
     def run_on_image(self, raw_image:np.ndarray, instance_pcds:dict, frame_num:int, edge_color: tuple = (0, 255, 255), vert_color:tuple = (0, 0, 255)):
         """
@@ -649,7 +826,7 @@ class InstanceRAWDrawer():
 
             # Read 3d cuboids data on image frame
             for bbox in semantic_pcd['instance_3dboxes']:
-                inst_3dbox = self.create_cuboid_edges(bbox['center'], bbox['dimensions'])
+                inst_3dbox = create_cuboid_edges(bbox['center'], bbox['dimensions'])
                 
                 vertices_3xN = np.asarray(inst_3dbox.points).T
                 edgesNx2 = np.asarray(inst_3dbox.lines) # pairs
@@ -668,8 +845,7 @@ class InstanceRAWDrawer():
                         #     continue
 
                         cv2.circle(raw_image, (int(center[0]), int(center[1])), 1, vert_color, 2)
-                
-                # Draw Edges
+
                 for edge in edgesNx2:
                     p1 = (utils.round( vertices_proj_4xN[0, edge[0]] ), utils.round( vertices_proj_4xN[1, edge[0]] ))
                     p2 = (utils.round( vertices_proj_4xN[0, edge[1]] ), utils.round( vertices_proj_4xN[1, edge[1]] ))
@@ -697,7 +873,7 @@ class InstanceRAWDrawer():
 
             # Read 3d_bboxes
             for bbox_data in semantic_pcd['instance_3dboxes']:
-                inst_3dbox = self.create_cuboid_edges(bbox_data['center'], bbox_data['dimensions'], color=edge_color)
+                inst_3dbox = create_cuboid_edges(bbox_data['center'], bbox_data['dimensions'], color=edge_color)
                 all_bboxes.append(inst_3dbox) 
                 
         return selected_pcds, all_bboxes
@@ -718,7 +894,6 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     # Open-CV windows
     cv2.namedWindow("DEBUG", cv2.WINDOW_NORMAL)
 
-
     # Create device for model inference
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
@@ -733,8 +908,8 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
-    ISP = InstanceScenePCD(dbscan_samples=5, dbscan_eps = 1.0, dbscan_jobs=4, merge_semantic_labels=True, label2id=raw_seg2bev.label2id)
-    IBD = InstanceBEVDrawer(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
+    ISP = InstanceScenePCD(dbscan_samples=15, dbscan_eps = 0.1, dbscan_jobs=None)
+    IBM  = InstanceBEVMasks(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
     IRD = InstanceRAWDrawer(scene=scene)
 
     # Scene frame iteration
@@ -763,11 +938,21 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             bev_image = raw_seg2bev.inverse_perspective_mapping(raw_image, camera_name=camera_name, frame_num=fk)
             raw_mask, bev_mask_sb, bev_mask_bs = BMM.load_semantic_images(image_name=raw_image_path)
         
+        # Merge semantic labels
+        #raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id)
+        bev_mask_sb = merge_semantic_labels(bev_mask_sb,    raw_seg2bev.label2id)
+        #bev_mask_bs = merge_semantic_labels(bev_mask_bs,    raw_seg2bev.label2id)
+
         # cv2.imshow(window_bev_name, bev_image)
         # cv2.imshow(window_s_name, raw2seg_bev.mask2image(raw_mask))
         # cv2.imshow(window_sb_name,  raw2seg_bev.mask2image(bev_mask_sb))
         # cv2.imshow(window_bs_name,  raw_seg2bev.mask2image(bev_mask_bs))
         
+        # Identify instances on semantic mask
+        # connected_components(bev_mask_sb, raw2seg_bev.label2id, raw2seg_bev.mask2image)
+        # continue
+
+
         # ##############################################################
         # Depth estimation #############################################
         print(f"# Depth estimation {'#'*45}")
@@ -787,6 +972,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         else:
             pcd = BMM.load_pointcloud(raw_image_path)
 
+       
         # ##############################################################
         # Generate panoptic pointcloud dict ############################
         print(f"# Generate panoptic pointcloud dict {'#'*28}")
@@ -795,59 +981,56 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             BMM.save_instance_pcds(raw_image_path, instance_pcds)
         else:
             instance_pcds = BMM.load_instance_pcds(raw_image_path)
+        
+        print(f"semantic labels in scene: {[semantic_pcd['label'] for semantic_pcd in instance_pcds]}")
+        instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=250, max_distance=50.0, max_height = 2.0)
+        
+        # Save class pcds
+        # pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels=["vehicle.car"])
+        # vehicle_pcd = np.asarray(pcds.pop(0).points)
+        # debug_name = f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.pcd"
+        # vehicle_pcd_path = os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{fk+1}.png")
+        # o3d.io.write_point_cloud(filename=vehicle_pcd_path, pointcloud=vehicle_pcd, write_ascii=True)      
 
         # ##############################################################
         # Draw cuboids on BEV image ####################################
-        # bev_image_cuboids = IBD.run(bev_image, instance_pcds, frame_num=fk)
-
+        # Transform cuboids to BEV, compute ConectedComponents of the bev_mask and
+        # calc occupancy/occlusion masks of each instance
+        print(f"# Draw cuboids on BEV image {'#'*36}")
+        bev_blended = get_blended_image(bev_image, raw2seg_bev.mask2image(bev_mask_sb))
+        instance_pcds = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_blended)
+        
         # ##############################################################
         # Draw cuboids on RAW image ####################################
         print(f"# Draw cuboids on RAW image {'#'*36}")
-        def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max_distance:float = 15.0):
-            for semantic_pcd in instance_pcds:
-                if not semantic_pcd['dynamic']:
-                    continue # Skip if non dynamic
-                
-                # Remove noise pcds from list
-                for i, aux in enumerate(semantic_pcd['instance_pcds']):
-                    if aux['inst_id'] == -1:
-                            semantic_pcd['instance_pcds'].pop(i)
-                assert len(semantic_pcd['instance_pcds']) == len(semantic_pcd['instance_3dboxes'])
-
-                # Remove far bboxes and pcds with few points
-                removing_indices = []
-                for i in range(len(semantic_pcd['instance_pcds'])):
-                    num_samples = semantic_pcd['instance_pcds'][i]['pcd'].shape[0]
-                    distance = np.linalg.norm( semantic_pcd['instance_3dboxes'][i]['center'] )
-                    print(f"instance: {semantic_pcd['instance_pcds'][i]['inst_id']} with index {i} has {num_samples} samples and it's {distance}m away")
-
-                    if  num_samples < min_samples_per_instance or distance > max_distance:
-                        removing_indices.append(i)
-                
-                print(f"removing indices: {removing_indices}")
-                semantic_pcd['instance_pcds']       = [valor for idx, valor in enumerate(semantic_pcd['instance_pcds'])     if idx not in removing_indices]
-                semantic_pcd['instance_3dboxes']    = [valor for idx, valor in enumerate(semantic_pcd['instance_3dboxes'])  if idx not in removing_indices]
-            
-            return instance_pcds
-        
-        instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=150, max_distance=50.0)
-        blended_image = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
-        raw_image_cuboids = IRD.run_on_image(blended_image, instance_pcds, frame_num=fk)
+        raw_blended = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
+        raw_image_cuboids = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
         pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
         
-        
+        # Reproyectar cuboides en raw a bev
+        bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk)
+
         # ##############################################################
         # Visualization ################################################
-        all_geometries = pcd_semantic + pcd_cuboids
-        cv2.imshow("DEBUG", raw_image_cuboids)
-        # cv2.imwrite(os.path.join(scene_path, "debug",f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.png"), raw_image_cuboids)
+        all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)]
+        cv2.imshow("DEBUG", bev_blended)
+        cv2.waitKey(0)
+        # debug_name = f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.png"
+        # cv2.imwrite(os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"), bev_image_cuboids)
+        # cv2.imwrite(os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"), raw_image_cuboids)
+        # cv2.imwrite(os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"), bev_repoj_cuboids)
         
     
         print()
         # Check for a key press (if a key is pressed, it returns the ASCII code)
         if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
             break
-        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG")
+        # o3d.visualization.draw_geometries(all_geometries, 
+        #                                   window_name="DEBUG", 
+        #                                   zoom=0.8,
+        #                                   lookat=[0, 0, 0],
+        #                                   up=[0, -1, 0],
+        #                                   front=[0, 0, 1])
 
     # Release resources
     cv2.destroyAllWindows()
