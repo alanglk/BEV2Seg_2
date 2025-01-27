@@ -124,6 +124,11 @@ def get_pcds_of_semantic_label(instance_pcds:dict, semantic_labels:list = None):
         pcds.append(pcd)
     return pcds
 
+def save_class_pcds(instance_pcds:dict, frame_num:int, semantic_labels = ["vehicle.car"]):
+            pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels=["vehicle.car"])
+            vehicle_pcd = np.asarray(pcds.pop(0).points)
+            vehicle_pcd_path = os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{frame_num+1}.png")
+            o3d.io.write_point_cloud(filename=vehicle_pcd_path, pointcloud=vehicle_pcd, write_ascii=True)      
 
 def intersection_factor(mask1, mask2):
     """
@@ -727,14 +732,15 @@ class InstanceBEVMasks():
                 
                 base_poly = np.array([pixels[i] for i in base_verts]).reshape((-1, 1, 2))
                 
-                # Draw Edges and fill base
+                # Draw Edges
                 if bev_image is not None:
                     for edge in base_edges:
                         cv2.line(bev_image, pixels[edge[0]], pixels[edge[1]], edge_color, 1)
                     
-                    mask = np.ones(bev_image.shape, dtype=np.uint8)
-                    mask = cv2.fillPoly(mask, [base_poly], base_color)
-                    bev_image = get_blended_image(bev_image, mask, alpha=0.9)
+                    # Occupancy is drawn below
+                    # mask = np.ones(bev_image.shape, dtype=np.uint8)
+                    # mask = cv2.fillPoly(mask, [base_poly], base_color)
+                    # bev_image = get_blended_image(bev_image, mask, alpha=0.9)
 
                 # Compute instance mask and save it as occupancy mask
                 instance_mask = np.zeros(bev_mask.shape, dtype=np.uint8)
@@ -771,15 +777,21 @@ class InstanceBEVMasks():
                     ccomp_mask[semantic_ccomps == j] = 1
                     oc_mask = semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask']
                     semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask'] = oc_mask | ccomp_mask
-                    cv2.imshow("DEBUG", semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask'] * 255)
-                    cv2.waitKey(0)
+                    # cv2.imshow("DEBUG", semantic_pcd['instance_bev_mask'][max_i_index]['oclussion_mask'] * 255)
+                    # cv2.waitKey(0)
+            
             # Draw Occupancy/Oclussion masks
             if bev_image is not None:
+                h, w = semantic_pcd['instance_bev_mask'][0]['occupancy_mask'].shape
+                render_mask = np.zeros((h, w, 3), dtype=np.uint8)
                 for inst_bev_mask in semantic_pcd['instance_bev_mask']:
-                    occupancy = (inst_bev_mask['occupancy_mask'][:, :, None] * np.array([0, 255, 0])).astype(np.uint8)
-                    oclussion = (inst_bev_mask['oclussion_mask'][:, :, None] * np.array([0, 255, 0])).astype(np.uint8)
-                    bev_image = get_blended_image(bev_image, occupancy, alpha=0.9)
-                    bev_image = get_blended_image(bev_image, oclussion, alpha=0.9)
+                    occupancy = (inst_bev_mask['occupancy_mask'][:, :, None] * np.asarray(base_color)).astype(np.uint8)
+                    oclussion = (inst_bev_mask['oclussion_mask'][:, :, None] * np.asarray(base_color) * 0.5).astype(np.uint8)
+                    render_mask = render_mask | occupancy | oclussion
+                if np.max(render_mask) > 0:
+                    bev_image = get_blended_image(bev_image, render_mask) 
+                    cv2.imshow("DEBUG", bev_image)
+                    cv2.waitKey(0)
                 
         return instance_pcds
 
@@ -890,7 +902,6 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     scene = scl.Scene(vcd=vcd)
     camera_name = 'CAM_FRONT'
     
-
     # Open-CV windows
     cv2.namedWindow("DEBUG", cv2.WINDOW_NORMAL)
 
@@ -939,19 +950,9 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             raw_mask, bev_mask_sb, bev_mask_bs = BMM.load_semantic_images(image_name=raw_image_path)
         
         # Merge semantic labels
-        #raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id)
+        # raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id)
+        # bev_mask_bs = merge_semantic_labels(bev_mask_bs,    raw_seg2bev.label2id)
         bev_mask_sb = merge_semantic_labels(bev_mask_sb,    raw_seg2bev.label2id)
-        #bev_mask_bs = merge_semantic_labels(bev_mask_bs,    raw_seg2bev.label2id)
-
-        # cv2.imshow(window_bev_name, bev_image)
-        # cv2.imshow(window_s_name, raw2seg_bev.mask2image(raw_mask))
-        # cv2.imshow(window_sb_name,  raw2seg_bev.mask2image(bev_mask_sb))
-        # cv2.imshow(window_bs_name,  raw_seg2bev.mask2image(bev_mask_bs))
-        
-        # Identify instances on semantic mask
-        # connected_components(bev_mask_sb, raw2seg_bev.label2id, raw2seg_bev.mask2image)
-        # continue
-
 
         # ##############################################################
         # Depth estimation #############################################
@@ -984,13 +985,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         
         print(f"semantic labels in scene: {[semantic_pcd['label'] for semantic_pcd in instance_pcds]}")
         instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=250, max_distance=50.0, max_height = 2.0)
-        
-        # Save class pcds
-        # pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels=["vehicle.car"])
-        # vehicle_pcd = np.asarray(pcds.pop(0).points)
-        # debug_name = f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.pcd"
-        # vehicle_pcd_path = os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{fk+1}.png")
-        # o3d.io.write_point_cloud(filename=vehicle_pcd_path, pointcloud=vehicle_pcd, write_ascii=True)      
+        # save_class_pcds(instance_pcds, fk, semantic_labels=["vehicle.car"]) # Save class pcds
 
         # ##############################################################
         # Draw cuboids on BEV image ####################################
@@ -998,7 +993,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # calc occupancy/occlusion masks of each instance
         print(f"# Draw cuboids on BEV image {'#'*36}")
         bev_blended = get_blended_image(bev_image, raw2seg_bev.mask2image(bev_mask_sb))
-        instance_pcds = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_blended)
+        instance_pcds = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=None)
         
         # ##############################################################
         # Draw cuboids on RAW image ####################################
@@ -1006,15 +1001,14 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         raw_blended = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
         raw_image_cuboids = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
         pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
-        
-        # Reproyectar cuboides en raw a bev
-        bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk)
+        bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk) # Reproyectar cuboides en raw a bev
 
         # ##############################################################
         # Visualization ################################################
         all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)]
         cv2.imshow("DEBUG", bev_blended)
         cv2.waitKey(0)
+        
         # debug_name = f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.png"
         # cv2.imwrite(os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"), bev_image_cuboids)
         # cv2.imwrite(os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"), raw_image_cuboids)
@@ -1050,5 +1044,4 @@ if __name__ == "__main__":
     depth_pro_path      = "./models/ml_depth_pro/depth_pro.pt" 
     tmp_path            = "" # args.tmp_path
     
-
     main(scene_path=scene_path, raw2segmodel_path=raw2segmodel_path, bev2segmodel_path= bev2segmodel_path, depth_pro_path=depth_pro_path)
