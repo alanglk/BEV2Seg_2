@@ -101,6 +101,34 @@ def check_paths(paths: List[str]) -> List[bool]:
 
     return flag_list
 
+def get_pallete(N: int) -> np.ndarray:
+    """
+    Return Nx3 uint8 np.ndarray BGR color palette.
+    """
+    # Define a default pastel palette
+    DEFAULT_PALLETE = [
+        (255, 182, 193),  # Light Pink
+        (135, 206, 250),  # Light Sky Blue
+        (152, 251, 152),  # Pale Green
+        (240, 230, 140),  # Khaki
+        (221, 160, 221),  # Plum
+        (255, 228, 196),  # Bisque
+        (173, 216, 230),  # Light Blue
+        (250, 250, 210),  # Light Goldenrod Yellow
+        (216, 191, 216),  # Thistle
+        (255, 240, 245),  # Lavender Blush
+    ]
+
+    final_pallete = np.empty((N, 3), dtype=np.uint8)
+    for i in range(N):
+        if i < len(DEFAULT_PALLETE):
+            final_pallete[i] = np.asarray(DEFAULT_PALLETE[i])
+        else:
+            # Generate a random pastel color (BGR format)
+            random_color = np.random.randint(128, 256, size=3)  # Pastel shades are closer to white
+            final_pallete[i] = random_color
+    return final_pallete
+
 def get_blended_image(image_a:np.ndarray, image_b:np.ndarray, alpha:float=0.5):
     """
     INPUT: raw_image is image_a and semantic mask colored is image_b 
@@ -124,8 +152,8 @@ def get_pcds_of_semantic_label(instance_pcds:dict, semantic_labels:list = None):
         pcds.append(pcd)
     return pcds
 
-def save_class_pcds(instance_pcds:dict, frame_num:int, semantic_labels = ["vehicle.car"]):
-            pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels=["vehicle.car"])
+def save_class_pcds(instance_pcds:dict, frame_num:int, semantic_labels:list = None):
+            pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels= semantic_labels)
             vehicle_pcd = np.asarray(pcds.pop(0).points)
             vehicle_pcd_path = os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{frame_num+1}.png")
             o3d.io.write_point_cloud(filename=vehicle_pcd_path, pointcloud=vehicle_pcd, write_ascii=True)      
@@ -790,8 +818,8 @@ class InstanceBEVMasks():
                     render_mask = render_mask | occupancy | oclussion
                 if np.max(render_mask) > 0:
                     bev_image = get_blended_image(bev_image, render_mask) 
-                    cv2.imshow("DEBUG", bev_image)
-                    cv2.waitKey(0)
+                    # cv2.imshow("DEBUG", bev_image)
+                    # cv2.waitKey(0)
                 
         return instance_pcds
 
@@ -910,21 +938,27 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     print(f"Using device: {device}")
     
     # Create instances
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
-    
     raw2seg_bev = Raw2Seg_BEV(raw2segmodel_path, None, device=device)
     raw_seg2bev = Raw_BEV2Seg(bev2segmodel_path, None, device=device)
     raw2seg_bev.set_openlabel(vcd)
     raw_seg2bev.set_openlabel(vcd)
     
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
     ISP = InstanceScenePCD(dbscan_samples=15, dbscan_eps = 0.1, dbscan_jobs=None)
-    IBM  = InstanceBEVMasks(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
+    IBM = InstanceBEVMasks(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
     IRD = InstanceRAWDrawer(scene=scene)
+
+    # PCD odometry stitching
+    initial_translation_4x1 = None
+    accum_pcd_points = np.empty((0, 3))
+    accum_pcd_colors = np.empty((0, 3))
+    
 
     # Scene frame iteration
     frame_keys = vcd.data['openlabel']['frames'].keys()
+    frame_color_pallete = get_pallete(len(frame_keys)).astype(np.float64) / 255.0
     for fk in tqdm(frame_keys, desc="frames"):
         frame = vcd.get_frame(frame_num=fk)
         frame_properties    = frame['frame_properties']
@@ -982,7 +1016,6 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             BMM.save_instance_pcds(raw_image_path, instance_pcds)
         else:
             instance_pcds = BMM.load_instance_pcds(raw_image_path)
-        
         print(f"semantic labels in scene: {[semantic_pcd['label'] for semantic_pcd in instance_pcds]}")
         instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=250, max_distance=50.0, max_height = 2.0)
         # save_class_pcds(instance_pcds, fk, semantic_labels=["vehicle.car"]) # Save class pcds
@@ -993,7 +1026,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # calc occupancy/occlusion masks of each instance
         print(f"# Draw cuboids on BEV image {'#'*36}")
         bev_blended = get_blended_image(bev_image, raw2seg_bev.mask2image(bev_mask_sb))
-        instance_pcds = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=None)
+        instance_pcds = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image)
         
         # ##############################################################
         # Draw cuboids on RAW image ####################################
@@ -1004,10 +1037,38 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk) # Reproyectar cuboides en raw a bev
 
         # ##############################################################
+        # Odometry Stitching ###########################################
+        frame_pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels=['flat.driveable_surface', 'movable_object.barrier'])
+        transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
+        
+        if initial_translation_4x1 is None:
+            frame_transforms = frame['frame_properties']['transforms']
+            frame_odometry = frame_transforms['vehicle-iso8855_to_odom']['odometry_xyzypr']
+            initial_translation_4x1 = utils.add_homogeneous_row(np.asarray(frame_odometry[:3]).reshape((3, 1)))
+        
+        pcd_color = frame_color_pallete[fk]
+        for fpcd in frame_pcds:
+            points_4xN = utils.add_homogeneous_row( np.asarray(fpcd.points).T )
+            points_transformed_4xN = transform_4x4 @ points_4xN - initial_translation_4x1
+            points_transformed_Nx3 = points_transformed_4xN[:-1, :].T
+
+            frame_colors = np.asarray(fpcd.colors)
+            #frame_colors = np.repeat(pcd_color.reshape((3, -1)), points_transformed_Nx3.shape[0], axis=1).T
+
+            accum_pcd_points = np.vstack((accum_pcd_points, points_transformed_Nx3))
+            accum_pcd_colors = np.vstack((accum_pcd_colors, frame_colors))
+        
+        accum_pcd = o3d.geometry.PointCloud()
+        accum_pcd.points = o3d.utility.Vector3dVector(accum_pcd_points)
+        accum_pcd.colors = o3d.utility.Vector3dVector(accum_pcd_colors)
+
+        # ##############################################################
         # Visualization ################################################
-        all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)]
-        cv2.imshow("DEBUG", bev_blended)
-        cv2.waitKey(0)
+        # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+        # all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
+        all_geometries = [accum_pcd]
+        # cv2.imshow("DEBUG", bev_blended)
+        # cv2.waitKey(0)
         
         # debug_name = f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.png"
         # cv2.imwrite(os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"), bev_image_cuboids)
@@ -1019,12 +1080,27 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # Check for a key press (if a key is pressed, it returns the ASCII code)
         if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
             break
-        # o3d.visualization.draw_geometries(all_geometries, 
-        #                                   window_name="DEBUG", 
-        #                                   zoom=0.8,
-        #                                   lookat=[0, 0, 0],
-        #                                   up=[0, -1, 0],
-        #                                   front=[0, 0, 1])
+        
+        # Draw 3d Geometries
+        if fk > 15:
+            o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
+
+        # vis = o3d.visualization.Visualizer()
+        # vis.create_window(window_name="DEBUG")
+        # vis.add_geometry(all_geometries)
+        # camera_lookat   = [0, 0, 0]     # Point the camera is looking at
+        # camera_front    = [1, 0, 0]     # Direction the camera is facing (aligned with the x-axis for depth)
+        # camera_up       = [0, 0, 1]     # "Up" direction (aligned with z-axis for height)
+        # camera_position = [-1, 0, 0]    # Camera's position in space
+        # camera_zoom     = 0.5           # Adjust zoom level (lower values = closer zoom)
+
+        # view_control = vis.get_view_control()
+        # view_control.set_lookat(camera_lookat)
+        # view_control.set_front(camera_front)
+        # view_control.set_up(camera_up)
+        # view_control.set_zoom(camera_zoom)
+        # vis.run()
+        # vis.destroy_window()
 
     # Release resources
     cv2.destroyAllWindows()
