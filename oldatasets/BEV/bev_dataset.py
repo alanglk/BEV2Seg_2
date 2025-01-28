@@ -5,7 +5,7 @@ import torchvision.transforms.functional as F
 from oldatasets.NuImages.nulabels import nuid2name, nuid2color
 from oldatasets.common import target2image
 
-from typing import Union
+from typing import Union, List
 
 import numpy as np
 from PIL import Image
@@ -31,6 +31,19 @@ class BEVDataset(Dataset):
     BEVDataset requires the following structure despite OpenLABEL files are not neccesary
     for training Networks.
     """
+    DATASET_VERSIONS = ['mini', 'train', 'val', 'test']
+    @staticmethod
+    def get_data_tokens(data_path:str) -> List:
+        """
+        Return the list of sample tokens of a BEVDataset 
+        """
+        # Load all the tokens from the dataroot folder
+        if not os.path.isdir(data_path):
+            raise Exception(f"BEVDataset data path not found: {data_path}")
+        files = os.listdir(data_path)
+        data_tokens = [os.path.splitext(f)[0] for f in files if f.endswith('.json')]
+        return data_tokens
+    
     def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color):
         """
         BGR format!!!
@@ -45,6 +58,8 @@ class BEVDataset(Dataset):
         """
         super().__init__()
         dataroot = os.path.join(dataroot, version)
+        assert version in BEVDataset.DATASET_VERSIONS
+
         self.dataroot = os.path.abspath(dataroot)
         self.version = version
         self.image_extension = image_extension
@@ -58,10 +73,7 @@ class BEVDataset(Dataset):
 
         # Load all the tokens from the dataroot folder
         if os.path.isdir(self.dataroot):
-            files = os.listdir(self.dataroot)
-            self.data_tokens = [os.path.splitext(f)[0] for f in files if f.endswith('.json')]
-        else:
-            raise Exception(f"BEVDataset path not found: {self.dataroot}")
+            self.data_tokens = self.get_data_tokens(self.dataroot)
         
     def __len__(self):
         return len(self.data_tokens)

@@ -6,14 +6,22 @@ from oldatasets.NuImages import NuImagesDataset, NuImagesFeatureExtractionDatase
 
 import cv2
 
-NUIMAGES_PATH = "./tmp/NuImages"
+NUIMAGES_PATH = ".tests/tmp/NuImages"
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
-OUTPUT_PATH = "./tests/tmp/NuImages/mini"
+OUTPUT_PATH = "./tests/tmp/trash/NuImages/mini"
 
 DISPLAY_IMAGES = True
 
 ######################## TESTS ########################
 def test_import_datasets():
+    if not os.path.exists(OUTPUT_PATH):
+        # Create the tmp folder
+        os.makedirs(OUTPUT_PATH)
+    else:
+        # Clear the tmp folder
+        files = os.listdir(OUTPUT_PATH)
+        for f in files:
+            os.remove(os.path.join(OUTPUT_PATH, f))
     assert os.path.exists(NUIMAGES_PATH)
     assert NuImagesDataset is not None
 

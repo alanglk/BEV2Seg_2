@@ -7,7 +7,7 @@ from oldatasets.NuImages.nulabels import nulabels, nuname2label, nuid2name, nuid
 from oldatasets.common import Dataset2BEV, progress_bar, target2image
 
 import os
-from typing import Union
+from typing import Union, List
 
 class NuImagesFormattedDataset(Dataset):
     """
@@ -23,6 +23,20 @@ class NuImagesFormattedDataset(Dataset):
         test/
     ´´´
     """
+    DATASET_VERSIONS = ['mini', 'train', 'val', 'test']
+
+    @staticmethod
+    def get_data_tokens(data_path:str, file_extension:str = '.png') -> List:
+        """
+        Return the list of sample tokens of a NuImagesFormatted Dataset 
+        """
+        # Load all the tokens from the dataroot folder
+        if not os.path.isdir(data_path):
+            raise Exception(f"NuImagesFormatted data path not found: {data_path}")
+        files = os.listdir(data_path)
+        data_tokens = [os.path.splitext(f)[0].replace('_raw', '') for f in files if f.endswith('_raw' + file_extension)]
+        return data_tokens
+
     def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color):
         """
         BGR format!!!
@@ -36,6 +50,8 @@ class NuImagesFormattedDataset(Dataset):
             - id2color: {0: rgb, 1: rgb...}. By default is the NuImages id2color
         """
         super().__init__()
+        assert version in NuImagesFormattedDataset.DATASET_VERSIONS
+
         dataroot = os.path.join(dataroot, version)
         self.dataroot = os.path.abspath(dataroot)
         self.version = version
@@ -49,11 +65,7 @@ class NuImagesFormattedDataset(Dataset):
         self.id2color = id2color
 
         # Load all the tokens from the dataroot folder
-        if os.path.isdir(self.dataroot):
-            files = os.listdir(self.dataroot)
-            self.data_tokens = [os.path.splitext(f)[0].replace('_raw', '') for f in files if f.endswith('_raw' + self.image_extension)]
-        else:
-            raise Exception(f"NuImagesFormatted path not found: {self.dataroot}")
+        self.data_tokens = NuImagesFormattedDataset.get_data_tokens(self.dataroot, self.image_extension)
         
     def __len__(self):
         return len(self.data_tokens)

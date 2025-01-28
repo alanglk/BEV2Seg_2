@@ -4,18 +4,17 @@ from vcd import core, scl
 
 from oldatasets.common import Dataset2BEV, display_image
 
-NUIMAGES_PATH   = "./tmp/NuImages"
-TMP_DIR         = "./tests/tmp/BEVDataset"
-SAMPLE_IMAGE    = "samples/CAM_FRONT_RIGHT/n013-2018-08-27-14-41-26+0800__CAM_FRONT_RIGHT__1535352274870176.jpg"
-SAMPLE_TOKEN    = "0128b121887b4d0d86b8b1a43ac001e9"
-SAMPLE_CAM      = "CAM_FRONT_RIGHT" 
+BEV_DATASET         = "./tests/tmp/BEVDataset"
+NUIMAGESFORMATTED   = "./tests/tmp/NuImagesFormatted"
+SAMPLE_TOKEN        = "3e422fcb9c2a49639ca24c8ff43f3d67"
+SAMPLE_CAM          = "CAM_FRONT" 
 
 DISPLAY_IMAGES = True
 
 ######################## TESTS ########################
 def test_img2bev():
-    sample_image = os.path.join(NUIMAGES_PATH, SAMPLE_IMAGE)
-    sample_vcd   = os.path.join(TMP_DIR, SAMPLE_TOKEN + ".json") 
+    sample_image = os.path.join(BEV_DATASET, 'mini', SAMPLE_TOKEN + "_raw.png")
+    sample_vcd   = os.path.join(BEV_DATASET, 'mini', SAMPLE_TOKEN + ".json") 
     assert os.path.exists(sample_image)
     assert os.path.exists(sample_vcd)
 

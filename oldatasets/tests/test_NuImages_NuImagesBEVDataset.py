@@ -4,9 +4,9 @@ from oldatasets.common import display_image, display_images
 from oldatasets.NuImages import NuImagesDataset, NuImagesBEVDataset, generate_BEVDataset_from_NuImages
 import numpy as np
 
-NUIMAGES_PATH = "./tmp/NuImages"
+NUIMAGES_PATH = "./tests/tmp/NuImages"
 NUIMAGES_PATH = "/run/user/17937/gvfs/smb-share:server=gpfs-cluster,share=databases/GeneralDatabases/nuImages"
-TMP_DIR = "./tests/tmp/BEVDataset"
+TMP_DIR = "./tests/tmp/trash"
 
 DISPLAY_IMAGES = False
 
