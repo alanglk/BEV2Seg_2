@@ -138,9 +138,9 @@ def main(config: dict):
         # Evaluation config
         eval_strategy="steps",      # ["no", "steps", "epoch"]
         #eval_steps=... (default: logging_steps if eval_strategy="steps" is set)
-        metric_for_best_model="mean_accuracy",
-        eval_accumulation_steps=val_acc_steps,
+        metric_for_best_model= "eval_loss", # "mean_accuracy",
         #metric_for_best_model="loss",
+        eval_accumulation_steps=val_acc_steps,
 
         # Checkpointing config
         save_strategy="steps",      # ["no", "steps", "epoch"]

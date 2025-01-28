@@ -201,7 +201,7 @@ if __name__ == "__main__":
          NUDATASET_PATH, 
          RAW2SEGMODEL_PATH, 
          BEV2SEGMODEL_PATH, 
-         dataset_versions='val',
+         dataset_versions='test',
          plot_results=False,
          save_results=True,
          results_path=OUT_PATH)

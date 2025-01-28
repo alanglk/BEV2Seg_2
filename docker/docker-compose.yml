@@ -1,7 +1,7 @@
 services:
   tensorboard:
     image: tensorflow/tensorflow
-    container_name: agarciaj/tensorboard
+    container_name: agarciaj_tensorboard
     volumes:
       - ../models/segformer_nu_formatted/runs:/runs
     ports:
