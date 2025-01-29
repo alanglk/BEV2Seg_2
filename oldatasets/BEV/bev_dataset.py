@@ -168,6 +168,15 @@ class BEVFeatureExtractionDataset(BEVDataset):
 
         image   = Image.open(bev_path)      # RGB (1024, 1024, 3)
         target  = Image.open(semantic_path) # RGB (1024, 1024, 3)
+        # cv2.namedWindow("DEBUG_IMAGE", cv2.WINDOW_NORMAL)
+        # cv2.imshow("DEBUG_IMAGE", cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR))
+        # cv2.waitKey(0)
+
+        # Data Augmentations
+        if self.transforms is not None:
+            image, target = self.transforms(image, target)
+        # cv2.imshow("DEBUG_IMAGE", cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR))
+        # cv2.waitKey(0)
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)
