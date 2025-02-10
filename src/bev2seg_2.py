@@ -86,9 +86,9 @@ class BEV2SEG_2_Interface(ABC):
         """IPM to BEV perspective
         INPUT: 
         """
-        # sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
+        sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
         self.drawer.add_images(imgs = {f"{camera_name}": image}, frame_num = frame_num)
-        # sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
+        sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
         
         # self.drawer.draw_bevs(_frame_num=frame_num)
         # return self.drawer.topView

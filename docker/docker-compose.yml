@@ -1,9 +1,9 @@
 services:
   tensorboard:
     image: tensorflow/tensorflow
-    container_name: agarciaj/tensorboard
+    container_name: agarciaj_tensorboard
     volumes:
-      - ../models/segformer_nu_formatted/runs:/runs
+      - ../models/segformer_bev/runs:/runs
     ports:
       - 6006:6006
     user: "${UID}:${GID}"

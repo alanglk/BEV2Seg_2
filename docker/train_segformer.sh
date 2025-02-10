@@ -78,7 +78,7 @@ ARGS=$(cat <<EOF
     -v ${DATAROOT_PATH}:/dataset:ro \
     -v ${CONFIG_DIR}:/config:ro \
     -v ${MODELS_PATH}:/models \
-    agarciaj/bev2seg_2:v0.3 \
+    agarciaj/bev2seg_2:v0.4 \
     bash -c "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES /scripts/train_segformer.py /config/${CONFIG_FILE}"
 EOF
 )
@@ -91,7 +91,7 @@ EOF
 #     --privileged \
 #     -v ./config:/config:ro \
 #     -v ./models:/models \
-#     agarciaj/bev2seg_2:v0.3 \
+#     agarciaj/bev2seg_2:v0.4 \
 #     bash -c "mkdir /dataset && sshfs agarciaj@zegama002:/gpfs/VICOMTECH/Databases/GeneralDatabases/nuImages /dataset && CUDA_VISIBLE_DEVICES=2,3 /scripts/train_segformer.py /config/segformer_nu.toml"
 # EOF
 # ) | tee -a models/train_segformer_nu.toml_$(date +%s).log"

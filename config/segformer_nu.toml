@@ -7,14 +7,32 @@ testing = false     # if set, the 'mini' version of the dataset
 [model]
 output_path = "/models"
 model_name = "segformer_nu_formatted"
-pretrained = "nvidia/mit-b2"
+pretrained = "nvidia/mit-b4"
 
 [training]
 batch_size = 16
-epochs = 100
-learning_rate = 0.001
-weight_decay = 0.001
-ls_steps = 100 # Logging/Saving steps
-dataloader_num_workers = 4      # (optional)
-val_acc_steps = 32              # (optional)
-resume_from_checkpoint = false
+epochs = 200
+learning_rate = 0.00006
+weight_decay = 0.01
+data_augmentations = true           # (optional) defaults to False. 
+                                    # If set, the dataset_type specific data augmentation functions are applied
+
+# Optimizer
+optim = "adamw_torch"               # (optional) defaults to "adamw_torch"
+# optim_args = {}                   # (optional) defaults to {}
+lr_scheduler_type = "polynomial"    # (optional) defaults to "linear"*
+# lr_scheduler_kwargs = {}          # (optional) defaults to {}. See documentation for each scheduler
+
+# Other
+val_acc_steps = 32                  # (optional) defaults to None
+dataloader_num_workers = 4          # (optional) defaults to 0
+resume_from_checkpoint = false      # (optional) defaults to False.
+                                    # example__path: "/models/segformer_bev/raw2bevseg_mit-b2_v0.1"
+ls_steps = 200                      # (optional) defaults to 200. 
+                                    # Logging/Saving steps. batch_size:32 -> 100; batch_size:16 -> 200
+
+# *Available lr_schedulers: 
+# [ "linear", "cosine", "cosine_with_restarts", "polynomial", 
+#   "constant", "constant_with_warmup", "inverse_sqrt", 
+#   "reduce_lr_on_plateau", "cosine_with_min_lr", "warmup_stable_decay" ]
+# See transformers.SchedulerType for more info

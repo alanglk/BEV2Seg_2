@@ -3,14 +3,14 @@ from oldatasets.common import display_images
 
 import numpy as np
 
-TMP_DIR = "./tmp/BEVDataset"
+TMP_DIR = "./tests/tmp/BEVDataset"
 DISPLAY_IMAGES = True
 
 def test_load_bev_dataset():
     """
     Test for loading a previously generated BEVDataset
     """
-    dataset = BEVDataset(dataroot=TMP_DIR, version='')
+    dataset = BEVDataset(dataroot=TMP_DIR, version='mini')
     
     for i in range(len(dataset)):
         image, target = dataset.__getitem__(i)
@@ -56,7 +56,7 @@ def test_segformer_feature_extraction_dataset():
             target_fe = dataset_fe.target2image(encoded['labels'])
             display_images("Encoded Targets", [target_bev, target_fe])
         
-    assert False
+    # assert False
 
 
 

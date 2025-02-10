@@ -13,3 +13,5 @@ transformers[torch]
 evaluate
 toml
 tensorboard
+
+scikit-learn
