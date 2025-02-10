@@ -72,6 +72,11 @@ def compute_metrics(eval_pred):
 
 ########################## MAIN ##########################
 def main(config: dict):
+    print("Segformer training configuration:")
+    print(config)
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    print()
+
     dataset_type    = config['data']['type']
     dataroot        = config['data']['dataroot']
     testing         = config['data']['testing']
@@ -103,7 +108,13 @@ def main(config: dict):
     if data_augmentations:
         # Defined depending on the Dataset Type
         if dataset_type == 'BEVDataset':
-            pass
+            transforms = {
+                'multiple_rotations':False,
+                'use_random': True,
+                'rx': (0.0, 0.0),
+                'ry': (-0.25, 0.25),
+                'rz': (-0.25, 0.25)
+            }
         elif dataset_type == 'NuImages':
             pass
         elif dataset_type == 'NuImagesFormatted':
@@ -153,7 +164,7 @@ def main(config: dict):
     segformer_config.label2id = train_dataset.label2id
 
     model = SegformerForSemanticSegmentation.from_pretrained(pretrained, config=segformer_config)
-    device = torch.device("cuda:7") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print(f"USING DEVICE: {device}")
 
     # Training Args

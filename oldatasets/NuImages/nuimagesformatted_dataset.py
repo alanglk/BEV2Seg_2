@@ -113,12 +113,15 @@ class NuImagesFormattedDataset(Dataset):
         """
         bev_path, semantic_path = self._get_item_paths(index)
 
-        image   = torch.tensor( np.array(Image.open(bev_path)) )      # RGB
-        target  = torch.tensor( np.array(Image.open(semantic_path)) ) # RGB
-
+        image   = Image.open(bev_path)      # RGB
+        target  = Image.open(semantic_path) # RGB
+        
         # Apply transforms if necessary
         if self.transforms is not None:
             image, target = self.transforms(image, target)
+
+        # image   = torch.tensor( np.array( image ) )
+        # target  = torch.tensor( np.array( target ) )
 
         return image, target
 

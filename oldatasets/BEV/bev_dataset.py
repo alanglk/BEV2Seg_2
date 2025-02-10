@@ -1,11 +1,18 @@
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms.functional as F
+import torchvision.transforms.transforms as v1
+import torchvision.transforms.v2 as v2
 
 from oldatasets.NuImages.nulabels import nuid2name, nuid2color
 from oldatasets.common import target2image
 
 from typing import Union, List
+
+# Imports para chapuza dataAugmentations
+from vcd import core, scl, utils, draw
+import matplotlib.pyplot as plt
+from oldatasets.common import Dataset2BEV
 
 import numpy as np
 from PIL import Image
@@ -24,6 +31,7 @@ class BEVDataset(Dataset):
             - token1_raw.png
             - token1_color.png
             - token1_semantic.png
+            - token1_raw_semantic.png (for data Augmentations)
             ...
         train/
         test/
@@ -63,7 +71,23 @@ class BEVDataset(Dataset):
         self.dataroot = os.path.abspath(dataroot)
         self.version = version
         self.image_extension = image_extension
+        
         self.transforms = transforms
+        self.prev_to_bev_transform = False 
+        # If prev_to_bev_transform is set
+        # apply custom geometric transform by modifiying the camera extrinsic parameters before reprojecting to BEV
+        if self.transforms is not None and isinstance(self.transforms, dict):
+            assert 'rx' in self.transforms 
+            assert 'ry' in self.transforms 
+            assert 'rz' in self.transforms 
+            if 'multiple_rotations' not in self.transforms:
+                self.transforms['multiple_rotations'] = False
+            if 'use_random' not in self.transforms:
+                self.transforms['use_random'] = True
+            if 'save_scene_path' not in self.transforms:
+                self.transforms['save_scene_path'] = None
+            self.prev_to_bev_transform = True
+        
         self.data_tokens = [] # All the tokens in the dataset
 
         # Save the id label mapping
@@ -88,6 +112,66 @@ class BEVDataset(Dataset):
         #target_1C = target[:, :, 0] # Get just the first channel
         return target2image(target, self.id2color)
 
+    def _data_augmentation(self, image:Image, target:Image, vcd:core.OpenLABEL, camera_name:str='CAM_FRONT'):
+        """
+        Codigo guarro de cojones. BEVDataset no estaba pensado para utilizar el openlabel
+        de las imágenes.
+
+        INPUT: PIL image and target (en raw)
+        OUTPUT: PIL augmented image and target (en bev)
+        """
+        
+        coord_sys = vcd.get_coordinate_system(camera_name)
+        T_4x4 = np.array(coord_sys['pose_wrt_parent']['matrix4x4']).reshape(4, 4)
+        R = T_4x4[:3, :3].reshape((3, 3))
+        C = T_4x4[:3, 3].reshape((3, 1))
+
+        # Modificar extrínsecos de la cámara
+        rvec = utils.R2rvec(R).flatten().tolist() # [rx, ry, rz]
+        rx, ry, rz = 0.0, 0.0, 0.0
+        if self.transforms['multiple_rotations']:
+            if self.transforms['use_random']:
+                rx = np.random.uniform(self.transforms['rx'][0], self.transforms['rx'][1])
+                ry = np.random.uniform(self.transforms['ry'][0], self.transforms['ry'][1])
+                rz = np.random.uniform(self.transforms['rz'][0], self.transforms['rz'][1])
+            else:
+                rx = np.abs( self.transforms['rx'][0] ) if isinstance(self.transforms['rx'], (tuple, list)) else float(self.transforms['rx']) 
+                ry = np.abs( self.transforms['ry'][0] ) if isinstance(self.transforms['ry'], (tuple, list)) else float(self.transforms['ry']) 
+                rz = np.abs( self.transforms['rz'][0] ) if isinstance(self.transforms['rz'], (tuple, list)) else float(self.transforms['rz']) 
+        else:
+            sel = np.random.randint(0, 3)
+            if sel == 0:
+                rx = np.random.uniform(self.transforms['rx'][0], self.transforms['rx'][1])
+            elif sel == 1:
+                ry = np.random.uniform(self.transforms['ry'][0], self.transforms['ry'][1])
+            elif sel == 2:
+                rz = np.random.uniform(self.transforms['rz'][0], self.transforms['rz'][1])
+
+        rvec[0] += rx # Roll
+        rvec[1] += ry # Pitch 
+        rvec[2] += rz # Yaw
+
+        R = utils.euler2R(rvec)
+        T_4x4 = utils.create_pose(R, C)
+        vcd.data['openlabel']['coordinate_systems'][camera_name]['pose_wrt_parent']['matrix4x4'] = T_4x4.flatten()
+
+        # Generar BEV image y target
+        scene = scl.Scene(vcd)
+
+        if self.transforms['save_scene_path'] is not None:
+            setup_viewer = draw.SetupViewer(scene=scene, coordinate_system="vehicle-iso8855")
+            fig = setup_viewer.plot_setup()
+            fig.savefig(self.transforms['save_scene_path'])
+
+        dbev = Dataset2BEV(cam_name=camera_name, scene=scene)
+        
+        # Transformar a BEV
+        image_bev, target_bev = dbev.convert2bev(np.array(image), np.array(target))
+        image_bev   = Image.fromarray(image_bev)
+        target_bev  = Image.fromarray(target_bev)
+
+        return image_bev, target_bev
+
     def _get_item_paths(self, index):
         """
         INPUT:
@@ -97,19 +181,46 @@ class BEVDataset(Dataset):
             target_path -> path of the annotations 
         """
         assert index < len(self)
-        
         sample_token = self.data_tokens[index]
-        
         bev_path = os.path.join(self.dataroot, sample_token + "_bev" + self.image_extension)
         semantic_path = os.path.join(self.dataroot, sample_token + "_semantic" + self.image_extension)
 
         if not os.path.isfile(bev_path):
             raise Exception(f"Image file file not found: {bev_path}")
-
         if not os.path.isfile(semantic_path):
             raise Exception(f"Semantic mask file not found: {semantic_path}")
-
         return bev_path, semantic_path
+
+    def _get_item_raw_paths(self, index):
+        """
+        Más chapuzas de época para el data Augmentation
+        """
+        assert index < len(self)
+        sample_token = self.data_tokens[index]
+        raw_path = os.path.join(self.dataroot, sample_token + "_raw" + self.image_extension)
+        raw_semantic_path = os.path.join(self.dataroot, sample_token + "_raw_semantic" + self.image_extension)
+
+        if not os.path.isfile(raw_path):
+            raise Exception(f"Image file file not found: {raw_path}")
+        if not os.path.isfile(raw_semantic_path):
+            raise Exception(f"Semantic mask file not found: {raw_semantic_path}")
+        return raw_path, raw_semantic_path
+
+    def _get_item_openlabel_path(self, index):
+        """
+        Used for data geometric augmentations
+        INPUT:
+            Index of the current sample in the dataset
+        OUTPUT:
+            openlabel_path
+        """
+        assert index < len(self)
+        sample_token = self.data_tokens[index]
+        openlabel_path = os.path.join(self.dataroot, sample_token + ".json")
+
+        if not os.path.isfile(openlabel_path):
+            raise Exception(f"OpenLABEL file file not found: {openlabel_path}")
+        return openlabel_path
 
     def __getitem__(self, index):
         """
@@ -119,15 +230,30 @@ class BEVDataset(Dataset):
             image   -> BEV torch.Tensor (H, W, 3) # BGR
             target  -> BEV annotations of the image ("mask"): torch.Tensor (H, W)
         """
-        bev_path, semantic_path = self._get_item_paths(index)
+        
+        if self.transforms is not None and self.prev_to_bev_transform:
+            raw_path, raw_semantic_path = self._get_item_raw_paths(index)
+            openlabel_path = self._get_item_openlabel_path(index)
+            vcd = core.OpenLABEL()
+            
+            # Load files
+            image   = Image.open(raw_path)          # BGR
+            target  = Image.open(raw_semantic_path) # BGR
+            vcd.load_from_file( openlabel_path )
 
-        image   = torch.tensor( np.array(Image.open(bev_path)) )      # BGR
-        target  = torch.tensor( np.array(Image.open(semantic_path)) ) # BGR
+            # Data Augmentation and transform to BEV
+            image, target = self._data_augmentation(image, target, vcd, camera_name='CAM_FRONT')            
+            return image, target
+
+        bev_path, semantic_path = self._get_item_paths(index)
+        image   = Image.open(bev_path)      # BGR
+        target  = Image.open(semantic_path) # BGR
 
         # Apply transforms if necessary
         if self.transforms is not None:
             image, target = self.transforms(image, target)
-
+        # image   = torch.tensor( np.array( image ) )
+        # target  = torch.tensor( np.array( target ) )
         return image, target
 
 class BEVFeatureExtractionDataset(BEVDataset):
@@ -162,30 +288,43 @@ class BEVFeatureExtractionDataset(BEVDataset):
                 "labels": target
             }
         """
-        # image, target = super().__getitem__(index)
+
+        # Load BEV Image and BEV target
+        if self.transforms is not None and self.prev_to_bev_transform:
+            # Custom Data Augmentations from Raw Image
+            raw_path, raw_semantic_path = self._get_item_raw_paths(index)
+            openlabel_path = self._get_item_openlabel_path(index)
+            vcd = core.OpenLABEL()
+            
+            # Load files
+            image   = Image.open(raw_path)          # RGB
+            target  = Image.open(raw_semantic_path) # RGB
+            vcd.load_from_file( openlabel_path )
+
+            # Data Augmentation and transform to BEV
+            image, target = self._data_augmentation(image, target, vcd, camera_name='CAM_FRONT') 
         
-        bev_path, semantic_path = self._get_item_paths(index)
+        else:
+            bev_path, semantic_path = self._get_item_paths(index)
 
-        image   = Image.open(bev_path)      # RGB (1024, 1024, 3)
-        target  = Image.open(semantic_path) # RGB (1024, 1024, 3)
+            image   = Image.open(bev_path)      # RGB (1024, 1024, 3)
+            target  = Image.open(semantic_path) # RGB (1024, 1024, 3)
+
+            # Normal Data Augmentations
+            if self.transforms is not None:
+                image, target = self.transforms(image, target)
+        
         # cv2.namedWindow("DEBUG_IMAGE", cv2.WINDOW_NORMAL)
-        # cv2.imshow("DEBUG_IMAGE", cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR))
-        # cv2.waitKey(0)
-
-        # Data Augmentations
-        if self.transforms is not None:
-            image, target = self.transforms(image, target)
         # cv2.imshow("DEBUG_IMAGE", cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR))
         # cv2.waitKey(0)
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)
-        # time_prev = time.time_ns
         encoded_inputs = self.image_processor(image, target, return_tensors="pt")
-        #print(f"Ellapsed time: {time.time_ns- time_prev}")
         
         # Remove the batch_dim from each sample
         for k,v in encoded_inputs.items():
           encoded_inputs[k].squeeze_()
-
+        
         return encoded_inputs
+    
