@@ -173,7 +173,7 @@ def main(data_folder,  image_token, cam_name, output_json_path):
                               cam_name=cam_name, 
                               output_json_path=output_json_path)
     bev_ps.run()
-    return
+    
     # Compute 2D - 3D ratio
     data = None
     with open(output_json_path, "r") as f:

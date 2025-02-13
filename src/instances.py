@@ -12,7 +12,7 @@ from vcd import scl, draw, utils
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
 
-from utils import create_cuboid_edges, intersection_factor, get_blended_image, get_pcds_of_semantic_label, get_pallete
+from utils import create_cuboid_edges, intersection_factor, get_blended_image, get_pcds_of_semantic_label, get_pallete, filter_instances
 
 from sklearn.cluster import DBSCAN
 import open3d as o3d
@@ -20,7 +20,7 @@ import numpy as np
 import cv2
 
 from collections import defaultdict
-from typing import List
+from typing import List, Tuple
 
 
 class InstanceScenePCD():
@@ -72,11 +72,25 @@ class InstanceScenePCD():
                 color_map[l] = np.random.random(3)
         return color_map
         
-    def run(self, pcd: o3d.geometry.PointCloud, semantic_mask:np.ndarray, camera_name:str, lims: tuple = (10, 5, 30)):
+    def run(self, 
+            pcd: o3d.geometry.PointCloud, 
+            semantic_mask:np.ndarray, 
+            camera_name:str, 
+            lims: tuple = (10, 5, 30),
+            min_samples_per_instance=250, 
+            max_distance=50.0, 
+            max_height = 2.0,
+            verbose=False):
         """
         INPUT
             - pcd: open-3d pointcloud
             - semantic_mask: (H, W) semamtic mask
+            - camera_name: cam_name from wich pcd is beign computed
+            - lims: pre FILTER. (x, y, z) on camera_name frame absolute lims to filter out the raw pcd
+            - min_samples_per_instance: post FILTER. Minimun number of points to consider an instance
+            - max_distance: post FILTER. Max distance of the centroid from the camera_name origin
+            - max_height: post FILTER. Maximun height of an instance
+            - verbose: wether to print out info or not
         OUTPUT:
             instance_pointclouds: 
                 [{  'label': str, 
@@ -105,11 +119,11 @@ class InstanceScenePCD():
         semantic_mask   = semantic_mask.flatten()[mask]
         pcd_points      = np.asarray(pcd.points)[mask]
         pcd_colors      = np.asarray(pcd.colors)[mask]
-        segmented_pointclouds = self._get_segmented_pcds(pcd_points, pcd_colors, semantic_mask, camera_name)
+        instance_pcds = self._get_segmented_pcds(pcd_points, pcd_colors, semantic_mask, camera_name)
 
 
         # Compute instances for each segmented pcd class
-        for seg_pcd in segmented_pointclouds:
+        for seg_pcd in instance_pcds:
             if not seg_pcd['dynamic']:
                 continue
             
@@ -151,7 +165,17 @@ class InstanceScenePCD():
                         'dimensions': (bbox_width, bbox_height, bbox_depth)
                         }
                 seg_pcd['instance_3dboxes'].append(data)
-        return segmented_pointclouds
+        
+        # Apply filter to the detected objects
+        if verbose:
+            print(f"[InstanceScenePCD] [PostFilter] semantic labels in scene: {[semantic_pcd['label'] for semantic_pcd in instance_pcds]}")
+        instance_pcds = filter_instances(instance_pcds, 
+                                         min_samples_per_instance=min_samples_per_instance, 
+                                         max_distance=max_distance, 
+                                         max_height=max_height, 
+                                         verbose=verbose)
+
+        return instance_pcds
 
 class InstanceBEVMasks():
     DEFAULT_SELECTED_LABELS = ['vehicle.car']
@@ -179,7 +203,7 @@ class InstanceBEVMasks():
             edge_color: tuple = (0, 255, 255), 
             vert_color:tuple = (0, 0, 255),
             base_color:tuple = (0, 255, 255),
-            ):
+            ) -> Tuple[dict, np.ndarray]:
         """
         INPUT:
             - bev_mask: (H, W, C) where C is going to be ignored
@@ -211,6 +235,7 @@ class InstanceBEVMasks():
                         'oclussion_mask': (H, W) binary mask
                     }]
                 }]
+            bev_image with bboxes and occupancy/oclusion masks if provided. Else none.
         """
         
         if len(bev_mask.shape) > 2:
@@ -318,11 +343,11 @@ class InstanceBEVMasks():
                     oclussion = (inst_bev_mask['oclussion_mask'][:, :, None] * np.asarray(base_color) * 0.5).astype(np.uint8)
                     render_mask = render_mask | occupancy | oclussion
                 if np.max(render_mask) > 0:
-                    bev_image = get_blended_image(bev_image, render_mask) 
+                    bev_image = get_blended_image(bev_image, render_mask)
                     # cv2.imshow("DEBUG", bev_image)
                     # cv2.waitKey(0)
-                
-        return instance_pcds
+                return instance_pcds, bev_image
+        return instance_pcds, None
 
 class InstanceRAWDrawer():
     DEFAULT_DRAWING_LABELS = ['vehicle.car']

@@ -174,7 +174,7 @@ def AABB_A_bigger_than_B(A: dict, B:dict) -> bool:
     B_dims = B['dimensions']
     return A_dims[0] * A_dims[1] * A_dims[2] >= B_dims[0] * B_dims[1] * B_dims[2]
 
-def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max_distance:float = 15.0, max_height:float = 2.0):
+def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max_distance:float = 15.0, max_height:float = 2.0, verbose=False):
     for semantic_pcd in instance_pcds:
         if not semantic_pcd['dynamic']:
             continue # Skip if non dynamic
@@ -225,7 +225,9 @@ def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max
                     
             # Add the instance
             added_AABBs.append(i)
-        print(f"class: {semantic_pcd['label']} removing indices: {removing_indices}")
+        
+        if verbose:
+            print(f"class: {semantic_pcd['label']} removing indices: {removing_indices}")
         semantic_pcd['instance_pcds']       = [valor for idx, valor in enumerate(semantic_pcd['instance_pcds'])     if idx not in removing_indices]
         semantic_pcd['instance_3dboxes']    = [valor for idx, valor in enumerate(semantic_pcd['instance_3dboxes'])  if idx not in removing_indices]
     

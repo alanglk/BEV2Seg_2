@@ -13,7 +13,7 @@ import depth_pro
 
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
-from utils import check_paths, merge_semantic_labels, get_blended_image, filter_instances
+from utils import check_paths, merge_semantic_labels, get_blended_image
 from bev2seg_2 import Raw2Seg_BEV, Raw_BEV2Seg
 
 from bevmap_manager import BEVMapManager
@@ -121,14 +121,13 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         frame = vcd.get_frame(frame_num=fk)
         frame_properties    = frame['frame_properties']
         raw_image_path      = frame_properties['streams'][camera_name]['stream_properties']['uri']
-        raw_image_path      = os.path.join(scene_path, raw_image_path)
+        raw_image_path      = os.path.join(scene_path, "nuscenes_sequence", raw_image_path)
         # sample_token        = frame_properties['sample_token']
 
         # ##############################################################
         # Load input image #############################################
         print(f"# Load input image {'#'*45}")
         raw_image = cv2.imread(raw_image_path)
-
 
         # ##############################################################
         # Generate semantic masks ######################################
@@ -142,7 +141,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             raw_mask, bev_mask_sb, bev_mask_bs = BMM.load_semantic_images(image_name=raw_image_path)
         
         # Merge semantic labels
-        # raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id)
+        raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id)
         # bev_mask_bs = merge_semantic_labels(bev_mask_bs,    raw_seg2bev.label2id)
         bev_mask_sb = merge_semantic_labels(bev_mask_sb,    raw_seg2bev.label2id)
 
@@ -169,29 +168,35 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # Generate panoptic pointcloud dict ############################
         print(f"# Generate panoptic pointcloud dict {'#'*28}")
         if BMM.gen_flags['all'] or BMM.gen_flags['instances']:
-            instance_pcds = ISP.run(pcd, raw_mask, camera_name, lims=(np.inf, np.inf, np.inf))
+            instance_pcds = ISP.run(pcd, 
+                                    raw_mask, 
+                                    camera_name, 
+                                    lims=(np.inf, np.inf, np.inf), 
+                                    min_samples_per_instance=250, 
+                                    max_distance=50.0, 
+                                    max_height = 2.0,
+                                    verbose=True)
             BMM.save_instance_pcds(raw_image_path, instance_pcds)
         else:
             instance_pcds = BMM.load_instance_pcds(raw_image_path)
-        print(f"semantic labels in scene: {[semantic_pcd['label'] for semantic_pcd in instance_pcds]}")
-        instance_pcds = filter_instances(instance_pcds, min_samples_per_instance=250, max_distance=50.0, max_height = 2.0)
         # save_class_pcds(instance_pcds, fk, semantic_labels=["vehicle.car"]) # Save class pcds
-
+        
         # ##############################################################
-        # Draw cuboids on BEV image ####################################
+        # Draw cuboids and Occupancy/Oclusion on RAW image #############
         # Transform cuboids to BEV, compute ConectedComponents of the bev_mask and
         # calc occupancy/occlusion masks of each instance
-        # print(f"# Draw cuboids on BEV image {'#'*36}")
-        # bev_blended = get_blended_image(bev_image, raw2seg_bev.mask2image(bev_mask_sb))
-        # instance_pcds = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image)
+        print(f"# Draw cuboids and Occupancy/Oclusion on RAW image {'#'*13}")
+        bev_image_cuboids = bev_image.copy()
+        # bev_blended = get_blended_image(bev_image_cuboids, raw2seg_bev.mask2image(bev_mask_sb))
+        instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
         
         # ##############################################################
         # Draw cuboids on RAW image ####################################
         # print(f"# Draw cuboids on RAW image {'#'*36}")
-        # raw_blended = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
-        # raw_image_cuboids = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
+        raw_blended = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
+        raw_image_cuboids = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
         # pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
-        # bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk) # Reproyectar cuboides en raw a bev
+        bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk) # Reproyectar cuboides en raw a bev
         
         # ##############################################################
         # Odometry Stitching ###########################################
@@ -207,13 +212,26 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # all_geometries = []
         # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
         
-        # cv2.imshow("DEBUG", bev_blended)
+        # cv2.imshow("DEBUG", bev_image_occ_ocl)
         # cv2.waitKey(0)
         # debug_name = f"{os.path.splitext(os.path.basename(raw_image_path))[0]}.png"
         # cv2.imwrite(os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"), bev_image_cuboids)
+        # cv2.imwrite(os.path.join(scene_path, "debug", "bev_occupancy_oclusion", f"bev_occ_{fk+1}.png"), bev_image_occ_ocl)
         # cv2.imwrite(os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"), raw_image_cuboids)
         # cv2.imwrite(os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"), bev_repoj_cuboids)
         
+        
+        cv2.imwrite(os.path.join(scene_path, "paola", "image_raw_cam_front",    f"{fk+1}.png"), raw_image)
+        cv2.imwrite(os.path.join(scene_path, "paola", "image_bev_cam_front",    f"{fk+1}.png"), bev_image)
+        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_raw_cam_front", f"{fk+1}.png"), raw_mask)
+        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_colored_raw_cam_front", f"{fk+1}.png"),raw2seg_bev.mask2image(raw_mask))
+        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_bev_cam_front", f"{fk+1}.png"), bev_mask_sb)
+        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_colored_bev_cam_front", f"{fk+1}.png"), raw2seg_bev.mask2image(bev_mask_sb) )
+        cv2.imwrite(os.path.join(scene_path, "paola", "cuboids_raw_cam_front",  f"{fk+1}.png"), raw_image_cuboids)
+        cv2.imwrite(os.path.join(scene_path, "paola", "cuboids_bev_cam_front",  f"{fk+1}.png"), bev_repoj_cuboids)
+        
+        continue
+
         # ##############################################################
         # Annotations ##################################################
         print(f"# Annotating cuboids on vcd {'#'*36}")
@@ -247,7 +265,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
                     center_trans_4x1 = transform_4x4 @ center_4x1
                     center_1x3 = center_trans_4x1[:3].T
 
-                    bbox_cuboid_img = types.cuboid(name="box3D",
+                    bbox_cuboid_img = types.cuboid(name="bbox3D",
                                                    val=(center_1x3[0, 0], 
                                                         center_1x3[0, 1], 
                                                         center_1x3[0, 2], 
