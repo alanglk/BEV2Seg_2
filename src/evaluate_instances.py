@@ -1,15 +1,21 @@
-from vcd import core, scl, types
+from vcd import core, scl, types, utils
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+import open3d as o3d
 import textwrap
+import threading
+import time
+
+from utils import get_pallete
 
 from tqdm import tqdm
 from typing import TypedDict, Dict, List, Tuple
+import argparse
+import sys
 import os
-
 
 
 def check_paths(paths: List[str]):
@@ -28,7 +34,7 @@ class AnnotationInfo(TypedDict):
     objects: Dict[str, ObjInfo] # Semantic-type - ObjInfo
     frame_presence: Dict[int, FramePresence] # frame num - FramePresence
 
-def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str], filter_out:bool = False) -> Tuple[AnnotationInfo, AnnotationInfo]:
+def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_names:List[str]=None, filter_out:bool = False) -> Tuple[AnnotationInfo, AnnotationInfo]:
     """
     Return the information stored aboud the selected types of ground_truth and detection annotations. 
     If `filter_out` is set, the not selected types will not be returned. 
@@ -95,9 +101,21 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str], filter_out:bool
         for k in dropping_keys:
             obj_dict.pop(k)
         return obj_dict
+    def ignore_names(obj_dict:Dict[str, ObjInfo], ignoring_names:List[str]) -> Dict[str, ObjInfo]:
+        dropping_keys = []
+        for tp, obj in obj_dict.items():
+            for uid, obj_data in obj.items():
+                if obj_data['name'] in ignoring_names:
+                    dropping_keys.append((tp, uid))
+        for tp, uid in dropping_keys:
+            obj_dict[tp].pop(uid)
+        return obj_dict
+
     if filter_out:
-        gt_objs['objects'] = filter_out(gt_objs['objects'], selected_types)
-        dt_objs['objects'] = filter_out(dt_objs['objects'], selected_types)
+        gt_objs['objects'] = filter_out(gt_objs['objects'], selected_types)     if selected_types is not None else gt_objs['objects']
+        dt_objs['objects'] = filter_out(dt_objs['objects'], selected_types)     if selected_types is not None else dt_objs['objects']
+        gt_objs['objects'] = ignore_names(gt_objs['objects'], ignoring_names)   if ignoring_names is not None else gt_objs['objects']
+        dt_objs['objects'] = ignore_names(dt_objs['objects'], ignoring_names)   if ignoring_names is not None else dt_objs['objects']
 
 
     # Compute presence of objects in frames
@@ -199,7 +217,58 @@ def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene,
 
     return cost_matrix
 
-def show_cost_matrix(cost_matrix: np.ndarray, assignments:List[Tuple[int]], gt_labels: List[str], dt_labels: List[str], semantic_type:str, frame_num:int):
+def assign_detections_to_ground_truth(cost_matrix:np.ndarray) -> List[int]:
+    """
+    Cost matrix (N, M) where N is the number of GT elements and M is the
+    number of detected elements (custom annotations). Returns the list of assignments
+    """
+    n, m = cost_matrix.shape
+    
+    # If it is not a square matrix, fill missing values with infinity
+    max_dim = max(n, m)
+    padded_cost_matrix = np.full((max_dim, max_dim), np.max(cost_matrix)+1)  # Valor alto
+    padded_cost_matrix[:n, :m] = cost_matrix  # Insertamos la matriz original
+
+    # Solve LSAP
+    row_ind, col_ind = linear_sum_assignment(padded_cost_matrix)
+
+    # Filtrar asignaciones inválidas (aquellas que caen en la parte añadida)
+    valid_assignments = [(r, c) for r, c in zip(row_ind, col_ind) if r < n and c < m]
+
+    assert len(valid_assignments) == min(n, m)
+    return valid_assignments
+
+
+# ===========================================================================================
+#                                      DEBUG FUNCTIONS                                      =
+# =========================================================================================== 
+_stop_loading_event = None
+_loading_thread = None
+_renderer = None
+
+def _loading_animation(stop_event):
+    """'Loading...' animation in another thread"""
+    chars = ['|', '/', '-', '\\']
+    i = 0
+    while not stop_event.is_set():
+        sys.stdout.write(f"\rLoading {chars[i % len(chars)]} ")
+        sys.stdout.flush()
+        time.sleep(0.2)
+        i += 1
+    sys.stdout.write("\rLoading... Done! ✅\n") # Final msg
+def init_loading_print():
+    global _stop_loading_event, _loading_thread  # Declarar las variables globales
+    _stop_loading_event = threading.Event()  # Crear el evento
+    _loading_thread = threading.Thread(target=_loading_animation, args=(_stop_loading_event,))
+    _loading_thread.start()
+def finish_loading_print():
+    global _stop_loading_event, _loading_thread  
+    if _stop_loading_event:
+        _stop_loading_event.set()  
+    if _loading_thread:
+        _loading_thread.join()  
+
+def debug_show_cost_matrix(cost_matrix: np.ndarray, assignments:List[Tuple[int]], gt_labels: List[str], dt_labels: List[str], semantic_type:str, frame_num:int):
     plt.figure(figsize=(10, 8))
     wrapped_gt_labels = ["\n".join(textwrap.wrap(label, width=15)) for label in gt_labels]
     
@@ -226,37 +295,182 @@ def show_cost_matrix(cost_matrix: np.ndarray, assignments:List[Tuple[int]], gt_l
     plt.title(f"Cost Matrix for type: {semantic_type} in frame {frame_num}")
     plt.show()
 
-def assign_detections_to_ground_truth(cost_matrix:np.ndarray) -> List[int]:
-    """
-    Cost matrix (N, M) where N is the number of GT elements and M is the
-    number of detected elements (custom annotations). Returns the list of assignments
-    """
-    n, m = cost_matrix.shape
+def debug_load_accum_pcd(vcd:core.OpenLABEL, base_path:str):
+    """Return the scene accumulated pointcloud on 'odom' frame"""
+    lidar_stream = vcd.get_stream("LIDAR_TOP")
+    pcd_path = os.path.join(base_path, lidar_stream['uri'])
+    check_paths([pcd_path])
+    return o3d.io.read_point_cloud(pcd_path) # on 'odom' frame
+
+class Debug3DRenderer:
+    def __init__(self, 
+                 vcd:core.OpenLABEL, 
+                 scene:scl.Scene, 
+                 base_path:str, 
+                 frame_num:int=0, 
+                 voxel_size:float=0.2, 
+                 background_color:Tuple[float]=[0.185, 0.185, 0.185]):
+        """
+        Init the renderer by loading the accumulated pointcloud
+        """
+        self.vis = o3d.visualization.VisualizerWithKeyCallback()
+        self.vis.register_key_action_callback(ord(' '), self._space_callback) # Space to next frame
+        self.vis.create_window("3D Debug Renderer")
+        self.vis.get_render_option().background_color = background_color
+
+        # Save references to vcd data and scene data
+        self.vcd = vcd
+        self.scene = scene
+
+        # Load Accumulated PCD and add to the visualizer
+        init_loading_print()
+        accum_pcd = debug_load_accum_pcd(self.vcd, base_path)
+        accum_pcd = accum_pcd.voxel_down_sample(voxel_size)
+        finish_loading_print()
+        
+        self.accum_pcd = accum_pcd
+        self.vis.add_geometry(accum_pcd)
+
+        # Save reference to the camera controller
+        self.ctr = self.vis.get_view_control()
+
+        # Create the ego_vehicle representation
+        center, rotation, size = self._get_ego_frame_data(frame_num)
+        self.ego_vehicle_bbox = o3d.geometry.OrientedBoundingBox(center, rotation, size)
+        self.ego_color = [0.0, 1.0, 0.0]
+
+        # Set the current frame indicator for rendering the same semantic types of the same frame
+        self.current_frame = frame_num
+        self.space_pressed = False
     
-    # If it is not a square matrix, fill missing values with infinity
-    max_dim = max(n, m)
-    padded_cost_matrix = np.full((max_dim, max_dim), np.max(cost_matrix)+1)  # Valor alto
-    padded_cost_matrix[:n, :m] = cost_matrix  # Insertamos la matriz original
+    def _space_callback(self, vis, key, action):
+        print(f"[Debug3DRenderer] Key: {key}, Action: {action}")
+        self.space_pressed = True
 
-    # Solve LSAP
-    row_ind, col_ind = linear_sum_assignment(padded_cost_matrix)
+    def _get_ego_frame_data(self, frame_num:int):
+        """Return the ego vehicle data in odom frame:
+             ego_center_3x1, rotation_3x3, size
+        """
+        frame_properties = self.vcd.get_frame(frame_num=frame_num)['frame_properties']
+        frame_odometry = frame_properties['transforms']['vehicle-iso8855_to_odom']['odometry_xyzypr']
+        t_vec =  frame_odometry[:3]
+        ypr = frame_odometry[3:]
+        r_3x3 = utils.euler2R(ypr)
+        transform_4x4 = utils.create_pose(R=r_3x3, C=np.array([t_vec]).reshape(3, 1))
 
-    # Filtrar asignaciones inválidas (aquellas que caen en la parte añadida)
-    valid_assignments = [(r, c) for r, c in zip(row_ind, col_ind) if r < n and c < m]
+        ego_center_3x1 = np.zeros((3, 1))
+        ego_center_4x1 = utils.add_homogeneous_row(ego_center_3x1)
+        ego_center_3x1 = (transform_4x4 @ ego_center_4x1)[:3].ravel()
 
-    assert len(valid_assignments) == min(n, m)
-    return valid_assignments
+        return ego_center_3x1, r_3x3, [2.0, 2.0, 2.0]
+
+    def _update_camera_ego(self, frame_num):
+        """Update camera and ego position"""
+        ego_center, r_3x3, _ = self._get_ego_frame_data(frame_num)
+        self.ego_vehicle_bbox.center = ego_center
+        self.ego_vehicle_bbox.R = r_3x3
+        ego_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(self.ego_vehicle_bbox)
+        ego_set.paint_uniform_color(self.ego_color)
+        self.vis.add_geometry(ego_set)
+
+        # Configurar la cámara para mirar hacia abajo (mirada top-down)
+        self.ctr.set_zoom(0.8)  
+        self.ctr.set_front([0, 0, 1])       # Top-view
+        self.ctr.set_lookat(ego_center)     # Apuntar al centro del vehículo (ego)
+        self.ctr.set_up([0, -1, 0])         # Alinear eje Y como el 'arriba' de la cámara
+        # self.ctr.set_eye(camera_position)   # Establecer la posición de la cámara
+
+    def _get_associated_geometries(self, gt_uids:List[str], dt_uids:List[str], assignments:List[Tuple[int]], frame_num:int) -> List[o3d.geometry.LineSet]:
+        colors = get_pallete(len(assignments)) / 255.0
+        geometries = []
+        for index, (i, j) in enumerate(assignments):
+            obj_uid_1 = gt_uids[i]
+            obj_uid_2 = dt_uids[j]
+            colors[index]
+
+            # TODO: box3D -> bbox3D
+            bbox1 = self.vcd.get_object_data(obj_uid_1,'bbox3D', frame_num=frame_num)
+            bbox2 = self.vcd.get_object_data(obj_uid_2,'box3D', frame_num=frame_num)
+            
+            x1, y1, z1, rx1, ry1, rz1, sx1, sy1, sz1 = bbox1['val']
+            x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2['val']
+            
+            center1 = [x1, y1, z1] 
+            center2 = [x2, y2, z2]
+
+            size1 = [sx1, sy1, sz1]
+            size2 = [sx2, sy2, sz2]
+            
+            rotation1 = o3d.geometry.get_rotation_matrix_from_xyz([rx1, ry1, rz1])  
+            rotation2 = o3d.geometry.get_rotation_matrix_from_xyz([rx2, ry2, rz2])  
+            
+            obx1 = o3d.geometry.OrientedBoundingBox(center1, rotation1, size1)
+            obx2 = o3d.geometry.OrientedBoundingBox(center2, rotation2, size2)
+            
+            obx1 = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx1)
+            obx2 = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx2)
+            obx1.paint_uniform_color(colors[index])
+            obx2.paint_uniform_color(colors[index])
+
+            geometries.append(obx1)
+            geometries.append(obx2)
+        return geometries
+
+    def update(self, gt_uids:List[str], dt_uids:List[str], assignments:List[Tuple[int]], semantic_type:List[str], frame_num:int):
+
+        """
+        Update scene with frame cuboids associations and move the camera setting ego_vehicle position at the window center
+
+        Args:
+            gt_uids: Ground Truth objects uids of semantic_type detected on current frame
+            dt_uids: Detected objects uids of semantic_type detected on current frame
+            assignments: associations between gt and dt
+            frame_num (int): current frame
+        """
+
+        # Remove prev geometries except the pointcloud if we have changed the
+        # frame index
+        if self.current_frame != frame_num:
+            self.vis.clear_geometries()
+            self.vis.add_geometry(self.accum_pcd)
+            self.current_frame = frame_num
+            self.space_pressed = False
+
+        # De momento semantic_types no lo utilizo porque solo trabajo con vehículos.
+        # la idea es diferenciar las clases semánticas por color
+        geometries = self._get_associated_geometries(gt_uids, dt_uids, assignments, frame_num)
+        for g in geometries:
+            self.vis.add_geometry(g)
+
+        # Upate camera and ego
+        self._update_camera_ego(frame_num)
+
+        # Refrescar visualización
+        print("[Debug3DRenderer] Press Space to continue to next frame")
+        while True:
+            self.vis.poll_events()
+            self.vis.update_renderer()
+            if self.space_pressed:
+                break
+
+    def close(self):
+        """Cierra la ventana de visualización."""
+        self.vis.destroy_window()
 
 
-
-
+# ===========================================================================================
+#                                            MAIN                                           =
+# =========================================================================================== 
 def main(
         openlabel_path:str,
         semantic_types: List[str],
-        debug=False
+        ignoring_names: List[str],
+        save_path:str = None,
+        debug:bool=False
         ):
     # Check wheter the file exists
     check_paths([openlabel_path])
+    scene_path = os.path.abspath(os.path.dirname(openlabel_path))
 
     # Load OpenLABEL
     vcd = core.OpenLABEL()
@@ -265,7 +479,7 @@ def main(
 
     # Get the selected ground_truth and annotated objects 
     all_objs_inf = vcd.get_objects()
-    gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=semantic_types, filter_out=True)
+    gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=semantic_types, ignoring_names=ignoring_names, filter_out=True)
 
     frame_keys = vcd.data['openlabel']['frames'].keys()
     for fk in tqdm(frame_keys, desc="frames"):
@@ -273,6 +487,9 @@ def main(
         dt_uids_in_frame = dt_objs_inf['frame_presence'][fk] # Detections of frame
         
         for tp in semantic_types:
+            if tp not in gt_uids_in_frame or tp not in dt_uids_in_frame:
+                continue
+
             gt_uids = gt_uids_in_frame[tp]
             dt_uids = dt_uids_in_frame[tp]
             
@@ -280,6 +497,9 @@ def main(
             gt_objs_data = [ vcd.get_object_data(uid=uid, data_name='bbox3D', frame_num=fk) for uid in gt_uids]
             dt_objs_data = [ vcd.get_object_data(uid=uid, data_name='box3D', frame_num=fk) for uid in dt_uids]
             
+            if len(gt_objs_data) == 0 or len(dt_objs_data) == 0:
+                continue # Skip
+
             cost_matrix = get_cost_matrix(gt_objs_data, dt_objs_data, scene=scene, frame_num=fk)
             assignments = assign_detections_to_ground_truth(cost_matrix)
             print(cost_matrix)
@@ -288,21 +508,55 @@ def main(
             if debug:
                 gt_labels = [gt_objs_inf['objects'][tp][uid]['name'] for uid in gt_uids]
                 dt_labels = [dt_objs_inf['objects'][tp][uid]['name'] for uid in dt_uids]
-                show_cost_matrix(cost_matrix, assignments, gt_labels, dt_labels, tp, fk)
+                # debug_show_cost_matrix(cost_matrix, assignments, gt_labels, dt_labels, tp, fk)
+                
+                # Render scene
+                global _renderer
+                if _renderer is None:
+                    _renderer = Debug3DRenderer(vcd, scene, base_path=scene_path, frame_num=fk)
+                _renderer.update(gt_uids, dt_uids, assignments, semantic_type=tp, frame_num=fk)
             
 
             # ADD RELATIONS TO VISUALIZE IN WEBLABEL
+            for i, j in assignments:
+                gt_obj_uid = gt_uids[i]
+                dt_obj_uid = dt_uids[j]
+
+                vcd.add_relation_object_object(
+                    "Association", 
+                    semantic_type=f"Association/{tp}",
+                    object_uid_1=gt_obj_uid,
+                    object_uid_2=dt_obj_uid,
+                    relation_uid=None,
+                    ont_uid=None,
+                    frame_value=fk,
+                    set_mode=core.SetMode.replace)
 
             # print(f"frame: {fk}, semantic-type: {tp} first GT object data:")
             # uid_0 = gt_uids[0]
             # name_0 = gt_objs_inf['objects'][tp][uid_0]['name']
             # print(f"uid_0: {uid_0} name_0: {name_0}")
+    vcd.save(save_path)
 
+if __name__ == "__main__":   
+    parser = argparse.ArgumentParser(description="Script for evaluating 3D detections.")
+    # parser.add_argument('openlabel_path', type=str, help="Path to the openlabel with the ground truth and annotated detections")
 
-if __name__ == "__main__":
+    parser.add_argument('--semantic_types', nargs="+", default=["vehicle.car"], help="List of semantic types to consider")
+    parser.add_argument('--ignoring_names', nargs="+", default=["ego_vehicle"], help="List of object names to ignore")
+    parser.add_argument('--save_path', type=str, default=None, help="If set, the associated openlabel will be saved")
+    parser.add_argument('--debug', action='store_true', help="Enable debug mode")
+    args = parser.parse_args()
+
+    # Check provided paths
+    if args.save_path is not None:
+        check_paths([args.openlabel_path, args.save_path])
+    elif 'openlabel_path' in args._get_args():
+        check_paths([args.openlabel_path])
+
     OPENLABEL_PATH = "./tmp/my_scene/nuscenes_sequence/annotated_openlabel.json"
-    semantic_types = [
-        "vehicle.car"
-    ]
+    SAVING_PATH = "./tmp/my_scene/nuscenes_sequence/associated_openlabel.json"
+    semantic_types = [ "vehicle.car" ]
+    ignoring_names = [ "ego_vehicle" ]
 
-    main(openlabel_path=OPENLABEL_PATH, semantic_types=semantic_types, debug=True)
+    main(openlabel_path=OPENLABEL_PATH, semantic_types=semantic_types,ignoring_names=ignoring_names, save_path=SAVING_PATH, debug=True)
