@@ -221,17 +221,15 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         # cv2.imwrite(os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"), bev_repoj_cuboids)
         
         
-        cv2.imwrite(os.path.join(scene_path, "paola", "image_raw_cam_front",    f"{fk+1}.png"), raw_image)
-        cv2.imwrite(os.path.join(scene_path, "paola", "image_bev_cam_front",    f"{fk+1}.png"), bev_image)
-        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_raw_cam_front", f"{fk+1}.png"), raw_mask)
-        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_colored_raw_cam_front", f"{fk+1}.png"),raw2seg_bev.mask2image(raw_mask))
-        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_bev_cam_front", f"{fk+1}.png"), bev_mask_sb)
-        cv2.imwrite(os.path.join(scene_path, "paola", "semantic_colored_bev_cam_front", f"{fk+1}.png"), raw2seg_bev.mask2image(bev_mask_sb) )
-        cv2.imwrite(os.path.join(scene_path, "paola", "cuboids_raw_cam_front",  f"{fk+1}.png"), raw_image_cuboids)
-        cv2.imwrite(os.path.join(scene_path, "paola", "cuboids_bev_cam_front",  f"{fk+1}.png"), bev_repoj_cuboids)
+        # cv2.imwrite(os.path.join(scene_path, "paola", "image_raw_cam_front",    f"{fk+1}.png"), raw_image)
+        # cv2.imwrite(os.path.join(scene_path, "paola", "image_bev_cam_front",    f"{fk+1}.png"), bev_image)
+        # cv2.imwrite(os.path.join(scene_path, "paola", "semantic_raw_cam_front", f"{fk+1}.png"), raw_mask)
+        # cv2.imwrite(os.path.join(scene_path, "paola", "semantic_colored_raw_cam_front", f"{fk+1}.png"),raw2seg_bev.mask2image(raw_mask))
+        # cv2.imwrite(os.path.join(scene_path, "paola", "semantic_bev_cam_front", f"{fk+1}.png"), bev_mask_sb)
+        # cv2.imwrite(os.path.join(scene_path, "paola", "semantic_colored_bev_cam_front", f"{fk+1}.png"), raw2seg_bev.mask2image(bev_mask_sb) )
+        # cv2.imwrite(os.path.join(scene_path, "paola", "cuboids_raw_cam_front",  f"{fk+1}.png"), raw_image_cuboids)
+        # cv2.imwrite(os.path.join(scene_path, "paola", "cuboids_bev_cam_front",  f"{fk+1}.png"), bev_repoj_cuboids)
         
-        continue
-
         # ##############################################################
         # Annotations ##################################################
         print(f"# Annotating cuboids on vcd {'#'*36}")
@@ -281,10 +279,10 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
         annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
         vcd.save(os.path.join(scene_path, "nuscenes_sequence", "annotated_openlabel.json"))
         
-        print()
+        # print()
         # Check for a key press (if a key is pressed, it returns the ASCII code)
-        if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
-            break
+        # if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
+        #     break
         
     # Release resources
     cv2.destroyAllWindows()

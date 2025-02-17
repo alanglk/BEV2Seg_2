@@ -302,12 +302,15 @@ def debug_load_accum_pcd(vcd:core.OpenLABEL, base_path:str):
     check_paths([pcd_path])
     return o3d.io.read_point_cloud(pcd_path) # on 'odom' frame
 
+import open3d.visualization.gui as gui
+import open3d.visualization.rendering as rendering
+
 class Debug3DRenderer:
     def __init__(self, 
                  vcd:core.OpenLABEL, 
                  scene:scl.Scene, 
                  base_path:str, 
-                 frame_num:int=0, 
+                 frame_num:int,
                  voxel_size:float=0.2, 
                  background_color:Tuple[float]=[0.185, 0.185, 0.185]):
         """
@@ -342,10 +345,19 @@ class Debug3DRenderer:
         # Set the current frame indicator for rendering the same semantic types of the same frame
         self.current_frame = frame_num
         self.space_pressed = False
-    
+        
     def _space_callback(self, vis, key, action):
         print(f"[Debug3DRenderer] Key: {key}, Action: {action}")
         self.space_pressed = True
+
+    def _get_line_material(self) -> rendering.MaterialRecord:
+        mat = rendering.MaterialRecord()
+        mat.shader = "defaultLit"
+        return mat
+    def _get_pcd_material(self) -> rendering.MaterialRecord:
+        mat = rendering.MaterialRecord()
+        mat.shader = "defaultUnlit"
+        return mat
 
     def _get_ego_frame_data(self, frame_num:int):
         """Return the ego vehicle data in odom frame:
@@ -364,23 +376,70 @@ class Debug3DRenderer:
 
         return ego_center_3x1, r_3x3, [2.0, 2.0, 2.0]
 
-    def _update_camera_ego(self, frame_num):
-        """Update camera and ego position"""
-        ego_center, r_3x3, _ = self._get_ego_frame_data(frame_num)
-        self.ego_vehicle_bbox.center = ego_center
-        self.ego_vehicle_bbox.R = r_3x3
-        ego_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(self.ego_vehicle_bbox)
-        ego_set.paint_uniform_color(self.ego_color)
-        self.vis.add_geometry(ego_set)
+    def _get_text_mesh(self,
+                       text:str, 
+                       position:np.ndarray,
+                       size:float=0.1, 
+                       color:Tuple[float]=(1, 0, 0)
+                       ) ->  o3d.geometry.TriangleMesh:
+        text_mesh = o3d.t.geometry.TriangleMesh.create_text(text, depth=0.3).to_legacy()
+        text_mesh.scale(size, center=(0, 0, 0))
+        text_mesh.paint_uniform_color(color)  # Text color
+        text_mesh.translate(position) # Translate to point
+        
+        # Invertir el orden de los índices de los triángulos
+        triangles = np.asarray(text_mesh.triangles)
+        triangles = triangles[:, [2, 1, 0]]  
+        text_mesh.triangles = o3d.utility.Vector3iVector(triangles)
+        text_mesh.compute_vertex_normals()
 
-        # Configurar la cámara para mirar hacia abajo (mirada top-down)
-        self.ctr.set_zoom(0.8)  
-        self.ctr.set_front([0, 0, 1])       # Top-view
-        self.ctr.set_lookat(ego_center)     # Apuntar al centro del vehículo (ego)
-        self.ctr.set_up([0, -1, 0])         # Alinear eje Y como el 'arriba' de la cámara
-        # self.ctr.set_eye(camera_position)   # Establecer la posición de la cámara
+        return text_mesh
 
-    def _get_associated_geometries(self, gt_uids:List[str], dt_uids:List[str], assignments:List[Tuple[int]], frame_num:int) -> List[o3d.geometry.LineSet]:
+    def _get_arrow_mesh(self, 
+                   A:np.ndarray, 
+                   B:np.ndarray, 
+                   cone_height:float=0.2, 
+                   cylinder_radius:float=0.05,
+                   color:Tuple[float]=(1, 0, 0)
+                   ) ->  o3d.geometry.TriangleMesh:
+        arrow_direction = B - A 
+        arrow_length = np.linalg.norm(arrow_direction)
+        arrow_direction /= arrow_length             # Normalize
+        z_axis = np.array([0, 0, 1])    # Reference arrow vector in o3d
+
+        # Get arrow rotation matrix
+        arrow_dot   = np.dot(z_axis, arrow_direction)
+        arrow_cross = np.cross(z_axis, arrow_direction)
+        arrow_angle = np.arccos(np.clip(arrow_dot, -1.0, 1.0))
+        axis_height = np.linalg.norm(arrow_cross)
+        if axis_height < 1e-6:
+            rotation_matrix = np.eye(3) # Identity matrix (no rotation)
+        else:
+            arrow_cross /= axis_height # Normalize
+            rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle(arrow_cross * arrow_angle)
+            
+        # Create arrow
+        arrow_cylinder_height = arrow_length - cone_height
+        arrow_cylinder_height = arrow_cylinder_height if arrow_cylinder_height > 0 else 0.1
+        arrow = o3d.geometry.TriangleMesh.create_arrow(
+                cylinder_radius=cylinder_radius, cone_radius=cylinder_radius * 1.5,
+                cylinder_height=arrow_cylinder_height,
+                cone_height=cone_height)
+        arrow.rotate(rotation_matrix, center=(0, 0, 0))  # Apply rotation matrix
+        arrow.translate(A)  # A as Origin
+        arrow.paint_uniform_color(color)  # Red
+        return arrow
+
+    def _get_associated_geometries(self, 
+                                   gt_uids:List[str], 
+                                   dt_uids:List[str], 
+                                   assignments:List[Tuple[int]], 
+                                   frame_num:int, 
+                                   arrow_cone_height:float=0.2, 
+                                   arrow_cylinder_radius:float=0.05,
+                                   arrow_color:Tuple[float]=(1, 0, 0)
+                                   ) -> List[o3d.geometry.LineSet]:
+        
         colors = get_pallete(len(assignments)) / 255.0
         geometries = []
         for index, (i, j) in enumerate(assignments):
@@ -389,9 +448,13 @@ class Debug3DRenderer:
             colors[index]
 
             # TODO: box3D -> bbox3D
-            bbox1 = self.vcd.get_object_data(obj_uid_1,'bbox3D', frame_num=frame_num)
-            bbox2 = self.vcd.get_object_data(obj_uid_2,'box3D', frame_num=frame_num)
-            
+            bbox1 = self.vcd.get_object_data(obj_uid_1,'bbox3D', frame_num=frame_num) # GT
+            bbox2 = self.vcd.get_object_data(obj_uid_2,'box3D', frame_num=frame_num) # DT
+            if "val" not in bbox1:
+                print(f"[Debug3DRenderer] Missing bbox3D values for bbox1 with UID {obj_uid_1}")
+            if "val" not in bbox2:
+                print(f"[Debug3DRenderer] Missing bbox3D values for bbox2 with UID {obj_uid_2}")
+
             x1, y1, z1, rx1, ry1, rz1, sx1, sy1, sz1 = bbox1['val']
             x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2['val']
             
@@ -409,12 +472,38 @@ class Debug3DRenderer:
             
             obx1 = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx1)
             obx2 = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx2)
-            obx1.paint_uniform_color(colors[index])
-            obx2.paint_uniform_color(colors[index])
+            obx1.paint_uniform_color(colors[index]) # GT Color
+            obx2.paint_uniform_color(colors[index]) # DT Color
 
+            # Add uids text labels to bboxes
+            text1 = self._get_text_mesh(str(obj_uid_1), np.array([x1, y1, z1]))
+            text2 = self._get_text_mesh(str(obj_uid_2), np.array([x2, y2, z2]))
+            
+            # Compute arrow between GT and DT
+            arrow = self._get_arrow_mesh(np.array([x1, y1, z1]), np.array([x2, y2, z2]))
+
+            # Add geometries
             geometries.append(obx1)
             geometries.append(obx2)
+            geometries.append(text1)
+            geometries.append(text2)
+            geometries.append(arrow)
         return geometries
+    
+    def _update_camera_ego(self, frame_num):
+        """Update camera and ego position"""
+        ego_center, r_3x3, _ = self._get_ego_frame_data(frame_num)
+        self.ego_vehicle_bbox.center = ego_center
+        self.ego_vehicle_bbox.R = r_3x3
+        ego_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(self.ego_vehicle_bbox)
+        ego_set.paint_uniform_color(self.ego_color)
+        self.vis.add_geometry(ego_set)
+
+        # Configurar la cámara para mirar hacia abajo (mirada top-down)
+        self.ctr.set_zoom(0.2)  
+        self.ctr.set_front([0, 0, 1])       # Top-view
+        self.ctr.set_lookat(ego_center)     # Apuntar al centro del vehículo (ego)
+        self.ctr.set_up([0, -1, 0])         # Alinear eje Y como el 'arriba' de la cámara
 
     def update(self, gt_uids:List[str], dt_uids:List[str], assignments:List[Tuple[int]], semantic_type:List[str], frame_num:int):
 
@@ -481,6 +570,7 @@ def main(
     all_objs_inf = vcd.get_objects()
     gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=semantic_types, ignoring_names=ignoring_names, filter_out=True)
 
+    global _renderer
     frame_keys = vcd.data['openlabel']['frames'].keys()
     for fk in tqdm(frame_keys, desc="frames"):
         gt_uids_in_frame = gt_objs_inf['frame_presence'][fk] # Ground_truth of frame
@@ -511,7 +601,6 @@ def main(
                 # debug_show_cost_matrix(cost_matrix, assignments, gt_labels, dt_labels, tp, fk)
                 
                 # Render scene
-                global _renderer
                 if _renderer is None:
                     _renderer = Debug3DRenderer(vcd, scene, base_path=scene_path, frame_num=fk)
                 _renderer.update(gt_uids, dt_uids, assignments, semantic_type=tp, frame_num=fk)
@@ -536,6 +625,9 @@ def main(
             # uid_0 = gt_uids[0]
             # name_0 = gt_objs_inf['objects'][tp][uid_0]['name']
             # print(f"uid_0: {uid_0} name_0: {name_0}")
+    
+    if _renderer is not None:
+        _renderer.close()
     vcd.save(save_path)
 
 if __name__ == "__main__":   
