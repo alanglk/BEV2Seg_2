@@ -1,3 +1,6 @@
 [submodule "ml-depth-pro"]
 	path = ml-depth-pro
 	url = https://github.com/apple/ml-depth-pro.git
+[submodule "3D-Metrics"]
+	path = 3D-Metrics
+	url = https://github.com/M-G-A/3D-Metrics.git

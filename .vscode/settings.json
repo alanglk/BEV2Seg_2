@@ -1,6 +1,6 @@
 {
     "python.analysis.extraPaths": [".venv/bin/activate"],
-    "python.autoComplete.extraPaths": [ "${workspaceFolder}/oldatasets" ],
+    "python.autoComplete.extraPaths": [ "${workspaceFolder}/oldatasets", "${workspaceFolder}/3D-Metrics" ],
     "python.terminal.activateEnvInCurrentTerminal": true,
     "python.defaultInterpreterPath": "./.venv/bin/python3",
     "terminal.integrated.env.linux": { "PYTHONPATH": "${workspaceFolder}" },

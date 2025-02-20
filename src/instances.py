@@ -12,7 +12,7 @@ from vcd import scl, draw, utils
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
 
-from utils import create_cuboid_edges, intersection_factor, get_blended_image, get_pcds_of_semantic_label, get_pallete, filter_instances
+from my_utils import create_cuboid_edges, intersection_factor, get_blended_image, get_pcds_of_semantic_label, get_pallete, filter_instances
 
 from sklearn.cluster import DBSCAN
 import open3d as o3d

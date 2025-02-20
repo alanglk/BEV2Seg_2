@@ -9,13 +9,23 @@ import textwrap
 import threading
 import time
 
-from utils import get_pallete
+from my_utils import get_pallete, DEFAULT_MERGE_DICT, parse_mtl, parse_obj_with_materials
+
+# import open3d.visualization.gui as gui
+# import open3d.visualization.rendering as rendering
+from three_d_metrics.open3d_addon import * # 3d metrics
+
+
+from shapely.geometry import Polygon
+from scipy.spatial import Delaunay
+import copy
 
 from tqdm import tqdm
 from typing import TypedDict, Dict, List, Tuple
 import argparse
 import sys
 import os
+
 
 
 def check_paths(paths: List[str]):
@@ -85,13 +95,6 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
     if len(dt_objs['objects'].keys()) == 0:
         raise Exception(f"There are no detections (custom annotations) on the openLABEL")
     
-    # Check if the selected types are present in the ground_truth and annotations
-    for tp in selected_types:
-        if tp not in gt_objs['objects']:
-            raise Exception(f"GT has no type {tp}")
-        if tp not in dt_objs['objects']:
-            raise Exception(f"DT (custom annotations) has no type {tp}")
-
     # Drop out the non selected objects   
     def filter_out(obj_dict:Dict[str, ObjInfo], selected_types:List[str]) -> Dict[str, ObjInfo]:
         dropping_keys = []
@@ -178,6 +181,143 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
         print(f"[DT]   Frames with no entries: {dt_frames_with_no_objs}")
     return gt_objs, dt_objs
 
+def merge_semantic_labels(objs_inf:AnnotationInfo, merge_dict:dict = DEFAULT_MERGE_DICT):
+    """Return AnnotationInfo with merged semantic types
+    """
+    # Merge object semantic
+    dropping_types = []
+    for tp in objs_inf['objects']:
+        if tp in merge_dict:
+            continue # super-type
+        
+        for merge_tp in merge_dict:
+            if tp in merge_dict[merge_tp]:
+                if merge_tp not in objs_inf['objects']:
+                    objs_inf['objects'][merge_tp] = {}
+                objs_inf['objects'][merge_tp].update(objs_inf['objects'][tp])
+                dropping_types.append(tp)
+
+    # Merge frame pressence based on the already merged types
+    for frame in objs_inf['frame_presence']:
+        for tp in objs_inf['frame_presence'][frame]:
+            if tp in dropping_types:
+                merge_tp = None
+                for m_tp in merge_dict:
+                    if tp in merge_dict[m_tp]:
+                        merge_tp = m_tp
+                if merge_tp is None:
+                    continue
+                
+                if merge_tp not in objs_inf['frame_presence'][frame]:
+                    objs_inf['frame_presence'][frame][merge_tp] = []
+                objs_inf['frame_presence'][frame][merge_tp] += objs_inf['frame_presence'][frame][tp]
+    
+    # Drop merged types from objects
+    for tp in dropping_types:
+        objs_inf['objects'].pop(tp)
+
+    # Drop merged types from frame_pressence
+    for frame in objs_inf['frame_presence']:
+        for tp in dropping_types:
+            if tp in objs_inf['frame_presence'][frame]:
+                objs_inf['frame_presence'][frame].pop(tp)
+    return objs_inf
+
+def get_types_in_obj_inf(objs_inf:AnnotationInfo) -> list:
+    distinct_types = {}
+    for tp in objs_inf['objects']:
+        if tp not in distinct_types:
+            distinct_types.update({tp:0})
+    
+    for frame in objs_inf['frame_presence']:
+        for tp in objs_inf['frame_presence'][frame]:
+            assert tp in distinct_types
+            distinct_types[tp] += 1
+
+    return list(distinct_types.items())
+
+def get_camera_fov_polygon(camera:scl.Camera, camera_depth:float, fov_coord_sys:str, scene:scl.Scene, frame_num) -> np.ndarray:
+    """Get the FOV area of a camera
+    """
+    h, w = camera.height, camera.width
+    d = camera_depth
+    K_3x3 = camera.K_3x3
+    fx = K_3x3[0, 0]
+    alpha = np.arctan((w/2)/fx)
+    delta_x = np.tan(alpha) * d
+    fov_poly_3d = np.array([[0, 0, 0], [delta_x, 0, d], [-delta_x, 0, d]])
+
+    N, _ = fov_poly_3d.shape # (N, 3) where N is the number of points
+    fov_poly_4xN = utils.add_homogeneous_row(fov_poly_3d.T)
+    
+    # Transform to the odom coordinate system
+    fov_poly_4xN_t = scene.transform_points3d_4xN(fov_poly_4xN, cs_src=fov_coord_sys, cs_dst='odom', frame_num=frame_num)
+    fov_poly_3d_t = fov_poly_4xN_t[:3].T  # X, Y, Z
+    return fov_poly_3d_t[:, :2]
+
+def rotate_3d(points, angles):
+    """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
+    rx, ry, rz = angles
+    # Rotation matrices
+    Rx = np.array([[1, 0, 0],
+                   [0, np.cos(rx), -np.sin(rx)],
+                   [0, np.sin(rx), np.cos(rx)]])
+    Ry = np.array([[np.cos(ry), 0, np.sin(ry)],
+                   [0, 1, 0],
+                   [-np.sin(ry), 0, np.cos(ry)]])
+    Rz = np.array([[np.cos(rz), -np.sin(rz), 0],
+                   [np.sin(rz), np.cos(rz), 0],
+                   [0, 0, 1]])
+    R = Rz @ Ry @ Rx  # Apply rotations in X → Y → Z order
+    return np.dot(points, R.T)
+def bbox_3d_corners(center, size, rotation):
+    """ Compute the 8 corner points of the 3D bounding box """
+    x, y, z = center
+    sx, sy, sz = size
+    # Unrotated corner points (relative to center)
+    corners = np.array([
+        [-sx, -sy, -sz], [sx, -sy, -sz], [sx, sy, -sz], [-sx, sy, -sz],
+        [-sx, -sy, sz],  [sx, -sy, sz],  [sx, sy, sz],  [-sx, sy, sz]
+    ])
+    rotated_corners = rotate_3d(corners, rotation) # Rotate corners
+    rotated_corners += np.array([x, y, z]) # Translate to final position
+    return rotated_corners
+def project_to_xy(corners):
+    """ Project 3D points onto the XY plane """
+    return [(x, y) for x, y, z in corners]
+def check_intersection(polygon:Polygon, bbox:List[float]) -> bool:
+    """ Check if the 2D projection of the 3D bounding box intersects with the polygon """
+    center = bbox[:3]
+    rotation = bbox[3:6]
+    size = bbox[6:9]
+    corners_3d = bbox_3d_corners(center, size, rotation)  # Get rotated 3D bounding box corners
+    footprint_2d = Polygon(project_to_xy(corners_3d)).convex_hull  # Project to XY plane
+
+    global _debug, _debug_fov_intersection
+    if _debug and _debug_plt:
+        pass
+        # px, py = polygon.exterior.xy
+        # fx, fy = footprint_2d.exterior.xy
+        # plt.plot(px, py, color="blue")
+        # plt.plot(fx, fy, color="orange")
+        # plt.show()
+
+
+    return polygon.intersects(footprint_2d) # Check intersection
+def get_obj_indices_in_fov(objs_data:List[dict], fov_poly:np.ndarray, camera_name:str, scene:scl.Scene, frame_num:int) -> List[int]:
+    """Return the list of indices that intersects with fov_poly on the XY plane
+    """
+    fov_poly = Polygon(fov_poly)
+    in_indices = []
+    for i, obj_data in enumerate(objs_data):
+        # Transform bbox to camera frame
+        bbox_t = obj_data['val']
+        if obj_data['coordinate_system'] != 'odom':
+            bbox_t = scene.transform_cuboid(obj_data['val'], obj_data['coordinate_system'], camera_name, frame_num)
+        if check_intersection(fov_poly, bbox_t):
+            in_indices.append(i)
+    return in_indices
+
 
 def compute_cost_between_bboxes(bbox1: Tuple[float], bbox2: Tuple[float]) -> float:
     """
@@ -192,7 +332,7 @@ def compute_cost_between_bboxes(bbox1: Tuple[float], bbox2: Tuple[float]) -> flo
     dist = np.sqrt(dist_2)
     return dist
 
-def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene, frame_num:int) -> np.ndarray:
+def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene, frame_num:int, max_association_distance:float=7.0) -> np.ndarray:
     """
     Compute cost matrix with bboxes on 'odom' coordinate system
     {
@@ -217,49 +357,186 @@ def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene,
 
     return cost_matrix
 
-def assign_detections_to_ground_truth(cost_matrix:np.ndarray) -> List[int]:
+def assign_detections_to_ground_truth(cost_matrix:np.ndarray, max_association_distance:float=7.0) -> List[int]:
     """
     Cost matrix (N, M) where N is the number of GT elements and M is the
-    number of detected elements (custom annotations). Returns the list of assignments
+    number of detected elements (custom annotations).
+    Returns the modified cost_matrix and the list of assignments
     """
-    n, m = cost_matrix.shape
-    
-    # If it is not a square matrix, fill missing values with infinity
-    max_dim = max(n, m)
-    padded_cost_matrix = np.full((max_dim, max_dim), np.max(cost_matrix)+1)  # Valor alto
-    padded_cost_matrix[:n, :m] = cost_matrix  # Insertamos la matriz original
+
+    if cost_matrix.size == 0:
+        return cost_matrix, [] # There are no elements
+
+    # Define a large value to represent invalid associations
+    inf_value = np.max(cost_matrix) + 1
+
+    # Identify detections (columns) where all values exceed max_association_distance
+    invalid_detections = np.all(cost_matrix > max_association_distance, axis=0)
+
+    # Remove those invalid detections from the cost matrix
+    valid_detections_mask = ~invalid_detections
+    filtered_cost_matrix = cost_matrix[:, valid_detections_mask]
+
+    # If all detections are invalid, return an empty assignment
+    if filtered_cost_matrix.size == 0:
+        return cost_matrix, []
+
+    # Pad to square matrix for LSAP
+    n_filtered, m_filtered = filtered_cost_matrix.shape
+    max_dim = max(n_filtered, m_filtered)
+    padded_cost_matrix = np.full((max_dim, max_dim), inf_value)
+    padded_cost_matrix[:n_filtered, :m_filtered] = filtered_cost_matrix
 
     # Solve LSAP
     row_ind, col_ind = linear_sum_assignment(padded_cost_matrix)
 
-    # Filtrar asignaciones inválidas (aquellas que caen en la parte añadida)
-    valid_assignments = [(r, c) for r, c in zip(row_ind, col_ind) if r < n and c < m]
+    # Convert indices back to original detection indices
+    valid_assignments = [
+        (r, np.flatnonzero(valid_detections_mask)[c])
+        for r, c in zip(row_ind, col_ind) if r < n_filtered and c < m_filtered
+    ]
 
-    assert len(valid_assignments) == min(n, m)
-    return valid_assignments
+    return padded_cost_matrix, valid_assignments
+
+def get_oriented_bbox_from_vals(vals:List[float]) -> OrientedBoundingBox:
+    """Return OrientedBoundingBox from three_d_metrics"""
+    x, y, z, rx, ry, rz, sx, sy, sz = vals
+    center  = [x, y, z] 
+    size    = [sx, sy, sz]
+    rotation = o3d.geometry.get_rotation_matrix_from_xyz([rx, ry, rz])  
+    return OrientedBoundingBox(center, rotation, size)
+
+from matplotlib.widgets import Slider
+def compute_3d_detection_metrics(gt_bboxes:List[dict], 
+                                 dt_bboxes:List[dict], 
+                                 assignments:List[Tuple[int]],
+                                 cost_matrix:np.ndarray,
+                                 scene:scl.Scene,
+                                 frame_num:int, 
+                                 gt_uids:List[str]=None, 
+                                 dt_uids:List[str]=None
+                                 ):
+    """Compute 3D detection metics: 
+    
+    - Precission
+    - Recall
+    - IoU_v (volumetric)
+    - v2v (volume2volume distance)]
+    
+    Parameters
+    --------------
+    gt_bboxes, dt_bboxes: 
+    ```
+    {
+        "name": "box3D",
+        "coordinate_system": "odom",
+        "val": [ x, y, z, rx, ry, rz, sx, sy, sz ]
+    }
+    ```
+    cost_matrix: v2v associated distances
+    """   
+    global _debug, _debug_plt, _plt_init, _plt_figure, _plt_axes 
+    global _plt_3d_gt_bboxes, _plt_3d_dt_bboxes, _plt_3d_labels
+    if _debug and _debug_plt:
+        if not _plt_init:
+            _debug_init_plt(frame_num)
+        _debug_clear_plt(frame_num)
+        _plt_3d_gt_bboxes    = []
+        _plt_3d_dt_bboxes    = []
+        _plt_3d_labels       = []
+    
+    tp = 0 # Detections that are associated
+    fp = 0 # Detections that arent associated
+    fn = 0 # Groundtruth not associated
+    
+    n = len(gt_bboxes)
+    m = len(dt_bboxes)
+
+    # Fin False Negatives
+    for i in range(n):
+        associated = False
+        for a in assignments:
+            if i == a[0] or i == a[1]:
+                associated = True
+        fn += 1 if not associated else 0
+
+    # Find False and True Positives
+    for j in range(m):
+        associated = False
+        for a in assignments:
+            if i == a[0] or i == a[1]:
+                associated = True
+        fp += 1 if not associated else 0
+        tp += 1 if associated else 0
 
 
+    for (i, j) in assignments:
+        bbox1, bbox2 = gt_bboxes[i]['val'], dt_bboxes[j]['val']
+        if gt_bboxes[i]['coordinate_system'] != 'odom':
+            bbox1 = scene.transform_cuboid(bbox1, cs_src=gt_bboxes[i]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
+        if dt_bboxes[j]['coordinate_system'] != 'odom':
+            bbox2 = scene.transform_cuboid(bbox2, cs_src=dt_bboxes[j]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
+        bbox1 = get_oriented_bbox_from_vals(bbox1)
+        bbox2 = get_oriented_bbox_from_vals(bbox2)
+
+        dd = bbox1.dd(bbox2)        # Difference in Dimensions
+        iou = bbox1.IoU_v(bbox2)    # Volumetric IoU
+        v2v = bbox1.v2v(bbox2)      # Volume-Volume Distance
+        # bbd = bbox1.bbd(bbox2,ax=ax)
+        if _debug:
+            label = f"{i, j}"
+            if gt_uids is not None and dt_uids is not None:
+                label = f"{gt_uids[i], dt_uids[j]}"
+            _plt_3d_gt_bboxes.append(bbox1)
+            _plt_3d_dt_bboxes.append(bbox2)
+            _plt_3d_labels.append(label)
+            print(f"[3D-Metrics]    {label} DD      Metric: {dd}")
+            print(f"[3D-Metrics]    {label} IoU_v   Metric: {iou}")
+            print(f"[3D-Metrics]    {label} V2V     Metric: {v2v}")
+
+    if _debug_plt and len(assignments) > 0:
+        if len(assignments) > 1:
+            ax_slider = _plt_axes[4]
+            slider = Slider(ax_slider, "Assignment", 0, len(assignments)-1, valinit=0, valstep=1)
+            slider.on_changed(_debug_update_plt_slider)
+        else:
+            _debug_update_plt_slider
+        
+    return None
 # ===========================================================================================
 #                                      DEBUG FUNCTIONS                                      =
 # =========================================================================================== 
-_stop_loading_event = None
-_loading_thread = None
+_debug = False
+_debug_plt = True
+_debug_3d = False
+
 _renderer = None
 
-def _loading_animation(stop_event):
+_plt_init = False
+_plt_axes = None
+_plt_figure = None 
+_plt_curr_frame = -1
+_plt_3d_gt_bboxes    = None
+_plt_3d_dt_bboxes    = None
+_plt_3d_labels       = None
+
+_loading_thread = None
+_stop_loading_event = None
+
+def _loading_animation(stop_event, msg:str):
     """'Loading...' animation in another thread"""
     chars = ['|', '/', '-', '\\']
     i = 0
     while not stop_event.is_set():
-        sys.stdout.write(f"\rLoading {chars[i % len(chars)]} ")
+        sys.stdout.write(f"\r{msg} {chars[i % len(chars)]} ")
         sys.stdout.flush()
         time.sleep(0.2)
         i += 1
-    sys.stdout.write("\rLoading... Done! ✅\n") # Final msg
-def init_loading_print():
+    sys.stdout.write(f"\r{msg}... Done! ✅\n") # Final msg
+def init_loading_print(msg:str = "Loading"):
     global _stop_loading_event, _loading_thread  # Declarar las variables globales
     _stop_loading_event = threading.Event()  # Crear el evento
-    _loading_thread = threading.Thread(target=_loading_animation, args=(_stop_loading_event,))
+    _loading_thread = threading.Thread(target=_loading_animation, args=(_stop_loading_event, msg))
     _loading_thread.start()
 def finish_loading_print():
     global _stop_loading_event, _loading_thread  
@@ -268,11 +545,74 @@ def finish_loading_print():
     if _loading_thread:
         _loading_thread.join()  
 
+def _debug_init_plt(frame_num:int):
+    global _plt_init, _plt_curr_frame, _plt_figure, _plt_axes
+    if not _plt_init: 
+        _plt_figure = plt.figure(figsize=(10, 8)) 
+        _debug_clear_plt(frame_num)
+        _plt_curr_frame = frame_num
+        _plt_init = True
+        plt.ion()
+        plt.show()
+
+def _debug_clear_plt(frame_num:int):
+    global _plt_init, _plt_curr_frame, _plt_figure, _plt_axes 
+    if _plt_curr_frame != frame_num:
+        _plt_curr_frame = frame_num
+        _plt_figure.clf()
+        _plt_axes = []
+        # Add new axes
+        ax1 = _plt_figure.add_subplot(2, 2, 1)
+        _plt_axes.append(ax1)
+        ax2 = _plt_figure.add_subplot(2, 2, 2)
+        _plt_axes.append(ax2)
+        ax3 = _plt_figure.add_subplot(2, 2, 3, projection='3d', proj_type = 'ortho', elev=30, azim=-80)
+        _plt_axes.append(ax3)
+        ax4 = _plt_figure.add_subplot(2, 2, 4, projection='3d', proj_type = 'ortho', elev=30, azim=-80)
+        _plt_axes.append(ax4)
+        ax_slider = _plt_figure.add_axes([0.2, 0.02, 0.6, 0.03])
+        _plt_axes.append(ax_slider)
+        
+def _debug_show_plt():
+    global _plt_init
+    if not _plt_init:
+        raise Exception("Cannot update plt without initializing it")
+    plt.draw()
+    plt.pause(0.001)
+
+def _debug_update_plt_slider(val, i, j):
+    global _plt_init, _plt_figure, _plt_axes 
+    global _plt_3d_gt_bboxes, _plt_3d_dt_bboxes, _plt_3d_labels
+    if not _plt_init:
+        return
+    ax3, ax4 = _plt_axes[2], _plt_axes[3]
+
+    if _plt_3d_labels is None or len(_plt_3d_labels) == 0:
+        return
+
+    idx = int(val)
+    bbox1, bbox2 = _plt_3d_gt_bboxes[idx], _plt_3d_dt_bboxes[idx]
+    plot_bb(bbox1.getT(),default_colors[2]/255, ax=ax3)
+    plot_bb(bbox2.getT(),default_colors[8]/255, ax=ax3)
+    plot_bb(bbox1.getT(),default_colors[2]/255, ax=ax4)
+    plot_bb(bbox2.getT(),default_colors[8]/255, ax=ax4)
+    label = _plt_3d_labels[idx]
+    ax3.set_title(f"{label} IoU_v")
+    ax4.set_title(f"{label} V2V Distance")
+
+    _plt_figure.canvas.draw_idle()
+
 def debug_show_cost_matrix(cost_matrix: np.ndarray, assignments:List[Tuple[int]], gt_labels: List[str], dt_labels: List[str], semantic_type:str, frame_num:int):
-    plt.figure(figsize=(10, 8))
+    global _debug_plt, _plt_init, _plt_figure, _plt_axes 
+    if not _debug_plt:
+        return
+    if not _plt_init:
+       _debug_init_plt(frame_num)
+    _debug_clear_plt(frame_num)
+
+    ax1 = _plt_axes[0]
     wrapped_gt_labels = ["\n".join(textwrap.wrap(label, width=15)) for label in gt_labels]
-    
-    ax = sns.heatmap(
+    sns.heatmap(
         cost_matrix,
         annot=True,  # show values
         fmt=".2f",  # value format
@@ -281,19 +621,20 @@ def debug_show_cost_matrix(cost_matrix: np.ndarray, assignments:List[Tuple[int]]
         xticklabels=dt_labels,
         yticklabels=wrapped_gt_labels,
         cbar_kws={'label': 'Cost'},
-        annot_kws={"size": 8}
+        annot_kws={"size": 8},
+        ax=ax1
     )
-    ax.set_xticklabels(dt_labels, fontsize=8)
-    ax.set_yticklabels(wrapped_gt_labels, fontsize=8, rotation=0, ha="right")
+    ax1.set_xticklabels(dt_labels, fontsize=8)
+    ax1.set_yticklabels(wrapped_gt_labels, fontsize=8, rotation=0, ha="right")
 
     # Mark assingments
     for (i, j) in assignments:
-        ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='black', lw=2))
+        ax1.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='black', lw=2))
     
-    plt.ylabel("Ground Truth (gt)")
-    plt.xlabel("Detections (dt)")
-    plt.title(f"Cost Matrix for type: {semantic_type} in frame {frame_num}")
-    plt.show()
+    ax1.set_ylabel("Ground Truth (gt)")
+    ax1.set_xlabel("Detections (dt)")
+    ax1.set_title(f"Cost Matrix [frame: {frame_num}]")
+    
 
 def debug_load_accum_pcd(vcd:core.OpenLABEL, base_path:str):
     """Return the scene accumulated pointcloud on 'odom' frame"""
@@ -302,9 +643,6 @@ def debug_load_accum_pcd(vcd:core.OpenLABEL, base_path:str):
     check_paths([pcd_path])
     return o3d.io.read_point_cloud(pcd_path) # on 'odom' frame
 
-import open3d.visualization.gui as gui
-import open3d.visualization.rendering as rendering
-
 class Debug3DRenderer:
     def __init__(self, 
                  vcd:core.OpenLABEL, 
@@ -312,7 +650,9 @@ class Debug3DRenderer:
                  base_path:str, 
                  frame_num:int,
                  voxel_size:float=0.2, 
-                 background_color:Tuple[float]=[0.185, 0.185, 0.185]):
+                 background_color:Tuple[float]=[0.185, 0.185, 0.185],
+                 ego_model_path:str=None,
+                 load_pcd:bool = True):
         """
         Init the renderer by loading the accumulated pointcloud
         """
@@ -326,13 +666,15 @@ class Debug3DRenderer:
         self.scene = scene
 
         # Load Accumulated PCD and add to the visualizer
-        init_loading_print()
-        accum_pcd = debug_load_accum_pcd(self.vcd, base_path)
-        accum_pcd = accum_pcd.voxel_down_sample(voxel_size)
-        finish_loading_print()
-        
-        self.accum_pcd = accum_pcd
-        self.vis.add_geometry(accum_pcd)
+        self.load_pcd = load_pcd
+        if self.load_pcd:
+            init_loading_print("Loading pointcloud")
+            accum_pcd = debug_load_accum_pcd(self.vcd, base_path)
+            accum_pcd = accum_pcd.voxel_down_sample(voxel_size)
+            finish_loading_print()
+
+            self.accum_pcd = accum_pcd
+            self.vis.add_geometry(accum_pcd)
 
         # Save reference to the camera controller
         self.ctr = self.vis.get_view_control()
@@ -340,7 +682,21 @@ class Debug3DRenderer:
         # Create the ego_vehicle representation
         center, rotation, size = self._get_ego_frame_data(frame_num)
         self.ego_vehicle_bbox = o3d.geometry.OrientedBoundingBox(center, rotation, size)
-        self.ego_color = [0.0, 1.0, 0.0]
+        self.ego_bbox_color = [0.0, 1.0, 0.0]
+        
+        self.ego_mesh = None 
+        self.ego_model_path = None # ego_model_path
+        if self.ego_model_path is not None:
+            self.ego_mesh = self._get_ego_mesh(self.ego_model_path)
+            
+            max_bounds = self.ego_mesh.get_max_bound()
+            min_bounds = self.ego_mesh.get_min_bound()
+            self.ego_sizes = np.abs(max_bounds - min_bounds)
+
+            # Aling ego_mesh with odom frame  
+            r_3x3 = o3d.geometry.get_rotation_matrix_from_xyz([0.0, -np.pi/2, -np.pi/2])
+            self.ego_mesh.rotate(r_3x3) 
+            # self.ego_mesh.scale()
 
         # Set the current frame indicator for rendering the same semantic types of the same frame
         self.current_frame = frame_num
@@ -348,16 +704,16 @@ class Debug3DRenderer:
         
     def _space_callback(self, vis, key, action):
         print(f"[Debug3DRenderer] Key: {key}, Action: {action}")
-        self.space_pressed = True
+        self.space_pressed = key == 1 # 1 key pressed 0 key released
 
-    def _get_line_material(self) -> rendering.MaterialRecord:
-        mat = rendering.MaterialRecord()
-        mat.shader = "defaultLit"
-        return mat
-    def _get_pcd_material(self) -> rendering.MaterialRecord:
-        mat = rendering.MaterialRecord()
-        mat.shader = "defaultUnlit"
-        return mat
+    # def _get_line_material(self) -> rendering.MaterialRecord:
+    #     mat = rendering.MaterialRecord()
+    #     mat.shader = "defaultLit"
+    #     return mat
+    # def _get_pcd_material(self) -> rendering.MaterialRecord:
+    #     mat = rendering.MaterialRecord()
+    #     mat.shader = "defaultUnlit"
+    #     return mat
 
     def _get_ego_frame_data(self, frame_num:int):
         """Return the ego vehicle data in odom frame:
@@ -376,12 +732,103 @@ class Debug3DRenderer:
 
         return ego_center_3x1, r_3x3, [2.0, 2.0, 2.0]
 
+    def _get_ego_mesh(self, ego_model_path) -> o3d.geometry.TriangleMesh | None:
+        if ego_model_path is None:
+            return None
+        
+        check_paths([ego_model_path])
+        
+        files = os.listdir(ego_model_path)
+        mtl_files = []
+        obj_files = []
+        for f in files:
+            if f.endswith(".mtl"):
+                mtl_files.append(f)
+            if f.endswith(".obj"):
+                obj_files.append(f)
+        assert len(mtl_files) == len(obj_files)
+
+        if len(mtl_files) == 0:
+            print(f"[Debug3DRenderer] No supported 3d mesh files were encountered for Ego Vehicle in {ego_model_path}")
+            return None
+        if len(mtl_files) > 1:
+            print(f"[Debug3DRenderer] Multiple mtl and obj files in {ego_model_path}")
+            return None
+        
+        # Parse mtl file and obj file
+        mtl_path = os.path.join(ego_model_path, mtl_files[0])
+        obj_path = os.path.join(ego_model_path, obj_files[0])            
+        materials = parse_mtl(mtl_path)
+        vertices, faces, face_materials = parse_obj_with_materials(obj_path)
+        
+        # Assign colors per vertex (by averaging face colors affecting each vertex)
+        # Map from vertices to the colors of the faces they belong to
+        vertex_colors = np.ones((len(vertices), 3))  # Default white
+        vertex_color_map = {i: [] for i in range(len(vertices))}
+
+        # Assign colors based on face materials
+        for face, material in zip(faces, face_materials):
+            color = materials.get(material, {"Kd": [1.0, 1.0, 1.0]})["Kd"]
+            for v in face:
+                vertex_color_map[v].append(color)
+
+        # Average colors for each vertex
+        for v, colors in vertex_color_map.items():
+            if colors:
+                vertex_colors[v] = np.mean(colors, axis=0)
+
+        # Create Open3D mesh
+        ego_mesh = o3d.geometry.TriangleMesh()
+        ego_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+        ego_mesh.triangles = o3d.utility.Vector3iVector(faces)
+        ego_mesh.vertex_colors = o3d.utility.Vector3dVector(vertex_colors)
+        ego_mesh.compute_vertex_normals()
+        return ego_mesh
+
+    def _get_fov_mesh(self, 
+                      fov_poly:np.ndarray, 
+                      color:np.ndarray = np.array([1.0, 0.0, 0.0])
+                      ) -> o3d.geometry.LineSet:
+        if np.max(color) > 1.0:
+            color = color.astype(float) / 255.0
+
+        # to 3D coords (Z=0)
+        N, _ = fov_poly.shape  # (N, 2), points in XY
+        fov_poly_3d = np.hstack([fov_poly, np.zeros((N, 1))])  # (X, Y) -> (X, Y, Z=0)
+
+        if N < 3:
+            raise ValueError("[Debug3DRenderer] ERROR: Less than 3 points to create a fov mesh")
+
+        # Delaunay triangulation to create a surface in XY
+        edges = []
+        if N == 3:
+            edges = [(0, 1), (1, 2), (2, 0)]
+        else:
+            tri = Delaunay(fov_poly)
+            edges = set()
+            for triangle in tri.simplices:
+                for i in range(3):  
+                    edge = tuple(sorted([triangle[i], triangle[(i + 1) % 3]]))
+                    edges.add(edge)
+            edges = list(edges)
+            if not edges:
+                edges = [(i, (i + 1) % N) for i in range(N)]
+
+        # Crear LineSet
+        fov_lines = o3d.geometry.LineSet()
+        fov_lines.points = o3d.utility.Vector3dVector(fov_poly_3d)
+        fov_lines.lines = o3d.utility.Vector2iVector(edges)
+        fov_lines.colors = o3d.utility.Vector3dVector(np.tile(color, (len(edges), 1)))
+        return fov_lines
+
     def _get_text_mesh(self,
                        text:str, 
                        position:np.ndarray,
                        size:float=0.1, 
-                       color:Tuple[float]=(1, 0, 0)
+                       color:np.ndarray=np.array([1, 0, 0])
                        ) ->  o3d.geometry.TriangleMesh:
+        if np.max(color) > 1.0:
+            color = color.astype(float) / 255.0
         text_mesh = o3d.t.geometry.TriangleMesh.create_text(text, depth=0.3).to_legacy()
         text_mesh.scale(size, center=(0, 0, 0))
         text_mesh.paint_uniform_color(color)  # Text color
@@ -430,63 +877,63 @@ class Debug3DRenderer:
         arrow.paint_uniform_color(color)  # Red
         return arrow
 
-    def _get_associated_geometries(self, 
-                                   gt_uids:List[str], 
-                                   dt_uids:List[str], 
-                                   assignments:List[Tuple[int]], 
-                                   frame_num:int, 
-                                   arrow_cone_height:float=0.2, 
-                                   arrow_cylinder_radius:float=0.05,
-                                   arrow_color:Tuple[float]=(1, 0, 0)
-                                   ) -> List[o3d.geometry.LineSet]:
+
+    def _get_bboxes3d(self, 
+                     uids: List[str], 
+                     frame_num:int, 
+                     color:np.ndarray = np.array([135, 206, 250])
+                     ) -> List[o3d.geometry.LineSet]:
+        if np.max(color) > 1.0:
+            color = color.astype(float) / 255.0
+        geometries = []
+        for uid in uids:
+            bbox = self.vcd.get_object_data(uid,'bbox3D', frame_num=frame_num)
+            if "val" not in bbox:
+                print(f"[Debug3DRenderer] Missing bbox3D values for object with UID {uid}")
+            
+            obx = get_oriented_bbox_from_vals(bbox['val'])
+            center = obx.center
+            obx = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx)
+            obx.paint_uniform_color(color) # GT Color
+
+            # Add uids text labels to bboxes
+            text = self._get_text_mesh(str(uid), center, color=color)
+            
+            # Add geometries
+            geometries.append(obx)
+            geometries.append(text)
+        return geometries
+
+    def _get_associated_arrows(self, 
+                               gt_uids:List[str], 
+                               dt_uids:List[str], 
+                               assignments:List[Tuple[int]], 
+                               frame_num:int, 
+                               arrow_cone_height:float=0.2, 
+                               arrow_cylinder_radius:float=0.05,
+                               arrow_color:np.ndarray = np.array([255, 0, 0])
+                               ) -> List[o3d.geometry.LineSet]:
         
-        colors = get_pallete(len(assignments)) / 255.0
+        if np.max(arrow_color) > 1.0:
+            arrow_color = arrow_color.astype(float) / 255.0
         geometries = []
         for index, (i, j) in enumerate(assignments):
             obj_uid_1 = gt_uids[i]
             obj_uid_2 = dt_uids[j]
-            colors[index]
 
-            # TODO: box3D -> bbox3D
             bbox1 = self.vcd.get_object_data(obj_uid_1,'bbox3D', frame_num=frame_num) # GT
-            bbox2 = self.vcd.get_object_data(obj_uid_2,'box3D', frame_num=frame_num) # DT
+            bbox2 = self.vcd.get_object_data(obj_uid_2,'bbox3D', frame_num=frame_num) # DT
             if "val" not in bbox1:
                 print(f"[Debug3DRenderer] Missing bbox3D values for bbox1 with UID {obj_uid_1}")
             if "val" not in bbox2:
                 print(f"[Debug3DRenderer] Missing bbox3D values for bbox2 with UID {obj_uid_2}")
 
             x1, y1, z1, rx1, ry1, rz1, sx1, sy1, sz1 = bbox1['val']
-            x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2['val']
-            
-            center1 = [x1, y1, z1] 
-            center2 = [x2, y2, z2]
-
-            size1 = [sx1, sy1, sz1]
-            size2 = [sx2, sy2, sz2]
-            
-            rotation1 = o3d.geometry.get_rotation_matrix_from_xyz([rx1, ry1, rz1])  
-            rotation2 = o3d.geometry.get_rotation_matrix_from_xyz([rx2, ry2, rz2])  
-            
-            obx1 = o3d.geometry.OrientedBoundingBox(center1, rotation1, size1)
-            obx2 = o3d.geometry.OrientedBoundingBox(center2, rotation2, size2)
-            
-            obx1 = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx1)
-            obx2 = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx2)
-            obx1.paint_uniform_color(colors[index]) # GT Color
-            obx2.paint_uniform_color(colors[index]) # DT Color
-
-            # Add uids text labels to bboxes
-            text1 = self._get_text_mesh(str(obj_uid_1), np.array([x1, y1, z1]))
-            text2 = self._get_text_mesh(str(obj_uid_2), np.array([x2, y2, z2]))
-            
+            x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2['val']            
             # Compute arrow between GT and DT
             arrow = self._get_arrow_mesh(np.array([x1, y1, z1]), np.array([x2, y2, z2]))
 
             # Add geometries
-            geometries.append(obx1)
-            geometries.append(obx2)
-            geometries.append(text1)
-            geometries.append(text2)
             geometries.append(arrow)
         return geometries
     
@@ -496,7 +943,16 @@ class Debug3DRenderer:
         self.ego_vehicle_bbox.center = ego_center
         self.ego_vehicle_bbox.R = r_3x3
         ego_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(self.ego_vehicle_bbox)
-        ego_set.paint_uniform_color(self.ego_color)
+        ego_set.paint_uniform_color(self.ego_bbox_color)
+
+        if self.ego_mesh is not None:
+            ego_mesh = copy.deepcopy(self.ego_mesh)
+            ego_mesh.rotate(r_3x3)
+            ego_mesh_center = ego_center 
+            ego_mesh_center[1] -= -self.ego_sizes[1] / 2
+            ego_mesh.translate(ego_mesh_center)
+            self.vis.add_geometry(ego_mesh)
+
         self.vis.add_geometry(ego_set)
 
         # Configurar la cámara para mirar hacia abajo (mirada top-down)
@@ -505,7 +961,15 @@ class Debug3DRenderer:
         self.ctr.set_lookat(ego_center)     # Apuntar al centro del vehículo (ego)
         self.ctr.set_up([0, -1, 0])         # Alinear eje Y como el 'arriba' de la cámara
 
-    def update(self, gt_uids:List[str], dt_uids:List[str], assignments:List[Tuple[int]], semantic_type:List[str], frame_num:int):
+    def update(self, 
+               gt_uids:List[str], 
+               dt_uids:List[str], 
+               assignments:List[Tuple[int]], 
+               semantic_type:List[str], 
+               frame_num:int,
+               fov_poly:np.ndarray=None,
+               gt_in_indices:List[int]=None, 
+               dt_in_indices:List[int]=None):
 
         """
         Update scene with frame cuboids associations and move the camera setting ego_vehicle position at the window center
@@ -515,20 +979,55 @@ class Debug3DRenderer:
             dt_uids: Detected objects uids of semantic_type detected on current frame
             assignments: associations between gt and dt
             frame_num (int): current frame
+            fov_poly: polygon of visible area
+            gt_in_indices: indices of visible objects in GT
+            dt_in_indices: indices of visible objects in detections
         """
 
         # Remove prev geometries except the pointcloud if we have changed the
         # frame index
         if self.current_frame != frame_num:
-            self.vis.clear_geometries()
-            self.vis.add_geometry(self.accum_pcd)
             self.current_frame = frame_num
-            self.space_pressed = False
+            self.space_pressed = False 
+            self.vis.clear_geometries()
+            if self.load_pcd:
+                self.vis.add_geometry(self.accum_pcd)
 
         # De momento semantic_types no lo utilizo porque solo trabajo con vehículos.
-        # la idea es diferenciar las clases semánticas por color
-        geometries = self._get_associated_geometries(gt_uids, dt_uids, assignments, frame_num)
-        for g in geometries:
+        # la idea es que se pueda diferenciar las clases semánticas por color
+        all_geometries = []
+        gt_bboxes = []
+        dt_bboxes = []
+        arrows = []
+        
+        # FOV -> Light Butter Yellow
+        if fov_poly is not None:
+            all_geometries += [self._get_fov_mesh(fov_poly, np.array([250, 230, 160]))] 
+
+        # In and Out FOV GT and Detectios + Association Arrows
+        if gt_in_indices is not None and dt_in_indices is not None: 
+            # Ground Truth -> Light Blue
+            gt_in_uids      = [gt_uids[i] for i in gt_in_indices]
+            gt_out_uids     = [gt_uids[i] for i in range(len(gt_uids)) if i not in gt_in_indices]
+            gt_bboxes_in    = self._get_bboxes3d(gt_in_uids,    frame_num, np.array([75, 156, 220]))    
+            gt_bboxes_out   = self._get_bboxes3d(gt_out_uids,   frame_num, np.array([19, 64, 99]))
+            gt_bboxes += gt_bboxes_in + gt_bboxes_out
+            
+            # Detections -> Pale Green
+            dt_in_uids      = [dt_uids[i] for i in dt_in_indices]
+            dt_out_uids     = [dt_uids[i] for i in range(len(dt_uids)) if i not in dt_in_indices]
+            dt_bboxes_in    = self._get_bboxes3d(dt_in_uids,    frame_num, np.array([102, 201, 102]))    
+            dt_bboxes_out   = self._get_bboxes3d(dt_out_uids,   frame_num, np.array([33, 93, 33]))
+            dt_bboxes += dt_bboxes_in + dt_bboxes_out
+
+            # Associations
+            arrows = self._get_associated_arrows(gt_in_uids, dt_in_uids, assignments, frame_num, arrow_color=np.array([240, 230, 140])) # Khaki
+        else:
+            gt_bboxes = self._get_bboxes3d(gt_uids, frame_num, np.array([75, 156, 220]))  # GT -> Light Blue
+            dt_bboxes = self._get_bboxes3d(dt_uids, frame_num, np.array([102, 201, 102])) # DT -> Pale Green
+        all_geometries += gt_bboxes + dt_bboxes + arrows
+
+        for g in all_geometries:
             self.vis.add_geometry(g)
 
         # Upate camera and ego
@@ -536,11 +1035,9 @@ class Debug3DRenderer:
 
         # Refrescar visualización
         print("[Debug3DRenderer] Press Space to continue to next frame")
-        while True:
+        while not self.space_pressed:
             self.vis.poll_events()
             self.vis.update_renderer()
-            if self.space_pressed:
-                break
 
     def close(self):
         """Cierra la ventana de visualización."""
@@ -555,7 +1052,8 @@ def main(
         semantic_types: List[str],
         ignoring_names: List[str],
         save_path:str = None,
-        debug:bool=False
+        debug:bool=False,
+        debug_ego_model_path:str=None
         ):
     # Check wheter the file exists
     check_paths([openlabel_path])
@@ -566,11 +1064,37 @@ def main(
     vcd.load_from_file(openlabel_path)
     scene = scl.Scene(vcd)
 
+    # TODO: Change this hardcoded params
+    camera_name = 'CAM_FRONT'
+    camera_depth = 30.0 # m
+    max_association_distance = 7.0 # m
+
+
+    # If merge labels was applied to the object detection, it has to be considered
+    # for the groundtruth
+    merge_dict = DEFAULT_MERGE_DICT
+    selected_types = []
+    for tp in semantic_types:
+        if tp not in merge_dict:
+            selected_types.append(tp)
+            continue
+        for sub_tp in merge_dict[tp]:
+            selected_types.append(sub_tp)
+
     # Get the selected ground_truth and annotated objects 
     all_objs_inf = vcd.get_objects()
-    gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=semantic_types, ignoring_names=ignoring_names, filter_out=True)
+    gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=selected_types, ignoring_names=ignoring_names, filter_out=True)
+    
+    gt_objs_inf = merge_semantic_labels(gt_objs_inf) # Merge semantic labes as was made to custom detections
+    dt_objs_inf = merge_semantic_labels(dt_objs_inf) # It does nothing
 
-    global _renderer
+    # Debug init
+    global _renderer, _debug, _debug_3d, _debug_plt
+    _debug = debug
+    _debug_3d = True
+    _debug_plt = False
+
+    # Main loop
     frame_keys = vcd.data['openlabel']['frames'].keys()
     for fk in tqdm(frame_keys, desc="frames"):
         gt_uids_in_frame = gt_objs_inf['frame_presence'][fk] # Ground_truth of frame
@@ -583,28 +1107,55 @@ def main(
             gt_uids = gt_uids_in_frame[tp]
             dt_uids = dt_uids_in_frame[tp]
             
-            # cambiar box3d a bbox3d
             gt_objs_data = [ vcd.get_object_data(uid=uid, data_name='bbox3D', frame_num=fk) for uid in gt_uids]
-            dt_objs_data = [ vcd.get_object_data(uid=uid, data_name='box3D', frame_num=fk) for uid in dt_uids]
+            dt_objs_data = [ vcd.get_object_data(uid=uid, data_name='bbox3D', frame_num=fk) for uid in dt_uids]
             
             if len(gt_objs_data) == 0 or len(dt_objs_data) == 0:
                 continue # Skip
+            
+            camera = scene.get_camera(camera_name=camera_name, frame_num=fk)
 
-            cost_matrix = get_cost_matrix(gt_objs_data, dt_objs_data, scene=scene, frame_num=fk)
-            assignments = assign_detections_to_ground_truth(cost_matrix)
-            print(cost_matrix)
-            print(assignments)
+
+            fov_poly = get_camera_fov_polygon(camera, camera_depth, camera_name, scene, fk) # (O, A, B )in odom cs
+            gt_in_indices = get_obj_indices_in_fov(gt_objs_data, fov_poly, camera_name, scene, fk)
+            dt_in_indices = get_obj_indices_in_fov(dt_objs_data, fov_poly, camera_name, scene, fk)
+
+            gt_in_uids = [gt_uids[i] for i in gt_in_indices]
+            dt_in_uids = [dt_uids[i] for i in dt_in_indices]
+            gt_in_objs_data = [gt_objs_data[i] for i in gt_in_indices]
+            dt_in_objs_data = [dt_objs_data[i] for i in dt_in_indices]
+
+
+            cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk)
+            padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
             
-            if debug:
-                gt_labels = [gt_objs_inf['objects'][tp][uid]['name'] for uid in gt_uids]
-                dt_labels = [dt_objs_inf['objects'][tp][uid]['name'] for uid in dt_uids]
-                # debug_show_cost_matrix(cost_matrix, assignments, gt_labels, dt_labels, tp, fk)
+            # compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids)
+
+
+            if _debug:
                 
-                # Render scene
-                if _renderer is None:
-                    _renderer = Debug3DRenderer(vcd, scene, base_path=scene_path, frame_num=fk)
-                _renderer.update(gt_uids, dt_uids, assignments, semantic_type=tp, frame_num=fk)
-            
+                if _debug_plt:
+                    debug_show_cost_matrix(padded_cost_matrix, assignments, gt_in_uids, dt_in_uids, tp, fk)
+                    _debug_show_plt()
+
+                # Render 3d scene
+                if _debug_3d:
+                    if _renderer is None:
+                        _renderer = Debug3DRenderer(vcd, 
+                                                    scene, 
+                                                    base_path=scene_path, 
+                                                    frame_num=fk, 
+                                                    ego_model_path=debug_ego_model_path, 
+                                                    load_pcd=False)
+                    _renderer.update(gt_uids, 
+                                    dt_uids, 
+                                    assignments, 
+                                    semantic_type=tp, 
+                                    frame_num=fk, 
+                                    fov_poly=fov_poly, 
+                                    gt_in_indices=gt_in_indices, 
+                                    dt_in_indices=dt_in_indices)
+
 
             # ADD RELATIONS TO VISUALIZE IN WEBLABEL
             for i, j in assignments:
@@ -620,6 +1171,8 @@ def main(
                     ont_uid=None,
                     frame_value=fk,
                     set_mode=core.SetMode.replace)
+
+            # Compute metrics
 
             # print(f"frame: {fk}, semantic-type: {tp} first GT object data:")
             # uid_0 = gt_uids[0]
@@ -648,7 +1201,15 @@ if __name__ == "__main__":
 
     OPENLABEL_PATH = "./tmp/my_scene/nuscenes_sequence/annotated_openlabel.json"
     SAVING_PATH = "./tmp/my_scene/nuscenes_sequence/associated_openlabel.json"
+    DEBUG_EGO_MODEL = "./assets/carlota_3d"
+    # DEBUG_EGO_MODEL = "./assets/lowpoly_car_3d"
+
     semantic_types = [ "vehicle.car" ]
     ignoring_names = [ "ego_vehicle" ]
 
-    main(openlabel_path=OPENLABEL_PATH, semantic_types=semantic_types,ignoring_names=ignoring_names, save_path=SAVING_PATH, debug=True)
+    main(openlabel_path=OPENLABEL_PATH, 
+         semantic_types=semantic_types,
+         ignoring_names=ignoring_names, 
+         save_path=SAVING_PATH, 
+         debug=True, 
+         debug_ego_model_path=DEBUG_EGO_MODEL)

@@ -13,7 +13,7 @@ import depth_pro
 
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
-from utils import check_paths, merge_semantic_labels, get_blended_image
+from my_utils import check_paths, merge_semantic_labels, get_blended_image
 from bev2seg_2 import Raw2Seg_BEV, Raw_BEV2Seg
 
 from bevmap_manager import BEVMapManager

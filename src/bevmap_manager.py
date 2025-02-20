@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 import cv2
 
-from utils import check_paths
+from my_utils import check_paths
 
 from typing import List
 import pickle

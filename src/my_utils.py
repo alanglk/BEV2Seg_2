@@ -127,26 +127,24 @@ def intersection_factor(mask1, mask2):
     
     return intersection / union
 
-def merge_semantic_labels(semantic_mask, label2id, merge_dict:dict = None):
-    DEFAULT_MERGE_DICT = {
-        'vehicle.car': [
-            "vehicle.bus.bendy", 
-            "vehicle.bus.rigid", 
-            "vehicle.car", 
-            "vehicle.construction", 
-            "vehicle.emergency.ambulance", 
-            "vehicle.emergency.police", 
-            "vehicle.trailer", 
-            "vehicle.truck"
-        ],
-        "vehicle.motorcycle":[
-            "vehicle.bicycle",
-            "vehicle.motorcycle"
-        ]
-    }
-    if merge_dict is None:
-        merge_dict = DEFAULT_MERGE_DICT
+DEFAULT_MERGE_DICT = {
+    'vehicle.car': [
+        "vehicle.bus.bendy", 
+        "vehicle.bus.rigid", 
+        "vehicle.car", 
+        "vehicle.construction", 
+        "vehicle.emergency.ambulance", 
+        "vehicle.emergency.police", 
+        "vehicle.trailer", 
+        "vehicle.truck"
+    ],
+    "vehicle.motorcycle":[
+        "vehicle.bicycle",
+        "vehicle.motorcycle"
+    ]
+}
 
+def merge_semantic_labels(semantic_mask, label2id, merge_dict:dict = DEFAULT_MERGE_DICT):
     # Merge labels
     for k, vals in merge_dict.items():
         to_id   = label2id[k]
@@ -298,3 +296,47 @@ def create_plane_at_y(y, size:int = 5):
     plane.paint_uniform_color([0.5, 0.5, 0.5])
     
     return plane
+
+
+# Function to parse MTL file and extract material colors
+def parse_mtl(mtl_file):
+    materials = {}
+    current_material = None
+    
+    with open(mtl_file, "r") as file:
+        for line in file:
+            parts = line.strip().split()
+            if not parts:
+                continue
+
+            if parts[0] == "newmtl":  # Start of a new material
+                current_material = parts[1]
+                materials[current_material] = {"Kd": [1.0, 1.0, 1.0]}  # Default color
+            elif parts[0] == "Kd" and current_material:  # Diffuse color
+                materials[current_material]["Kd"] = list(map(float, parts[1:4]))
+
+    return materials
+
+# Function to parse OBJ and extract face-material associations
+def parse_obj_with_materials(obj_file):
+    vertices = []
+    faces = []
+    face_materials = []
+    current_material = None
+    
+    with open(obj_file, "r") as file:
+        for line in file:
+            parts = line.strip().split()
+            if not parts:
+                continue
+            
+            if parts[0] == "v":  # Vertex
+                vertices.append(list(map(float, parts[1:4])))
+            elif parts[0] == "usemtl":  # Material assignment
+                current_material = parts[1]
+            elif parts[0] == "f":  # Face
+                face = [int(p.split("/")[0]) - 1 for p in parts[1:4]]  # Only vertex indices
+                faces.append(face)
+                face_materials.append(current_material)  # Store associated material
+    
+    return np.array(vertices), np.array(faces), face_materials
