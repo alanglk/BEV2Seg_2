@@ -13,7 +13,7 @@ import depth_pro
 
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
-from my_utils import check_paths, merge_semantic_labels, get_blended_image
+from my_utils import check_paths, merge_semantic_labels, get_blended_image, DEFAULT_MERGE_DICT
 from bev2seg_2 import Raw2Seg_BEV, Raw_BEV2Seg
 
 from bevmap_manager import BEVMapManager
@@ -71,7 +71,7 @@ import os
         bs: normal -> bev -> semantic
 """
 
-def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
+def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro_path:str, merge_semantic_labels_flag:bool = True):
     # Paths
     scene_openlabel_path    = os.path.join(scene_path, "original_openlabel.json")
     print(f"scene_openlabel_path: {scene_openlabel_path}")
@@ -81,12 +81,50 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     vcd = core.OpenLABEL()
     vcd.load_from_file(scene_openlabel_path)
     scene = scl.Scene(vcd=vcd)
-    camera_name = 'CAM_FRONT'
     frame_keys = vcd.data['openlabel']['frames'].keys()
     
+    # Params
+    model_config = {
+        'scene':{
+            'scene_path':scene_path,
+            'camera_name': 'CAM_FRONT'
+        },
+        'semantic':{
+            'raw2segmodel_path': raw2segmodel_path,
+            'bev2segmodel_path': bev2segmodel_path,
+            'merge_semantic_labels_flag': merge_semantic_labels_flag,
+            'merge_dict': DEFAULT_MERGE_DICT
+        },
+        'depth_estimation':{
+            'depth_pro_path': depth_pro_path
+        },
+        'scene_pcd':{},
+        'instance_scene_pcd':{
+            'dbscan_samples': 15,
+            'dbscan_eps': 0.1,
+            'dbscan_jobs': None,
+            'lims': (np.inf, np.inf, np.inf),
+            'min_samples_per_instance': 250,
+            'max_distance': 50.0,
+            'max_height': 2.0
+        }
+    }
+    
+    camera_name                 = model_config['scene']['camera_name']
+    dbscan_samples              = model_config['instance_scene_pcd']['dbscan_samples']
+    dbscan_eps                  = model_config['instance_scene_pcd']['dbscan_eps']
+    dbscan_jobs                 = model_config['instance_scene_pcd']['dbscan_jobs']
+    lims                        = model_config['instance_scene_pcd']['lims']
+    min_samples_per_instance    = model_config['instance_scene_pcd']['min_samples_per_instance']
+    max_distance                = model_config['instance_scene_pcd']['max_distance']
+    max_height                  = model_config['instance_scene_pcd']['max_height']
+    
+    # Save model_config in metadata:
+    vcd.add_metadata_properties({'model_config': model_config})
+
     # Open-CV windows
     cv2.namedWindow("DEBUG", cv2.WINDOW_NORMAL)
-
+    
     # Create device for model inference
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
@@ -100,7 +138,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
     BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
-    ISP = InstanceScenePCD(dbscan_samples=15, dbscan_eps = 0.1, dbscan_jobs=None)
+    ISP = InstanceScenePCD(dbscan_samples=dbscan_samples, dbscan_eps=dbscan_eps, dbscan_jobs=dbscan_jobs)
     IBM = InstanceBEVMasks(scene=scene, bev_parameters=raw_seg2bev.bev_parameters)
     IRD = InstanceRAWDrawer(scene=scene)
 
@@ -141,9 +179,10 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             raw_mask, bev_mask_sb, bev_mask_bs = BMM.load_semantic_images(image_name=raw_image_path)
         
         # Merge semantic labels
-        raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id)
-        # bev_mask_bs = merge_semantic_labels(bev_mask_bs,    raw_seg2bev.label2id)
-        bev_mask_sb = merge_semantic_labels(bev_mask_sb,    raw_seg2bev.label2id)
+        if merge_semantic_labels_flag:
+            raw_mask    = merge_semantic_labels(raw_mask,       raw_seg2bev.label2id, merge_dict=model_config['semantic']['merge_dict'])
+            # bev_mask_bs = merge_semantic_labels(bev_mask_bs,    raw_seg2bev.label2id, merge_dict=model_config['semantic']['merge_dict'])
+            bev_mask_sb = merge_semantic_labels(bev_mask_sb,    raw_seg2bev.label2id, merge_dict=model_config['semantic']['merge_dict'])
 
         # ##############################################################
         # Depth estimation #############################################
@@ -171,10 +210,10 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
             instance_pcds = ISP.run(pcd, 
                                     raw_mask, 
                                     camera_name, 
-                                    lims=(np.inf, np.inf, np.inf), 
-                                    min_samples_per_instance=250, 
-                                    max_distance=50.0, 
-                                    max_height = 2.0,
+                                    lims=lims,
+                                    min_samples_per_instance=min_samples_per_instance,
+                                    max_distance=max_distance,
+                                    max_height=max_height,
                                     verbose=True)
             BMM.save_instance_pcds(raw_image_path, instance_pcds)
         else:
@@ -277,7 +316,7 @@ def main(scene_path:str, raw2segmodel_path, bev2segmodel_path, depth_pro_path):
 
         transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
         annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
-        vcd.save(os.path.join(scene_path, "nuscenes_sequence", "annotated_openlabel.json"))
+        vcd.save(os.path.join(scene_path, "nuscenes_sequence", "detections_openlabel.json"))
         
         # print()
         # Check for a key press (if a key is pressed, it returns the ASCII code)

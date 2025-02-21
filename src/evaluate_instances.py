@@ -23,9 +23,10 @@ import copy
 from tqdm import tqdm
 from typing import TypedDict, Dict, List, Tuple
 import argparse
+import pickle
+import json
 import sys
 import os
-
 
 
 def check_paths(paths: List[str]):
@@ -319,20 +320,28 @@ def get_obj_indices_in_fov(objs_data:List[dict], fov_poly:np.ndarray, camera_nam
     return in_indices
 
 
-def compute_cost_between_bboxes(bbox1: Tuple[float], bbox2: Tuple[float]) -> float:
+def compute_cost_between_bboxes(bbox1: Tuple[float], bbox2: Tuple[float], dist_type:str = 'v2v ') -> float:
     """
     bboxes on the same coords system.
     bbox1: [ x, y, z, rx, ry, rz, sx, sy, sz ]
     bbox2: [ x, y, z, rx, ry, rz, sx, sy, sz ]
     """
-    x1, y1, z1, rx1, ry1, rz1, sx1, sy1, sz1 = bbox1
-    x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2
+    dist = 0.0
 
-    dist_2 = (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2) 
-    dist = np.sqrt(dist_2)
+    if dist_type == 'centroids':
+        x1, y1, z1, rx1, ry1, rz1, sx1, sy1, sz1 = bbox1
+        x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2
+        dist_2 = (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2) 
+        dist = np.sqrt(dist_2)
+    elif dist_type == 'v2v':
+        bbox1 = get_oriented_bbox_from_vals(bbox1)
+        bbox2 = get_oriented_bbox_from_vals(bbox2)
+        dist = bbox1.v2v(bbox2)      # Volume-Volume Distance
+    else:
+        raise Exception(f"Undefined distance type {dist_type}")
     return dist
 
-def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene, frame_num:int, max_association_distance:float=7.0) -> np.ndarray:
+def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene, frame_num:int, dist_type:str = 'v2v') -> np.ndarray:
     """
     Compute cost matrix with bboxes on 'odom' coordinate system
     {
@@ -353,11 +362,11 @@ def get_cost_matrix(gt_bboxes:List[dict], dt_bboxes:List[dict], scene:scl.Scene,
             if dt_bboxes[j]['coordinate_system'] != 'odom':
                 bbox2 = scene.transform_cuboid(bbox2, cs_src=dt_bboxes[j]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
 
-            cost_matrix[i][j] = compute_cost_between_bboxes(bbox1, bbox2)
+            cost_matrix[i][j] = compute_cost_between_bboxes(bbox1, bbox2, dist_type=dist_type)
 
     return cost_matrix
 
-def assign_detections_to_ground_truth(cost_matrix:np.ndarray, max_association_distance:float=7.0) -> List[int]:
+def assign_detections_to_ground_truth(cost_matrix:np.ndarray, max_association_distance:float=3.0) -> List[int]:
     """
     Cost matrix (N, M) where N is the number of GT elements and M is the
     number of detected elements (custom annotations).
@@ -395,6 +404,14 @@ def assign_detections_to_ground_truth(cost_matrix:np.ndarray, max_association_di
         (r, np.flatnonzero(valid_detections_mask)[c])
         for r, c in zip(row_ind, col_ind) if r < n_filtered and c < m_filtered
     ]
+
+    # Check if any of the assignments exceeds the max_association_distance
+    dropping_assignments = []
+    for idx, (i, j) in enumerate(valid_assignments):
+        if cost_matrix[i, j] > max_association_distance:
+            dropping_assignments.append(idx)
+    for idx in dropping_assignments:
+        valid_assignments.pop(idx)
 
     return padded_cost_matrix, valid_assignments
 
@@ -449,6 +466,11 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
     fp = 0 # Detections that arent associated
     fn = 0 # Groundtruth not associated
     
+    dds     = [] # Diferences in dimensions
+    v2vs    = [] # Volume-Volume distances
+    vious   = [] # Volumetric IoUs
+    bbds    = [] # Bounding Boxes Disparities
+
     n = len(gt_bboxes)
     m = len(dt_bboxes)
 
@@ -476,14 +498,22 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
             bbox1 = scene.transform_cuboid(bbox1, cs_src=gt_bboxes[i]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
         if dt_bboxes[j]['coordinate_system'] != 'odom':
             bbox2 = scene.transform_cuboid(bbox2, cs_src=dt_bboxes[j]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
+        # centroid_distance = compute_cost_between_bboxes(bbox1, bbox2, dist_type='centroids')
+        
         bbox1 = get_oriented_bbox_from_vals(bbox1)
         bbox2 = get_oriented_bbox_from_vals(bbox2)
 
         dd = bbox1.dd(bbox2)        # Difference in Dimensions
-        iou = bbox1.IoU_v(bbox2)    # Volumetric IoU
         v2v = bbox1.v2v(bbox2)      # Volume-Volume Distance
-        # bbd = bbox1.bbd(bbox2,ax=ax)
-        if _debug:
+        iou = bbox1.IoU_v(bbox2)    # Volumetric IoU
+        bbd = bbox1.bbd(bbox2)      # Bounding Box Disparity
+        
+        dds.append(dd)
+        v2vs.append(v2v)
+        vious.append(iou)
+        bbds.append(bbd)
+
+        if _debug and _debug_plt:
             label = f"{i, j}"
             if gt_uids is not None and dt_uids is not None:
                 label = f"{gt_uids[i], dt_uids[j]}"
@@ -501,8 +531,8 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
             slider.on_changed(_debug_update_plt_slider)
         else:
             _debug_update_plt_slider
-        
-    return None
+
+    return tp, fp, fn, dds, v2vs, vious, bbds
 # ===========================================================================================
 #                                      DEBUG FUNCTIONS                                      =
 # =========================================================================================== 
@@ -1047,34 +1077,145 @@ class Debug3DRenderer:
 # ===========================================================================================
 #                                            MAIN                                           =
 # =========================================================================================== 
+"""
+data = {
+    'scene_name_eval0':{
+        'openlabel_path': str,
+        'model_config':{
+            'scene':{
+                'scene_path':...,
+                'camera_name': 'CAM_FRONT'
+            },
+            'semantic':{
+                'raw2segmodel_path': ...,
+                'bev2segmodel_path': ...,
+                'merge_semantic_labels_flag': True,
+                'merge_dict': DEFAULT_MERGE_DICT,
+            },
+            'depth_estimation':{
+                'depth_pro_path':...
+            },
+            'scene_pcd':{
+            },
+            'instance_scene_pcd':{
+                'dbscan_samples': 15,
+                'dbscan_eps': 0.1,
+                'dbscan_jobs': None,
+                'lims': (np.inf, np.inf, np.inf),
+                'min_samples_per_instance': 250,
+                'max_distance': 50.0,
+                'max_height': 2.0
+            }
+        },
+        'eval_config':{
+            'camera_depth': 15.0,
+            'max_association_distance': 7.0,
+            'semantic_types': ['vehicle.car'],
+            'ignoring_names': ['ego_vehicle']
+        },
+        'frames': {
+            0: {
+                'semantic_type':{
+                    'num_gt_objs': 0,
+                    'num_dt_objs': 0,
+                    
+                    'metrics':{
+                        'tp': 0,
+                        'fp': 0,
+                        'fn': 0,
+                        'IoU_v': [...],
+                        'v2v_dist': [...],
+                        'bbd': [...]
+                    }
+                }
+            }
+        }
+        
+    }
+}
+"""
 def main(
         openlabel_path:str,
+        save_data_path:str,
         semantic_types: List[str],
         ignoring_names: List[str],
-        save_path:str = None,
+        camera_depth:float = 15.0,
+        max_association_distance:float = 3.0,
+        association_dist_type:str = 'v2v',
+        save_openlabel_path:str = None,
         debug:bool=False,
         debug_ego_model_path:str=None
         ):
+
     # Check wheter the file exists
     check_paths([openlabel_path])
+    if save_openlabel_path is not None:
+        check_paths([save_openlabel_path])
+        save_openlabel_path = os.path.abspath(save_openlabel_path)
     scene_path = os.path.abspath(os.path.dirname(openlabel_path))
+    save_data_path = os.path.abspath(save_data_path)
 
     # Load OpenLABEL
     vcd = core.OpenLABEL()
     vcd.load_from_file(openlabel_path)
     scene = scl.Scene(vcd)
 
-    # TODO: Change this hardcoded params
-    camera_name = 'CAM_FRONT'
-    camera_depth = 30.0 # m
-    max_association_distance = 7.0 # m
+    # Get model config from metadata
+    metadata = vcd.get_metadata()
+    model_config = None
+    if 'model_config' not in metadata:
+        raise Exception("OpenLABEL file provided has not metadata for evaluation")
+    model_config = metadata['model_config']
 
+    # Evaluation params
+    eval_name                   = metadata['scene_name']
+    camera_name                 = model_config['scene']['camera_name']
+    merge_semantic_labels_flag  = model_config['semantic']['merge_semantic_labels_flag'] # True
+    merge_dict                  = model_config['semantic']['merge_dict'] # DEFAULT_MERGE_DICT
+    eval_config = {
+        'camera_depth': camera_depth,
+        'max_association_distance': max_association_distance,
+        'association_dist_type': association_dist_type,
+        'semantic_types': semantic_types,
+        'ignoring_names': ignoring_names
+    }
+    
+    # Create data dict for saving evaluation data
+    data = {}
+    if os.path.exists(save_data_path):
+        print(f"Loading evaluation data from: {save_data_path}")
+        with open(save_data_path, "rb") as f:
+            data = pickle.load(f)
 
-    # If merge labels was applied to the object detection, it has to be considered
-    # for the groundtruth
-    merge_dict = DEFAULT_MERGE_DICT
+        if eval_name in data:
+            print(f"Scene {eval_name} is already evaluated with this params:")
+            print("============= model_config =============") 
+            print(f"{json.dumps(model_config, indent=4)}\n")
+            print("============= eval_config ==============") 
+            print(f"{json.dumps(eval_config, indent=4)}\n")
+            
+            res = input(f"Do you want to evaluate it again? [Y/n]")
+            if res.lower() != 'y':
+                print("Finish!! :D")
+                return
+            else:
+                new_name = input(f"Input new evaluation name (prev_name -> {eval_name}): ")
+                while new_name in data:
+                    new_name = input(f"{new_name} is already registered. Input another name: ")
+                eval_name = new_name
+    print(f"Evaluating scene and saving as {eval_name} in {save_data_path}")
+    data[eval_name] = {}
+    data[eval_name]['openlabel_path']   = openlabel_path
+    data[eval_name]['model_config']     = model_config
+    data[eval_name]['eval_config']      = eval_config
+    data[eval_name]['frames'] = {}
+
+    # Selected types = semantic_types + merge_dict_sub_types   
     selected_types = []
     for tp in semantic_types:
+        if not merge_semantic_labels_flag or merge_dict is None:
+            selected_types.append(tp)
+            continue
         if tp not in merge_dict:
             selected_types.append(tp)
             continue
@@ -1085,8 +1226,11 @@ def main(
     all_objs_inf = vcd.get_objects()
     gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=selected_types, ignoring_names=ignoring_names, filter_out=True)
     
-    gt_objs_inf = merge_semantic_labels(gt_objs_inf) # Merge semantic labes as was made to custom detections
-    dt_objs_inf = merge_semantic_labels(dt_objs_inf) # It does nothing
+    # If merge labels was applied to the object detection, it has to be considered
+    # for the groundtruth
+    if merge_semantic_labels_flag:
+        gt_objs_inf = merge_semantic_labels(gt_objs_inf) # Merge semantic labes as was made to custom detections
+        dt_objs_inf = merge_semantic_labels(dt_objs_inf) # It does nothing (in theory)
 
     # Debug init
     global _renderer, _debug, _debug_3d, _debug_plt
@@ -1099,7 +1243,8 @@ def main(
     for fk in tqdm(frame_keys, desc="frames"):
         gt_uids_in_frame = gt_objs_inf['frame_presence'][fk] # Ground_truth of frame
         dt_uids_in_frame = dt_objs_inf['frame_presence'][fk] # Detections of frame
-        
+        data[eval_name]['frames'][fk] = {}
+
         for tp in semantic_types:
             if tp not in gt_uids_in_frame or tp not in dt_uids_in_frame:
                 continue
@@ -1126,11 +1271,11 @@ def main(
             dt_in_objs_data = [dt_objs_data[i] for i in dt_in_indices]
 
 
-            cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk)
+            cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
             
-            # compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids)
-
+            _tp, _fp, _fn, _dd, _IoU_v, _v2v_dist, _bbd = compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids) 
+            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd } }
 
             if _debug:
                 
@@ -1158,58 +1303,59 @@ def main(
 
 
             # ADD RELATIONS TO VISUALIZE IN WEBLABEL
-            for i, j in assignments:
-                gt_obj_uid = gt_uids[i]
-                dt_obj_uid = dt_uids[j]
+            if save_openlabel_path is not None:
+                for i, j in assignments:
+                    gt_obj_uid = gt_uids[i]
+                    dt_obj_uid = dt_uids[j]
 
-                vcd.add_relation_object_object(
-                    "Association", 
-                    semantic_type=f"Association/{tp}",
-                    object_uid_1=gt_obj_uid,
-                    object_uid_2=dt_obj_uid,
-                    relation_uid=None,
-                    ont_uid=None,
-                    frame_value=fk,
-                    set_mode=core.SetMode.replace)
-
-            # Compute metrics
-
-            # print(f"frame: {fk}, semantic-type: {tp} first GT object data:")
-            # uid_0 = gt_uids[0]
-            # name_0 = gt_objs_inf['objects'][tp][uid_0]['name']
-            # print(f"uid_0: {uid_0} name_0: {name_0}")
+                    vcd.add_relation_object_object(
+                        "Association", 
+                        semantic_type=f"Association/{tp}",
+                        object_uid_1=gt_obj_uid,
+                        object_uid_2=dt_obj_uid,
+                        relation_uid=None,
+                        ont_uid=None,
+                        frame_value=fk,
+                        set_mode=core.SetMode.replace)
     
     if _renderer is not None:
         _renderer.close()
-    vcd.save(save_path)
+    if save_openlabel_path is not None:
+        vcd.add_metadata_properties({'eval_config': eval_config})
+        vcd.save(save_openlabel_path)
+    
+    # Save evaluation data
+    with open(save_data_path, "wb") as f:
+        pickle.dump(data, f)
+    
 
 if __name__ == "__main__":   
     parser = argparse.ArgumentParser(description="Script for evaluating 3D detections.")
     # parser.add_argument('openlabel_path', type=str, help="Path to the openlabel with the ground truth and annotated detections")
+    # parser.add_argument('save_path', type=str, help="Path to the openlabel with the ground truth and annotated detections")
 
     parser.add_argument('--semantic_types', nargs="+", default=["vehicle.car"], help="List of semantic types to consider")
     parser.add_argument('--ignoring_names', nargs="+", default=["ego_vehicle"], help="List of object names to ignore")
-    parser.add_argument('--save_path', type=str, default=None, help="If set, the associated openlabel will be saved")
+    parser.add_argument('--save_openlabel_path', type=str, default=None, help="If set, the associated openlabel will be saved")
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
     args = parser.parse_args()
 
-    # Check provided paths
-    if args.save_path is not None:
-        check_paths([args.openlabel_path, args.save_path])
-    elif 'openlabel_path' in args._get_args():
-        check_paths([args.openlabel_path])
-
-    OPENLABEL_PATH = "./tmp/my_scene/nuscenes_sequence/annotated_openlabel.json"
-    SAVING_PATH = "./tmp/my_scene/nuscenes_sequence/associated_openlabel.json"
-    DEBUG_EGO_MODEL = "./assets/carlota_3d"
+    OPENLABEL_PATH      = "./tmp/my_scene/nuscenes_sequence/detections_openlabel.json"
+    SAVE_DATA_PATH      = "./data/pipeline_3d_evaluations.pkl"              
+    SAVE_OPENLABEL_PATH = None # "./tmp/my_scene/nuscenes_sequence/associated_openlabel.json"
+    DEBUG_EGO_MODEL     = "./assets/carlota_3d"
     # DEBUG_EGO_MODEL = "./assets/lowpoly_car_3d"
 
     semantic_types = [ "vehicle.car" ]
     ignoring_names = [ "ego_vehicle" ]
 
     main(openlabel_path=OPENLABEL_PATH, 
+         save_data_path=SAVE_DATA_PATH,
          semantic_types=semantic_types,
-         ignoring_names=ignoring_names, 
-         save_path=SAVING_PATH, 
+         ignoring_names=ignoring_names,
+         camera_depth=15.0,
+         max_association_distance=3.0,
+         association_dist_type='v2v',
+         save_openlabel_path=SAVE_OPENLABEL_PATH, 
          debug=True, 
          debug_ego_model_path=DEBUG_EGO_MODEL)
