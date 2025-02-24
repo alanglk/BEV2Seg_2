@@ -29,6 +29,7 @@ from typing import List
 from tqdm import tqdm
 import argparse
 import pickle
+import sys
 import os
 
 
@@ -99,6 +100,26 @@ def show_eval_report(data:dict, model_name:str, eval_type:int, label_list:List):
     print(f"Confussion Matrix: \n{conf_matrix}\n")
     print("-----------------------------------------")
     print()
+
+def get_size(obj, seen=None):
+    """Recursively finds size of objects"""
+    size = sys.getsizeof(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    # Important mark as seen *before* entering recursion to gracefully handle
+    # self-referential objects
+    seen.add(obj_id)
+    if isinstance(obj, dict):
+        size += sum([get_size(v, seen) for v in obj.values()])
+        size += sum([get_size(k, seen) for k in obj.keys()])
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+        size += sum([get_size(i, seen) for i in obj])
+    return size
 
 def calculate_metrics(annotations, predictions, num_classes):
     """
@@ -190,7 +211,7 @@ def main(dataset_path:str,
         dataset     = NuImagesFormattedDataset(dataroot=dataset_path, version=dataset_version)
     else:
         raise Exception(f"Unknown evaluation type: {evaluation_type}")
-    
+       
     camera_name = 'CAM_FRONT'
     labels_list = list(model.id2label.values())
     num_labels = len(labels_list)
@@ -215,7 +236,9 @@ def main(dataset_path:str,
     
     data[model_name] = data[model_name] if model_name in data else {} 
     data[model_name][eval_type] = {}
-    
+    data[model_name]['model_path'] = model_path
+    data[model_name]['model_size'] = get_size(model)
+
     for m in metric_names:
         data[model_name][eval_type][m] = torch.zeros(num_labels, device=device)
     data[model_name][eval_type]['conf_matrix'] = torch.zeros((num_labels, num_labels), device=device)
