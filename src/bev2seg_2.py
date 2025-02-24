@@ -12,6 +12,7 @@ from oldatasets.NuImages.nulabels import nuid2color, nuid2name
 from typing import Union, Tuple
 from abc import ABC, abstractmethod
 
+import contextlib
 import sys
 import os
 
@@ -82,13 +83,17 @@ class BEV2SEG_2_Interface(ABC):
         self.scene = scl.Scene(openlabel)
         self.drawer = draw.TopView(scene=self.scene, coordinate_system="vehicle-iso8855", params=self.bev_parameters)
 
+    
     def inverse_perspective_mapping(self, image: np.ndarray, camera_name: str, frame_num: int = 0) -> np.ndarray:
         """IPM to BEV perspective
         INPUT: 
         """
-        sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
-        self.drawer.add_images(imgs = {f"{camera_name}": image}, frame_num = frame_num)
-        sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
+        with contextlib.redirect_stdout(open(os.devnull, 'w')):  # Redirige stdout temporalmente
+            self.drawer.add_images(imgs = {f"{camera_name}": image}, frame_num = frame_num)
+
+        # sys.stdout = open(os.devnull, 'w') # Redirigir stdout a os.devnull para ignorar la salida
+        # self.drawer.add_images(imgs = {f"{camera_name}": image}, frame_num = frame_num)
+        # sys.stdout = sys.__stdout__ # Restablecer la salida estándar para que vuelva a imprimir en pantalla
         
         # self.drawer.draw_bevs(_frame_num=frame_num)
         # return self.drawer.topView
