@@ -5,6 +5,7 @@ Ejemplo de uso:
 
 raw2bevseg (eval type 0):
 python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/BEVDataset --model_path ./models/segformer_bev/raw2bevseg_mit-b0_v0.3 --output_path ./data/model_evaluations.pkl
+python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/BEVDataset --model_path ./models/segformer_bev/raw2bevseg_mit-b0_v0.5 --output_path ./data/model_evaluations.pkl
 
 raw2segbev (eval types 1 and 2):
 python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/BEVDataset --model_path ./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.3 --output_path ./data/model_evaluations.pkl
