@@ -320,6 +320,17 @@ def get_obj_indices_in_fov(objs_data:List[dict], fov_poly:np.ndarray, camera_nam
     return in_indices
 
 
+def difference_in_each_dimension(bbox1: Tuple[float], bbox2: Tuple[float]) -> Tuple[float]:
+    """
+    bboxes on the same coords system.
+    bbox1: [ x, y, z, rx, ry, rz, sx, sy, sz ]
+    bbox2: [ x, y, z, rx, ry, rz, sx, sy, sz ]
+    """
+    x1, y1, z1, rx1, ry1, rz1, sx1, sy1, sz1 = bbox1
+    x2, y2, z2, rx2, ry2, rz2, sx2, sy2, sz2 = bbox2
+    dx, dy, dz = abs(sx1 - sx2), abs(sy1 - sy2), abs(sz1 - sz2)
+    return dx, dy, dz
+
 def compute_cost_between_bboxes(bbox1: Tuple[float], bbox2: Tuple[float], dist_type:str = 'v2v ') -> float:
     """
     bboxes on the same coords system.
@@ -466,7 +477,8 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
     fp = 0 # Detections that arent associated
     fn = 0 # Groundtruth not associated
     
-    dds     = [] # Diferences in dimensions
+    dds     = [] # Differences in dimensions
+    deds    = [] # Differnces in each dimensions
     v2vs    = [] # Volume-Volume distances
     vious   = [] # Volumetric IoUs
     bbds    = [] # Bounding Boxes Disparities
@@ -474,7 +486,7 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
     n = len(gt_bboxes)
     m = len(dt_bboxes)
 
-    # Fin False Negatives
+    # Find False Negatives
     for i in range(n):
         associated = False
         for a in assignments:
@@ -499,16 +511,18 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
         if dt_bboxes[j]['coordinate_system'] != 'odom':
             bbox2 = scene.transform_cuboid(bbox2, cs_src=dt_bboxes[j]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
         # centroid_distance = compute_cost_between_bboxes(bbox1, bbox2, dist_type='centroids')
+        ded = difference_in_each_dimension(bbox1, bbox2)
         
         bbox1 = get_oriented_bbox_from_vals(bbox1)
         bbox2 = get_oriented_bbox_from_vals(bbox2)
 
-        dd = bbox1.dd(bbox2)        # Difference in Dimensions
+        dd  = bbox1.dd(bbox2)        # Difference in Dimensions
         v2v = bbox1.v2v(bbox2)      # Volume-Volume Distance
         iou = bbox1.IoU_v(bbox2)    # Volumetric IoU
         bbd = bbox1.bbd(bbox2)      # Bounding Box Disparity
         
         dds.append(dd)
+        deds.append(ded)
         v2vs.append(v2v)
         vious.append(iou)
         bbds.append(bbd)
@@ -521,6 +535,7 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
             _plt_3d_dt_bboxes.append(bbox2)
             _plt_3d_labels.append(label)
             print(f"[3D-Metrics]    {label} DD      Metric: {dd}")
+            print(f"[3D-Metrics]    {label} DED     Metric: {ded}")
             print(f"[3D-Metrics]    {label} IoU_v   Metric: {iou}")
             print(f"[3D-Metrics]    {label} V2V     Metric: {v2v}")
 
@@ -532,7 +547,7 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
         else:
             _debug_update_plt_slider
 
-    return tp, fp, fn, dds, v2vs, vious, bbds
+    return tp, fp, fn, dds, deds, v2vs, vious, bbds
 # ===========================================================================================
 #                                      DEBUG FUNCTIONS                                      =
 # =========================================================================================== 
@@ -1274,8 +1289,8 @@ def main(
             cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
             
-            _tp, _fp, _fn, _dd, _IoU_v, _v2v_dist, _bbd = compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids) 
-            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd } }
+            _tp, _fp, _fn, _dd, _ded, _IoU_v, _v2v_dist, _bbd = compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids) 
+            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'ded':_ded, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd } }
 
             if _debug:
                 
