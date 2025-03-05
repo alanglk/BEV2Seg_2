@@ -7,7 +7,7 @@ testing = false                     # if set, the 'mini' version of the dataset
 [model]
 output_path = "/models"
 model_name = "segformer_bev"
-pretrained = "nvidia/mit-b0"
+pretrained = "nvidia/mit-b2"
 
 [training]
 batch_size = 16
@@ -25,7 +25,7 @@ lr_scheduler_type = "polynomial"    # (optional) defaults to "linear"*
 
 # Other
 val_acc_steps = 32                  # (optional) defaults to None
-dataloader_num_workers = 4          # (optional) defaults to 0
+dataloader_num_workers = 8          # (optional) defaults to 0
 resume_from_checkpoint = false      # (optional) defaults to False.
                                     # example__path: "/models/segformer_bev/raw2bevseg_mit-b2_v0.1"
 ls_steps = 200                      # (optional) defaults to 200. 
