@@ -70,6 +70,7 @@ class BEV2SEG_2_Interface(ABC):
             step_y              =   1.0,
             draw_grid           =   True
         )
+        self.drawer=None
 
         # Set the openlabel and create the BEV Drawer
         if openlabel_path is not None:
