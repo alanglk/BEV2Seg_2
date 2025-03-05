@@ -9,5 +9,6 @@
     "python.testing.pytestArgs": [
         "oldatasets/tests",
         "tests"
-    ]
+    ],
+    "cmake.sourceDirectory": "/home/VICOMTECH/agarciaj/GitLab/bev2seg_2/tracking"
 }
