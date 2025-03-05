@@ -11,7 +11,7 @@ import os
 
 
 class BEVMapManager():
-    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances']
+    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask']
     
     def __init__(self, 
                  scene_path: str, 
@@ -23,6 +23,7 @@ class BEVMapManager():
                 'depth': False, 
                 'pointcloud': False, 
                 'instances': False,
+                'occ_bev_mask':False,
                 'all': False
             }
         """
@@ -105,6 +106,14 @@ class BEVMapManager():
             instance_pcds = pickle.load(f)
         return instance_pcds
     
+    def load_occ_bev_masks(self, image_name:str) -> dict:
+        occ_bev_mask_path = self._get_path(image_name, 'occ_bev_mask', '.pkl')
+        check_paths([occ_bev_mask_path])
+        with open(occ_bev_mask_path, "rb") as f:
+            occ_bev_masks = pickle.load(f)
+        return occ_bev_masks
+    
+    
     def save_semantic_images(self, image_name:str, images:List[np.ndarray]):
         """
         INPUT:
@@ -132,3 +141,8 @@ class BEVMapManager():
         inst_path = self._get_path(image_name, 'instances', '.plk')
         with open(inst_path, "wb") as f:
             pickle.dump(instance_pcds, f)
+    
+    def save_occ_bev_masks(self, image_name:str, occ_bev_masks: dict):
+        occ_path = self._get_path(image_name, 'occ_bev_mask', '.pkl')
+        with open(occ_path, "wb") as f:
+            pickle.dump(occ_bev_masks, f)

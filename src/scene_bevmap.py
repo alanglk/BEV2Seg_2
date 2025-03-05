@@ -28,6 +28,7 @@ import numpy as np
 import torch
 import cv2
 
+from scene_renderer import DebugBEVMap
 import matplotlib.pyplot as plt
 
 from collections import defaultdict
@@ -70,6 +71,55 @@ import os
         sb: normal -> semantic -> bev
         bs: normal -> bev -> semantic
 """
+
+def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:int, transform_4x4:np.ndarray, cuboid_semantic_labels:List[str] = None, initial_traslation_4x1: np.ndarray = None):
+            global uid
+            initial_traslation_4x1 = np.zeros((4, 1)) if initial_traslation_4x1 is None else initial_traslation_4x1
+            frame_properties = vcd.get_frame(frame_num=frame_num)['frame_properties']
+
+            for semantic_pcd in instance_pcds:
+                # skip non dynamic objects
+                if not semantic_pcd['dynamic']:
+                    continue 
+                # skip non selected semantic classes
+                if cuboid_semantic_labels is not None and semantic_pcd['label'] not in cuboid_semantic_labels:
+                    continue
+                cs_src = semantic_pcd['camera_name']
+                for bbox in semantic_pcd['instance_3dboxes']:
+                    instance_name_id = f"bbox_{bbox['inst_id']}_{semantic_pcd['label_id']}_{frame_num}"
+                    uid += 1
+                    vcd.add_object(name=instance_name_id, semantic_type=f"annotated/{semantic_pcd['label']}", uid=uid, frame_value=frame_num)
+                    
+                    # Transform to odom
+                    frame_transforms = frame_properties['transforms']
+                    frame_odometry = frame_transforms['vehicle-iso8855_to_odom']['odometry_xyzypr']
+
+                    t_vec =  frame_odometry[:3]
+                    ypr = frame_odometry[3:]
+                    r_3x3 = utils.euler2R(ypr)
+                    pose_4x4 = utils.create_pose(R=r_3x3, C=np.array([t_vec]).reshape(3, 1))
+
+                    center_4x1 = utils.add_homogeneous_row(np.array(bbox['center']).reshape(3, -1))
+                    center_trans_4x1 = transform_4x4 @ center_4x1
+                    center_1x3 = center_trans_4x1[:3].T
+
+                    bbox_cuboid_img = types.cuboid(name="bbox3D",
+                                                   val=(center_1x3[0, 0], 
+                                                        center_1x3[0, 1], 
+                                                        center_1x3[0, 2], 
+                                                        ypr[2], ypr[1], ypr[0],
+                                                        bbox['dimensions'][2],
+                                                        bbox['dimensions'][0],
+                                                        bbox['dimensions'][1]
+                                                        ),
+                                                    coordinate_system="odom")
+                    vcd.add_object_data(uid, bbox_cuboid_img, frame_value=frame_num)
+            return vcd
+
+
+
+
+
 
 def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro_path:str, merge_semantic_labels_flag:bool = True):
     # Paths
@@ -135,7 +185,7 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
     raw2seg_bev.set_openlabel(vcd)
     raw_seg2bev.set_openlabel(vcd)
     
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False})
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': True, 'occ_bev_mask': True})
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
     ISP = InstanceScenePCD(dbscan_samples=dbscan_samples, dbscan_eps=dbscan_eps, dbscan_jobs=dbscan_jobs)
@@ -224,10 +274,16 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
         # Draw cuboids and Occupancy/Oclusion on RAW image #############
         # Transform cuboids to BEV, compute ConectedComponents of the bev_mask and
         # calc occupancy/occlusion masks of each instance
-        print(f"# Draw cuboids and Occupancy/Oclusion on RAW image {'#'*13}")
+        print(f"# Generate Occupancy/Oclusion Instances {'#'*20}")
         bev_image_cuboids = bev_image.copy()
+        if BMM.gen_flags['all'] or BMM.gen_flags['occ_bev_mask']:
+            instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
+            BMM.save_occ_bev_masks(raw_image_path, instance_pcds)
+        else:
+            instance_pcds = BMM.load_occ_bev_masks(raw_image_path)
         # bev_blended = get_blended_image(bev_image_cuboids, raw2seg_bev.mask2image(bev_mask_sb))
-        instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
+        # Uncomment this for visualization
+        # instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
         
         # ##############################################################
         # Draw cuboids on RAW image ####################################
@@ -272,48 +328,6 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
         # ##############################################################
         # Annotations ##################################################
         print(f"# Annotating cuboids on vcd {'#'*36}")
-        def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:int, transform_4x4:np.ndarray, cuboid_semantic_labels:List[str] = None, initial_traslation_4x1: np.ndarray = None):
-            global uid
-            initial_traslation_4x1 = np.zeros((4, 1)) if initial_traslation_4x1 is None else initial_traslation_4x1
-            
-            for semantic_pcd in instance_pcds:
-                # skip non dynamic objects
-                if not semantic_pcd['dynamic']:
-                    continue 
-                # skip non selected semantic classes
-                if cuboid_semantic_labels is not None and semantic_pcd['label'] not in cuboid_semantic_labels:
-                    continue
-                cs_src = semantic_pcd['camera_name']
-                for bbox in semantic_pcd['instance_3dboxes']:
-                    instance_name_id = f"bbox_{bbox['inst_id']}_{semantic_pcd['label_id']}_{frame_num}"
-                    uid += 1
-                    vcd.add_object(name=instance_name_id, semantic_type=f"annotated/{semantic_pcd['label']}", uid=uid, frame_value=fk)
-                    
-                    # Transform to odom
-                    frame_transforms = frame_properties['transforms']
-                    frame_odometry = frame_transforms['vehicle-iso8855_to_odom']['odometry_xyzypr']
-
-                    t_vec =  frame_odometry[:3]
-                    ypr = frame_odometry[3:]
-                    r_3x3 = utils.euler2R(ypr)
-                    pose_4x4 = utils.create_pose(R=r_3x3, C=np.array([t_vec]).reshape(3, 1))
-
-                    center_4x1 = utils.add_homogeneous_row(np.array(bbox['center']).reshape(3, -1))
-                    center_trans_4x1 = transform_4x4 @ center_4x1
-                    center_1x3 = center_trans_4x1[:3].T
-
-                    bbox_cuboid_img = types.cuboid(name="bbox3D",
-                                                   val=(center_1x3[0, 0], 
-                                                        center_1x3[0, 1], 
-                                                        center_1x3[0, 2], 
-                                                        ypr[2], ypr[1], ypr[0],
-                                                        bbox['dimensions'][2],
-                                                        bbox['dimensions'][0],
-                                                        bbox['dimensions'][1]
-                                                        ),
-                                                    coordinate_system="odom")
-                    vcd.add_object_data(uid, bbox_cuboid_img, frame_value=fk)
-
         transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
         annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
         vcd.save(os.path.join(scene_path, "nuscenes_sequence", "detections_openlabel.json"))

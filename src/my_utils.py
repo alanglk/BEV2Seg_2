@@ -233,7 +233,7 @@ def filter_instances(instance_pcds:dict, min_samples_per_instance:int = 150, max
 
 def create_cuboid_edges(center, 
                         dims, 
-                        color = (0.0, 1.0, 0.0), 
+                        color = np.array([0.0, 1.0, 0.0]), 
                         transform_4x4: np.ndarray = None, 
                         initial_traslation_4x1:np.ndarray=None) -> o3d.geometry.LineSet:
     # Desglosamos el centro y las dimensiones
