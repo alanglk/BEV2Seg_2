@@ -22,3 +22,4 @@ tmp/
 *.err
 *.out
 *.log
+*.pcd
