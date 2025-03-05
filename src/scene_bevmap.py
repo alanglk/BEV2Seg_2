@@ -185,7 +185,7 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
     raw2seg_bev.set_openlabel(vcd)
     raw_seg2bev.set_openlabel(vcd)
     
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': True, 'occ_bev_mask': True})
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False, 'occ_bev_mask': True})
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
     ISP = InstanceScenePCD(dbscan_samples=dbscan_samples, dbscan_eps=dbscan_eps, dbscan_jobs=dbscan_jobs)
