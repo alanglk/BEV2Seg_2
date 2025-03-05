@@ -1,0 +1,118 @@
+{
+    "openlabel": {
+        "metadata": {
+            "schema_version": "1.0.0",
+            "nuImages_path": "/nuimages",
+            "nuImages_version": "v1.0-val",
+            "sample_token": "0a1fca1d93d04f60a4b12961a22310bb",
+            "timestamp": 1533005102912407,
+            "sample_path_hardcoded": "samples/CAM_FRONT/n013-2018-07-31-10-43-27+0800__CAM_FRONT__1533005102912407.jpg"
+        },
+        "frames": {
+            "0": {
+                "frame_properties": {}
+            }
+        },
+        "frame_intervals": [
+            {
+                "frame_start": 0,
+                "frame_end": 0
+            }
+        ],
+        "coordinate_systems": {
+            "odom": {
+                "type": "scene_cs",
+                "parent": "",
+                "children": [
+                    "vehicle-iso8855"
+                ]
+            },
+            "vehicle-iso8855": {
+                "type": "local_cs",
+                "parent": "odom",
+                "children": [
+                    "CAM_FRONT"
+                ],
+                "pose_wrt_parent": {
+                    "matrix4x4": [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                }
+            },
+            "CAM_FRONT": {
+                "type": "sensor_cs",
+                "parent": "vehicle-iso8855",
+                "children": [],
+                "pose_wrt_parent": {
+                    "matrix4x4": [
+                        -0.0061117120383740176,
+                        0.005232954481208862,
+                        0.9999676310578047,
+                        1.67235256865,
+                        -0.999980989916506,
+                        0.0007845881108916597,
+                        -0.00611589953328695,
+                        0.0143122589858,
+                        -0.0008165669384739282,
+                        -0.9999860002064499,
+                        0.005228059825704623,
+                        1.50882708209,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                }
+            }
+        },
+        "streams": {
+            "CAM_FRONT": {
+                "description": "23b8c1e9392446debeb13b9046685257",
+                "uri": "",
+                "type": "camera",
+                "stream_properties": {
+                    "intrinsics_pinhole": {
+                        "width_px": 1600,
+                        "height_px": 900,
+                        "camera_matrix_3x4": [
+                            1282.473573,
+                            0.0,
+                            826.03044,
+                            0.0,
+                            0.0,
+                            1282.110712,
+                            483.91705,
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0,
+                            0.0
+                        ],
+                        "distortion_coeffs_1xN": [
+                            -0.119567,
+                            0.154233,
+                            -0.00042,
+                            2.3e-05,
+                            0.010264
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}
