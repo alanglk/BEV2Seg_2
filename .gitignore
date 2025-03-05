@@ -11,6 +11,11 @@ tmp/
 *.egg-info/
 
 # Files
+/models/ml_depth_pro/
+/models/**/raw*/
+/models/**/overfitted*/
+/models/**/checkpoint*/
+
 *.mp4
 *.gz
 *.tar
@@ -18,3 +23,4 @@ tmp/
 *.err
 *.out
 *.log
+*.pcd
