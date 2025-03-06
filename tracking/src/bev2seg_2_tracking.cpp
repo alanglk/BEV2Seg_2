@@ -12,18 +12,7 @@
 
 using namespace std;
 namespace fs = std::filesystem;
-
-/*
-<folder_path>/
-	- frame_0.txt
-	- frame_1.txt
-	- frame_2.txt
-	...
-
-frame_0.txt:
-\t|  center (x, y, z) | tracking_id | semantic label | index_pos |\n\t|-------------------|-------------|----------------|-----------|\n\t| x y z             | unknown     | pedestrian     | 0         |\n\t| x y z             | unknown     | vehicle.car    | 0         |\n\t| x y z             | unknown     | vehicle.car    | 1         |
-*/
-
+using namespace cv;
 
 void print_help() {
     cout << "Usage: bev2seg_2_tracking <path_to_folder>\n\n";
@@ -36,38 +25,8 @@ void print_help() {
     cout << "bev2seg_2_tracking ./frames/\n";
 }
 
-// trim from start (in place)
-inline void ltrim(std::string &s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
-        return !std::isspace(ch);
-    }));
-}
-inline void rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
-        return !std::isspace(ch);
-    }).base(), s.end());
-}
-inline std::string trim(std::string s) {
-    rtrim(s);
-    ltrim(s);
-    return s;
-}
-int extract_frame_number(const std::string& file_path) {
-    std::string filename = fs::path(file_path).filename().string(); // "frame_19.txt"
-    std::regex frame_regex(R"(frame_(\d+))");
-    std::smatch match;
-    if (std::regex_search(filename, match, frame_regex)) {
-        return std::stoi(match[1].str()); 
-    }
-    return -1; // Return -1 if frame num not found
-}
-
-
-
-
-
 struct ObjectData{
-	double x, y, z;
+	float x, y, z;
     string tracking_id;
     string semantic_label;
     int index_pos;
@@ -95,6 +54,15 @@ std::ostream& operator<<(std::ostream& os, const FrameData& frame) {
 }
 
 
+int extract_frame_number(const std::string& file_path) {
+    std::string filename = fs::path(file_path).filename().string(); // "frame_19.txt"
+    std::regex frame_regex(R"(frame_(\d+))");
+    std::smatch match;
+    if (std::regex_search(filename, match, frame_regex)) {
+        return std::stoi(match[1].str()); 
+    }
+    return -1; // Return -1 if frame num not found
+}
 
 FrameData read_frame_data(string file_path){
 	FrameData fdata;
@@ -132,6 +100,10 @@ FrameData read_frame_data(string file_path){
 int main (int argc, const char * argv[]) {
     cout << "BEV2Seg_2 Object tracker!\n";
 
+    
+    //****************************************************************************************
+    // Load input data
+    //****************************************************************************************
     // Check args
     if (argc != 2 || string(argv[1]) == "--help" || string(argv[1]) == "-h") {
         print_help();
@@ -161,10 +133,110 @@ int main (int argc, const char * argv[]) {
 		return fa.frame_num < fb.frame_num; // Ascending order
 	});
 
-    cout << "Loaded Frames: " << endl;
+
+    //****************************************************************************************
+    // Tracking initialization
+    //****************************************************************************************
+    std::unique_ptr<gtl::Tracker> tracker(new gtl::Tracker_KF()); 
+    gtl::Tracker::Params params; 
+    
+    //****************************************************************************************
+    // System and Measurement noise
+    //****************************************************************************************
+    int dims_ = 2;      // Variables for the state vector: x, y
+    int derivs_ = 2;    // How many variables are derived: x, y
+    
+    // System and measurement noise for dynamic variables: x, y
+    float system_noise_val_dev          = 0.1f;
+    float system_noise_deriv_dev        = 0.1f;
+	float groundTruth_meas_noise_dev    = 1.0f;
+
+    // KF specific noise parameters
+    // System noise for dynamic variables -> x, y, dx, dy
+    std::vector<float> systemNoiseVar({
+		system_noise_val_dev * system_noise_val_dev,        // x
+		system_noise_val_dev * system_noise_val_dev,        // y
+        system_noise_deriv_dev * system_noise_deriv_dev,    // dx
+        system_noise_deriv_dev * system_noise_deriv_dev     // dy
+    });
+	
+    // Measurement noise for dynamic variables -> x, y
+	std::vector<float> measurementNoiseVar;
+	for (int i = 0; i < dims_; i++) {
+		measurementNoiseVar.push_back(groundTruth_meas_noise_dev * groundTruth_meas_noise_dev);
+	}
+
+    //********************************************************************************************
+    // Association Function
+    //********************************************************************************************
+    // Distance between centroids
+    std::vector<float> associationThresholds({ groundTruth_meas_noise_dev * 4.0f });
+	std::unique_ptr<gtl::AssociationFunction> associationFunction(new gtl::AssociationFunctionGaussian(associationThresholds));
+	
+    //********************************************************************************************
+    // State Vector
+    //********************************************************************************************
+    gtl::StateVector::StateVectorDimensions svd(dims_, 1, derivs_);
+
+    // Fill-in parameters
+	params.associationFunction = associationFunction.get();
+	params.svDims = svd;	
+	params.maxNumTracks = 5;        // Maximun number of current tracks
+	params.num_min_instants_with_measurement = 2;       // if >= then birth
+	params.num_max_instants_without_measurement = 4;    // if > then kill
+	params.verbose = false;
+	params.trackerParams[gtl::Tracker_KF::PARAM_SYSTEM_NOISE_VAR] = systemNoiseVar;
+	params.trackerParams[gtl::Tracker_KF::PARAM_MEASUREMENT_NOISE_VAR] = measurementNoiseVar;
+	tracker->setParams(params);
+
+
+    //********************************************************************************************
+    // Track data
+    //********************************************************************************************
+
     for (const auto& frame : scene_frames){
-        cout << frame << endl;
+        int fk = frame.frame_num;
+        
+        // For each frame get the observed data
+        vector<gtl::Detection> detections_;
+        for (const auto& obj : frame.objects){
+            vector<float> measure_({obj.x, obj.y});
+            string det_name = to_string(fk) + "_" + obj.semantic_label + "_" + to_string(obj.index_pos); 
+            gtl::Detection detection_(gtl::StateVector(measure_), 1.0, obj.semantic_label, det_name);
+            detections_.push_back(detection_);
+        }
+
+        // Track detections
+        std::vector<gtl::Track> tracks = tracker->track(detections_, fk);
+
+
+        // Visualization
+        cv::Mat image(1080, 1080, CV_8UC3); // BGR
+        cv::namedWindow("Tracking Debug", cv::WINDOW_NORMAL);
+        
+        for (const auto& det : detections_){
+            vector<float> st = det.getStateVector().get();
+            float x     = st[0];
+            float y     = st[1];
+            float dx    = st[2];
+            float dy    = st[3];
+
+            Point center(x, y);
+            Scalar det_color(0, 255, 0); // Green
+            cv::circle(image, center, 1.0, det_color, 2, CV_8U);
+        }
+        
+        for (const auto& tr : tracks){
+            tr.getFrameEnd();
+            tr.getFrameStart();
+            tr.getglobalID();
+            ...
+        }
+
+
+        cv::imshow("Tracking Debug", image);
     }
 
+    cv::destroyAllWindows();
     return 0;
 }
