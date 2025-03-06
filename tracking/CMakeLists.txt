@@ -5,6 +5,8 @@ project(bev2seg_2_tracking
     DESCRIPTION "Tracking utility for BEV2Seg_2"
     LANGUAGES CXX)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 # Find Dependencies
 find_package(OpenCV REQUIRED)
 find_package(GTL REQUIRED)

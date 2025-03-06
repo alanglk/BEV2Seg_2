@@ -125,7 +125,7 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
     # Paths
     scene_openlabel_path    = os.path.join(scene_path, "original_openlabel.json")
     print(f"scene_openlabel_path: {scene_openlabel_path}")
-    check_paths([scene_openlabel_path,])
+    check_paths([scene_openlabel_path, raw2segmodel_path, bev2segmodel_path, depth_pro_path])
 
     # Load OpenLABEL Scene
     vcd = core.OpenLABEL()
@@ -185,7 +185,14 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
     raw2seg_bev.set_openlabel(vcd)
     raw_seg2bev.set_openlabel(vcd)
     
-    BMM = BEVMapManager(scene_path=scene_path, gen_flags={'all': False, 'pointcloud': False, 'instances': False, 'occ_bev_mask': True})
+    BMM = BEVMapManager(scene_path=scene_path, gen_flags={
+            'all': False, 
+            'pointcloud': False, 
+            'instances': False, 
+            'occ_bev_mask': False, 
+            'tracking': True
+        })
+    
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
     ISP = InstanceScenePCD(dbscan_samples=dbscan_samples, dbscan_eps=dbscan_eps, dbscan_jobs=dbscan_jobs)
@@ -274,7 +281,7 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
         # Draw cuboids and Occupancy/Oclusion on RAW image #############
         # Transform cuboids to BEV, compute ConectedComponents of the bev_mask and
         # calc occupancy/occlusion masks of each instance
-        print(f"# Generate Occupancy/Oclusion Instances {'#'*20}")
+        print(f"# Generate Occupancy/Oclusion Instances {'#'*23}")
         bev_image_cuboids = bev_image.copy()
         if BMM.gen_flags['all'] or BMM.gen_flags['occ_bev_mask']:
             instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
@@ -285,6 +292,13 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
         # Uncomment this for visualization
         # instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
         
+        # ##############################################################
+        # Apply tracking data to instances #############################
+        print(f"# Apply tracking data to instance dict {'#'*24}")
+        if BMM.gen_flags['all'] or BMM.gen_flags['tracking']:
+            BMM.save_tracking_frame(frame_num=fk, instance_pcds=instance_pcds)
+        BMM.load_tracking_frame(frame_num=fk, instance_pcds=instance_pcds)
+
         # ##############################################################
         # Draw cuboids on RAW image ####################################
         # print(f"# Draw cuboids on RAW image {'#'*36}")
@@ -350,7 +364,7 @@ if __name__ == "__main__":
     # args = parser.parse_args()
 
     scene_path              = "./tmp/my_scene" # args.scene_path
-    raw2segmodel_path       = "models/segformer_nu_formatted/raw2seg_bev_mit-b0_v0.2"
+    raw2segmodel_path       = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
     bev2segmodel_path       = "models/segformer_bev/raw2bevseg_mit-b0_v0.3"
     depth_pro_path          = "./models/ml_depth_pro/depth_pro.pt" 
     tmp_path                = "" # args.tmp_path

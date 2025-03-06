@@ -34,6 +34,26 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}" // Establecer el PYTHONPATH para todo el proyecto
             }
+        },
+        {
+            "name": "C++ bev2seg_2_tracking Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tracking/build/bev2seg_2_tracking",  // Ensure correct path
+            "args": ["./tmp/my_scene/generated/tracking"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Tracking CMake build"
         }
     ]
 }

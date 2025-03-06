@@ -11,7 +11,7 @@ import os
 
 
 class BEVMapManager():
-    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask']
+    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask', 'tracking']
     
     def __init__(self, 
                  scene_path: str, 
@@ -24,6 +24,7 @@ class BEVMapManager():
                 'pointcloud': False, 
                 'instances': False,
                 'occ_bev_mask':False,
+                'tracking': False
                 'all': False
             }
         """
@@ -113,7 +114,42 @@ class BEVMapManager():
             occ_bev_masks = pickle.load(f)
         return occ_bev_masks
     
-    
+    def load_tracking_frame(self, frame_num:int, instance_pcds:dict) -> dict:
+        """Load files to update the instance dic object ids
+        The file format for each frame is:
+        |  center (x, y, z) | tracking_id | semantic label | index_pos |
+        |-------------------|-------------|----------------|-----------|
+        | x y z             | unknown     | vehicle.car    | 0         |
+        | x y z             | unknown     | vehicle.car    | 1         |
+        | x y z             | unknown     | vehicle.car    | 2         |
+        """
+        assert 'tracking' in self.GEN_FOLDERS
+        data_path = os.path.join(self.gen_paths['tracking'],f"frame_{frame_num}.txt")
+        check_paths([data_path])
+        semantic_idx = {}
+
+        for i, semantic_data in enumerate(instance_pcds):
+            if semantic_data['label'] not in semantic_idx:
+                semantic_idx[semantic_data['label']] = i
+
+        with open(data_path, "r") as f:
+            for line in f:
+                obj_data = line.strip().split(" ")
+                x, y, z = float(obj_data[0]), float(obj_data[1]), float(obj_data[2])
+                inst_id         = obj_data[3]
+                semantic_label  = obj_data[4]
+                idx_pos         = int(obj_data[5])
+
+                # Update object data with tracking
+                s_data = instance_pcds[semantic_idx[semantic_label]] # semantic data
+                if 'instance_pcds' in s_data: 
+                    s_data['instance_pcds'][idx_pos]['inst_id']     = inst_id
+                if 'instance_3dboxes' in s_data:
+                    s_data['instance_3dboxes'][idx_pos]['inst_id']  = inst_id
+                if 'instance_bev_mask' in s_data:
+                    s_data['instance_bev_mask'][idx_pos]['inst_id'] = inst_id
+        return instance_pcds
+
     def save_semantic_images(self, image_name:str, images:List[np.ndarray]):
         """
         INPUT:
@@ -146,3 +182,34 @@ class BEVMapManager():
         occ_path = self._get_path(image_name, 'occ_bev_mask', '.pkl')
         with open(occ_path, "wb") as f:
             pickle.dump(occ_bev_masks, f)
+    
+    def save_tracking_frame(self, frame_num:int, instance_pcds:dict):
+        """Save files to perform object trackig
+        The file format for each frame is:
+        |  center (x, y, z) | tracking_id | semantic label | index_pos |
+        |-------------------|-------------|----------------|-----------|
+        | x y z             | unknown     | vehicle.car    | 0         |
+        | x y z             | unknown     | vehicle.car    | 1         |
+        | x y z             | unknown     | vehicle.car    | 2         |
+        """
+        assert 'tracking' in self.GEN_FOLDERS
+        data_path = os.path.join(self.gen_paths['tracking'],f"frame_{frame_num}.txt")
+        data = []
+        for semantic_data in instance_pcds:
+            label = semantic_data['label']
+            dynamic = semantic_data['dynamic']
+            
+            if not dynamic:
+                continue # It has no instance computation
+
+            instances = semantic_data['instance_3dboxes']
+            for i, inst in enumerate(instances):
+                inst_id     = inst['inst_id'] if inst['inst_id'] is not None else "unknown"
+                x, y, z     = inst['center']
+                sx, sy, sz  = inst['dimensions']
+                obj_data = f"{x} {y} {z} {inst_id} {label} {i}\n"
+                data.append(obj_data)
+        
+        # Save data
+        with open(data_path, "w") as f:
+            f.writelines(data)
