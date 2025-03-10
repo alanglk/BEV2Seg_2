@@ -15,33 +15,49 @@ namespace fs = std::filesystem;
 using namespace cv;
 
 void print_help() {
-    cout << "Usage: bev2seg_2_tracking <path_to_folder>\n\n";
+    cout << "Usage: bev2seg_2_tracking <path_to_folder> <output_folder_path>\n\n";
     cout << "Este script toma la ruta a una carpeta que contiene los frames con objetos.\n";
     cout << "Cada archivo en la carpeta corresponde a un frame de la secuencia.\n";
     cout << "Cada archivo tiene información sobre los objetos presentes en ese frame.\n";
     cout << "File Format:\n";
-    cout << "\t|  center (x, y, z) | tracking_id | semantic label | index_pos |\n\t|-------------------|-------------|----------------|-----------|\n\t| x y z             | unknown     | pedestrian     | 0         |\n\t| x y z             | unknown     | vehicle.car    | 0         |\n\t| x y z             | unknown     | vehicle.car    | 1         |\n";
+    cout << "\n\tFrame_num: fk\n\tImage_path: <image-path>\n\tDetections --------------------\n\t|  detection (x, y, z)  | semantic_label |object_id        |\n\t|-----------------------|----------------|-----------------|\n\t| x y z                 | pedestrian     | 0_pedestrian_0  |\n\t| x y z                 | vehicle.car    | 0_vehicle.car_0 |\n\t| x y z                 | vehicle.car    | 0_vehicle.car_1 |\n\tTracks --------------------\n\t|  prediction (x, y, dx, dy) | frame_start | frame_end | tracking_id | semantic_label | associated detections  |\n\t|----------------------------|-------------|-----------|-------------|----------------|------------------------|\n\t| x y dx dy                  | 0           | 0         | -1          | pedestrian     | [ 0_pedestrian_0,...]  |\n\t| x y dx dy                  | 0           | 0         | -2          | vehicle.car    | [ 0_vehicle.car_0,...] |\n\t| x y dx dy                  | 0           | 0         | -3          | vehicle.car    | [ 0_vehicle.car_1,...] |\n";
     cout << "Example:\n";
-    cout << "bev2seg_2_tracking ./frames/\n";
+    cout << "bev2seg_2_tracking ./frames/ ./output/\n";
 }
+
+/*
+Frame_num: fk
+Image_path: <image-path>
+Detections --------------------
+|  detection (x, y, z)  | semantic_label |object_id        |
+|-----------------------|----------------|-----------------|
+| x y z                 | pedestrian     | 0_pedestrian_0  |
+| x y z                 | vehicle.car    | 0_vehicle.car_0 |
+| x y z                 | vehicle.car    | 0_vehicle.car_1 |
+Tracks --------------------
+|  prediction (x, y, dx, dy) | frame_start | frame_end | tracking_id | semantic_label | associated detections  |
+|----------------------------|-------------|-----------|-------------|----------------|------------------------|
+| x y dx dy                  | 0           | 0         | -1          | pedestrian     | [ 0_pedestrian_0,...]  |
+| x y dx dy                  | 0           | 0         | -2          | vehicle.car    | [ 0_vehicle.car_0,...] |
+| x y dx dy                  | 0           | 0         | -3          | vehicle.car    | [ 0_vehicle.car_1,...] |
+*/
 
 struct ObjectData{
 	float x, y, z;
-    string tracking_id;
     string semantic_label;
-    int index_pos;
+    string object_id; // framenum_semanticlabel_indexpos
 };
 
 struct FrameData{
 	int frame_num;
+    string image_path;
 	vector<ObjectData> objects;
 };
 
 std::ostream& operator<<(std::ostream& os, const ObjectData& obj) {
     os << "x: " << obj.x << ", y: " << obj.y << ", z: " << obj.z
-       << ", Tracking ID: " << obj.tracking_id
-       << ", Semantic Label: " << obj.semantic_label
-       << ", Index Pos: " << obj.index_pos;
+       << ", Semantic label: " << obj.semantic_label
+       << ", Object ID: " << obj.object_id;
     return os;
 }
 std::ostream& operator<<(std::ostream& os, const FrameData& frame) {
@@ -53,48 +69,140 @@ std::ostream& operator<<(std::ostream& os, const FrameData& frame) {
     return os;
 }
 
-
-int extract_frame_number(const std::string& file_path) {
-    std::string filename = fs::path(file_path).filename().string(); // "frame_19.txt"
-    std::regex frame_regex(R"(frame_(\d+))");
-    std::smatch match;
-    if (std::regex_search(filename, match, frame_regex)) {
-        return std::stoi(match[1].str()); 
+string vectorToString(const vector<string>& vec) {
+    stringstream ss;
+    ss << "[";
+    
+    for (size_t i = 0; i < vec.size(); ++i) {
+        ss << "\"" << vec[i] << "\"";
+        if (i != vec.size() - 1) {
+            ss << ", ";
+        }
     }
-    return -1; // Return -1 if frame num not found
+
+    ss << "]";
+    return ss.str();
 }
 
-FrameData read_frame_data(string file_path){
-	FrameData fdata;
-    cout << "file_path:" << file_path << endl;
+FrameData read_frame_data(const string& file_path) {
+    FrameData fdata;
+    cout << "Reading file: " << file_path << endl;
 
-    int frame_num = extract_frame_number(file_path);
-    fdata.frame_num = frame_num;
-    if ( fdata.frame_num == -1 ) {
-        return fdata;
-    }
-
-    // Read frame data
     ifstream file(file_path);
-    if (! file.is_open()){
+    if (!file.is_open()) {
         cerr << "ERROR: Could not open file: " << file_path << endl;
         return fdata;
     }
 
     string line;
-    while ( getline(file, line) ){
-        istringstream iss(line);
-        ObjectData obj;
-        
-        if (!(iss >> obj.x >> obj.y >> obj.z >> obj.tracking_id >> obj.semantic_label >> obj.index_pos)) {
-            cerr << "ERROR: Could not read the line: " << line << endl;
+    bool in_detections_section = false;
+
+    while (getline(file, line)) {
+        // Eliminar espacios en blanco al inicio y final
+        line.erase(0, line.find_first_not_of(" \t"));
+        line.erase(line.find_last_not_of(" \t") + 1);
+
+        if (line.empty()) continue;  // Ignorar líneas vacías
+
+        // Leer el frame number
+        if (line.rfind("Frame_num:", 0) == 0) {  // Si la línea comienza con "Frame_num:"
+            istringstream iss(line.substr(10));  // Extraer el número después de "Frame_num:"
+            if (!(iss >> fdata.frame_num)) {
+                cerr << "ERROR: Invalid frame number format in file: " << file_path << endl;
+                return fdata;
+            }
             continue;
         }
 
-        fdata.objects.push_back(obj);
+        // Leer el image path
+        if (line.rfind("Image_path:", 0) == 0) {  // Si la línea comienza con "Image_path:"
+            fdata.image_path = line.substr(11);  // Extrae todo el contenido después de "Image_path: "
+            fdata.image_path.erase(0, fdata.image_path.find_first_not_of(" \t"));  // Elimina espacios extra
+            continue;
+        }
+
+        // Detectar el inicio de la sección "Detections"
+        if (line.find("Detections") != string::npos) {
+            in_detections_section = true;
+            continue;
+        }
+
+        // Detectar el inicio de la sección "Tracks" y salir de la lectura
+        if (line.find("Tracks") != string::npos) {
+            break;
+        }
+
+        // Leer los datos de detections
+        if (in_detections_section) {
+            istringstream iss(line);
+            ObjectData obj;
+            if (!(iss >> obj.x >> obj.y >> obj.z >> obj.semantic_label >> obj.object_id)) {
+                cerr << "WARNING: Could not parse detection line: " << line << endl;
+                continue;
+            }
+            fdata.objects.push_back(obj);
+        }
     }
+
     file.close();
-	return fdata;
+    return fdata;
+}
+
+
+void update_tracks_section(const string& file_path, const vector<gtl::Track>& tracks) {
+    ifstream file(file_path);
+    if (!file.is_open()) {
+        cerr << "ERROR: Could not open file for reading: " << file_path << endl;
+        return;
+    }
+
+    string content;
+    string line;
+    // Leer el archivo y guardar todo el contenido
+    while (getline(file, line)) {
+        if (line.find("Tracks --------------------") != string::npos) {
+            break;
+        }
+        content += line + "\n";
+    }
+
+    file.close();
+
+    // Escribir la nueva sección de Tracks en el archivo
+    ofstream fout(file_path, ios::out | ios::trunc);
+    if (!fout.is_open()) {
+        cerr << "ERROR: Could not open file for writing: " << file_path << endl;
+        return;
+    }
+
+    fout << content; // Escribir el contenido original hasta la sección de tracks
+    fout << "Tracks --------------------\n";
+
+    // Escribir los nuevos tracks
+    for (const auto& tr : tracks) {
+        vector<float> st = tr.getStateVector().get();
+        float x     = st[0];
+        float y     = st[1];
+        float dx    = st[2];
+        float dy    = st[3];
+        int frame_start = tr.getFrameEnd();
+        int frame_end = tr.getFrameStart();
+        int track_id = tr.getglobalID();
+        string semantic_label = tr.getClassName();
+        string object_id = tr.getName();
+        vector<string> associatedDetections;
+        
+        for (int i = frame_start; i <= frame_end; i++){
+            gtl::Detection det = tr.getDetection(i);
+            tr.get // TODO: terminar la asociacion de detecciones
+            associatedDetections.push_back(det.getName());
+        }
+        string ass_det_string = vectorToString(associatedDetections);
+        
+        // Escribir la nueva información de tracks
+        fout << x << " " << y << " " << dx << " " << dy << " " << frame_start << " " << frame_end << " " << track_id << " " << semantic_label << " " << ass_det_string << endl;
+    }
+    fout.close();
 }
 
 int main (int argc, const char * argv[]) {
@@ -109,23 +217,37 @@ int main (int argc, const char * argv[]) {
         print_help();
         return 0;
     }
-    string folder_path = argv[1];
+    fs::path input_folder_path = argv[1];
 
-    // Check path
-    if (!( fs::exists(folder_path) & fs::is_directory(folder_path) )) {
-        cerr << "Error: " << folder_path << " no es una ruta válida o no es una carpeta.\n";
+    // Check paths
+    if (!( fs::exists(input_folder_path) & fs::is_directory(input_folder_path) )) {
+        cerr << "Error: " << input_folder_path << " no es una ruta válida o no es una carpeta.\n";
         return 1;
     }
-
     // Read all the frames and get the objects data
+    string file_base_name;
     vector<FrameData> scene_frames;
-	for (const auto& entry : fs::directory_iterator(folder_path)) {
+	for (const auto& entry : fs::directory_iterator(input_folder_path)) {
         if (fs::is_regular_file(entry.status())) {
-            cout << "Procesando archivo: " << entry.path() << "\n";
+
+            // Obtener el nombre base del archivo sin la extensión
+            file_base_name = entry.path().stem().string();
+            if (file_base_name.empty()) {
+                cerr << "ERROR: Empty file base name" << endl;
+                continue;
+            }
+
             FrameData fdata = read_frame_data(entry.path());
 			scene_frames.push_back(fdata);
             cout << endl;
 		}
+    }
+    
+    // File base name: "frame_"
+    cout << "file_base_name: " << file_base_name << endl;
+    size_t pos = file_base_name.find_last_of('_');
+    if (pos != string::npos) {
+        file_base_name = file_base_name.substr(0, pos);
     }
 
 	// Sort Frames
@@ -193,7 +315,6 @@ int main (int argc, const char * argv[]) {
     //********************************************************************************************
     // Track data
     //********************************************************************************************
-
     for (const auto& frame : scene_frames){
         int fk = frame.frame_num;
         
@@ -201,8 +322,7 @@ int main (int argc, const char * argv[]) {
         vector<gtl::Detection> detections_;
         for (const auto& obj : frame.objects){
             vector<float> measure_({obj.x, obj.y});
-            string det_name = to_string(fk) + "_" + obj.semantic_label + "_" + to_string(obj.index_pos); 
-            gtl::Detection detection_(gtl::StateVector(measure_), 1.0, obj.semantic_label, det_name);
+            gtl::Detection detection_(gtl::StateVector(measure_), 1.0, obj.semantic_label, obj.object_id);
             detections_.push_back(detection_);
         }
 
@@ -210,33 +330,12 @@ int main (int argc, const char * argv[]) {
         std::vector<gtl::Track> tracks = tracker->track(detections_, fk);
 
 
-        // Visualization
-        cv::Mat image(1080, 1080, CV_8UC3); // BGR
-        cv::namedWindow("Tracking Debug", cv::WINDOW_NORMAL);
-        
-        for (const auto& det : detections_){
-            vector<float> st = det.getStateVector().get();
-            float x     = st[0];
-            float y     = st[1];
-            float dx    = st[2];
-            float dy    = st[3];
+        // Save data
+        string file_name = file_base_name + '_' + std::to_string(fk) + ".txt";
+        fs::path file_path = input_folder_path / file_name;
+        update_tracks_section(file_path, tracks);
 
-            Point center(x, y);
-            Scalar det_color(0, 255, 0); // Green
-            cv::circle(image, center, 1.0, det_color, 2, CV_8U);
-        }
-        
-        for (const auto& tr : tracks){
-            tr.getFrameEnd();
-            tr.getFrameStart();
-            tr.getglobalID();
-            ...
-        }
-
-
-        cv::imshow("Tracking Debug", image);
     }
-
     cv::destroyAllWindows();
     return 0;
 }

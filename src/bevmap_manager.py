@@ -117,11 +117,20 @@ class BEVMapManager():
     def load_tracking_frame(self, frame_num:int, instance_pcds:dict) -> dict:
         """Load files to update the instance dic object ids
         The file format for each frame is:
-        |  center (x, y, z) | tracking_id | semantic label | index_pos |
-        |-------------------|-------------|----------------|-----------|
-        | x y z             | unknown     | vehicle.car    | 0         |
-        | x y z             | unknown     | vehicle.car    | 1         |
-        | x y z             | unknown     | vehicle.car    | 2         |
+        Frame_num: fk
+        Image_path: <image_path>
+        Detections --------------------
+        |  detection (x, y, z)  | semantic label | index_pos |
+        |-----------------------|----------------|-----------|
+        | x y z                 | pedestrian     | 0         |
+        | x y z                 | vehicle.car    | 0         |
+        | x y z                 | vehicle.car    | 1         |
+        Tracks --------------------
+        |  prediction (x, y, dx, dy) | frame_start | frame_end | tracking_id | semantic label | index_pos |
+        |----------------------------|-------------|-----------|-------------|----------------|-----------|
+        | x y z                      | 0           | 0         | -1          | pedestrian     | 0         |
+        | x y z                      | 0           | 0         | -2          | vehicle.car    | 0         |
+        | x y z                      | 0           | 0         | -3          | vehicle.car    | 1         |
         """
         assert 'tracking' in self.GEN_FOLDERS
         data_path = os.path.join(self.gen_paths['tracking'],f"frame_{frame_num}.txt")
@@ -183,14 +192,23 @@ class BEVMapManager():
         with open(occ_path, "wb") as f:
             pickle.dump(occ_bev_masks, f)
     
-    def save_tracking_frame(self, frame_num:int, instance_pcds:dict):
+    def save_tracking_frame(self, frame_num:int, image_path:str, instance_pcds:dict):
         """Save files to perform object trackig
         The file format for each frame is:
-        |  center (x, y, z) | tracking_id | semantic label | index_pos |
-        |-------------------|-------------|----------------|-----------|
-        | x y z             | unknown     | vehicle.car    | 0         |
-        | x y z             | unknown     | vehicle.car    | 1         |
-        | x y z             | unknown     | vehicle.car    | 2         |
+        Frame_num: fk
+        Image_path: <image-path>
+        Detections --------------------
+        |  detection (x, y, z)  | semantic_label |object_id        |
+        |-----------------------|----------------|-----------------|
+        | x y z                 | pedestrian     | 0_pedestrian_0  |
+        | x y z                 | vehicle.car    | 0_vehicle.car_0 |
+        | x y z                 | vehicle.car    | 0_vehicle.car_1 |
+        Tracks --------------------
+        |  prediction (x, y, dx, dy) | frame_start | frame_end | tracking_id | semantic_label |object_id        |
+        |----------------------------|-------------|-----------|-------------|----------------|-----------------|
+        | x y dx dy                  | 0           | 0         | -1          | pedestrian     | 0_pedestrian_0  |
+        | x y dx dy                  | 0           | 0         | -2          | vehicle.car    | 0_vehicle.car_0 |
+        | x y dx dy                  | 0           | 0         | -3          | vehicle.car    | 0_vehicle.car_1 |
         """
         assert 'tracking' in self.GEN_FOLDERS
         data_path = os.path.join(self.gen_paths['tracking'],f"frame_{frame_num}.txt")
@@ -207,9 +225,11 @@ class BEVMapManager():
                 inst_id     = inst['inst_id'] if inst['inst_id'] is not None else "unknown"
                 x, y, z     = inst['center']
                 sx, sy, sz  = inst['dimensions']
-                obj_data = f"{x} {y} {z} {inst_id} {label} {i}\n"
+                obj_id      = f"{frame_num}_{label}_{i}" # frame_num semantic_label index_pos 
+                obj_data = f"{x} {y} {z} {label} {obj_id}\n"
                 data.append(obj_data)
         
         # Save data
         with open(data_path, "w") as f:
+            f.write(f"Frame_num: {frame_num}\nImage_path: {image_path}\nDetections --------------------\n")
             f.writelines(data)

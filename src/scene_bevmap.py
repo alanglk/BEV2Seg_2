@@ -190,9 +190,8 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
             'pointcloud': False, 
             'instances': False, 
             'occ_bev_mask': False, 
-            'tracking': True
+            'tracking': False
         })
-    
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
     SP  = ScenePCD(scene=scene)
     ISP = InstanceScenePCD(dbscan_samples=dbscan_samples, dbscan_eps=dbscan_eps, dbscan_jobs=dbscan_jobs)
@@ -258,7 +257,8 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
             pcd = SP.run(depth_dmap, camera_name, color_image=blended_image)
             BMM.save_pointcloud(raw_image_path, pcd)
         else:
-            pcd = BMM.load_pointcloud(raw_image_path)
+            pass
+            # pcd = BMM.load_pointcloud(raw_image_path)
 
         # ##############################################################
         # Generate panoptic pointcloud dict ############################
@@ -296,7 +296,7 @@ def main(scene_path:str, raw2segmodel_path:str, bev2segmodel_path:str, depth_pro
         # Apply tracking data to instances #############################
         print(f"# Apply tracking data to instance dict {'#'*24}")
         if BMM.gen_flags['all'] or BMM.gen_flags['tracking']:
-            BMM.save_tracking_frame(frame_num=fk, instance_pcds=instance_pcds)
+            BMM.save_tracking_frame(frame_num=fk, image_path=raw_image_path, instance_pcds=instance_pcds)
         BMM.load_tracking_frame(frame_num=fk, instance_pcds=instance_pcds)
 
         # ##############################################################
