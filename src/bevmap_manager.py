@@ -11,7 +11,7 @@ import os
 
 
 class BEVMapManager():
-    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask']
+    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask', 'tracking']
     
     def __init__(self, 
                  scene_path: str, 
@@ -24,6 +24,7 @@ class BEVMapManager():
                 'pointcloud': False, 
                 'instances': False,
                 'occ_bev_mask':False,
+                'tracking': False
                 'all': False
             }
         """
@@ -113,7 +114,51 @@ class BEVMapManager():
             occ_bev_masks = pickle.load(f)
         return occ_bev_masks
     
-    
+    def load_tracking_frame(self, frame_num:int, instance_pcds:dict) -> dict:
+        """Load files to update the instance dic object ids
+        The file format for each frame is:
+        Frame_num: fk
+        Image_path: <image_path>
+        Detections --------------------
+        |  detection (x, y, z)  | semantic label | index_pos |
+        |-----------------------|----------------|-----------|
+        | x y z                 | pedestrian     | 0         |
+        | x y z                 | vehicle.car    | 0         |
+        | x y z                 | vehicle.car    | 1         |
+        Tracks --------------------
+        |  prediction (x, y, dx, dy) | frame_start | frame_end | tracking_id | semantic label | index_pos |
+        |----------------------------|-------------|-----------|-------------|----------------|-----------|
+        | x y z                      | 0           | 0         | -1          | pedestrian     | 0         |
+        | x y z                      | 0           | 0         | -2          | vehicle.car    | 0         |
+        | x y z                      | 0           | 0         | -3          | vehicle.car    | 1         |
+        """
+        assert 'tracking' in self.GEN_FOLDERS
+        data_path = os.path.join(self.gen_paths['tracking'],f"frame_{frame_num}.txt")
+        check_paths([data_path])
+        semantic_idx = {}
+
+        for i, semantic_data in enumerate(instance_pcds):
+            if semantic_data['label'] not in semantic_idx:
+                semantic_idx[semantic_data['label']] = i
+
+        with open(data_path, "r") as f:
+            for line in f:
+                obj_data = line.strip().split(" ")
+                x, y, z = float(obj_data[0]), float(obj_data[1]), float(obj_data[2])
+                inst_id         = obj_data[3]
+                semantic_label  = obj_data[4]
+                idx_pos         = int(obj_data[5])
+
+                # Update object data with tracking
+                s_data = instance_pcds[semantic_idx[semantic_label]] # semantic data
+                if 'instance_pcds' in s_data: 
+                    s_data['instance_pcds'][idx_pos]['inst_id']     = inst_id
+                if 'instance_3dboxes' in s_data:
+                    s_data['instance_3dboxes'][idx_pos]['inst_id']  = inst_id
+                if 'instance_bev_mask' in s_data:
+                    s_data['instance_bev_mask'][idx_pos]['inst_id'] = inst_id
+        return instance_pcds
+
     def save_semantic_images(self, image_name:str, images:List[np.ndarray]):
         """
         INPUT:
@@ -146,3 +191,48 @@ class BEVMapManager():
         occ_path = self._get_path(image_name, 'occ_bev_mask', '.pkl')
         with open(occ_path, "wb") as f:
             pickle.dump(occ_bev_masks, f)
+    
+    def save_tracking_frame(self, frame_num:int, image_path:str, instance_pcds:dict, tracking_semantic_labels:List[str]):
+        """Save files to perform object trackig
+        The file format for each frame is:
+        Frame_num: fk
+        Image_path: <image-path>
+        Detections --------------------
+        |  detection (x, y, z)  | semantic_label |object_id        |
+        |-----------------------|----------------|-----------------|
+        | x y z                 | pedestrian     | 0_pedestrian_0  |
+        | x y z                 | vehicle.car    | 0_vehicle.car_0 |
+        | x y z                 | vehicle.car    | 0_vehicle.car_1 |
+        Tracks --------------------
+        |  prediction (x, y, dx, dy) | frame_start | frame_end | tracking_id | semantic_label |object_id        |
+        |----------------------------|-------------|-----------|-------------|----------------|-----------------|
+        | x y dx dy                  | 0           | 0         | -1          | pedestrian     | 0_pedestrian_0  |
+        | x y dx dy                  | 0           | 0         | -2          | vehicle.car    | 0_vehicle.car_0 |
+        | x y dx dy                  | 0           | 0         | -3          | vehicle.car    | 0_vehicle.car_1 |
+        """
+        assert 'tracking' in self.GEN_FOLDERS
+        data_path = os.path.join(self.gen_paths['tracking'],f"frame_{frame_num}.txt")
+        data = []
+        for semantic_data in instance_pcds:
+            label = semantic_data['label']
+            dynamic = semantic_data['dynamic']
+            
+            if not dynamic:
+                continue # It has no instance computation
+            
+            if label not in tracking_semantic_labels:
+                continue # Skip non selected label
+
+            instances = semantic_data['instance_3dboxes']
+            for i, inst in enumerate(instances):
+                inst_id     = inst['inst_id'] if inst['inst_id'] is not None else "unknown"
+                x, y, z     = inst['center']
+                sx, sy, sz  = inst['dimensions']
+                obj_id      = f"{frame_num}_{label}_{i}" # frame_num semantic_label index_pos 
+                obj_data = f"{x} {y} {z} {label} {obj_id}\n"
+                data.append(obj_data)
+        
+        # Save data
+        with open(data_path, "w") as f:
+            f.write(f"Frame_num: {frame_num}\nImage_path: {image_path}\nDetections --------------------\n")
+            f.writelines(data)

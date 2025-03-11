@@ -1355,7 +1355,7 @@ if __name__ == "__main__":
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
     args = parser.parse_args()
 
-    OPENLABEL_PATH      = "./tmp/my_scene/nuscenes_sequence/detections_openlabel.json"
+    OPENLABEL_PATH      = "./tmp/my_scene/scene/detections_openlabel.json"
     SAVE_DATA_PATH      = "./data/pipeline_3d_evaluations.pkl"              
     SAVE_OPENLABEL_PATH = None # "./tmp/my_scene/nuscenes_sequence/associated_openlabel.json"
     DEBUG_EGO_MODEL     = "./assets/carlota_3d"

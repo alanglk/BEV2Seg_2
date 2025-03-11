@@ -5,6 +5,7 @@
 *$py.class
 
 # Folders
+**/build/
 .venv/
 tmp/
 *.egg-info/
