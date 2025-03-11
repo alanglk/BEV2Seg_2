@@ -183,24 +183,33 @@ void update_tracks_section(const string& file_path, const vector<gtl::Track>& tr
         vector<float> st = tr.getStateVector().get();
         float x     = st[0];
         float y     = st[1];
-        float dx    = st[2];
-        float dy    = st[3];
-        int frame_start = tr.getFrameEnd();
-        int frame_end = tr.getFrameStart();
+        float z     = st[2];
+        float dx    = st[3];
+        float dy    = st[4];
+        float dz    = st[5];
+
+        int frame_start = tr.getFrameStart();
+        int frame_end = tr.getFrameEnd();
         int track_id = tr.getglobalID();
         string semantic_label = tr.getClassName();
         string object_id = tr.getName();
         vector<string> associatedDetections;
         
+        std::cout << "frame_start: " << frame_start << " frame_end: " << frame_end << std::endl;
         for (int i = frame_start; i <= frame_end; i++){
-            gtl::Detection det = tr.getDetection(i);
-            tr.get // TODO: terminar la asociacion de detecciones
-            associatedDetections.push_back(det.getName());
+            if ( tr.hasDetection(i) ){
+                gtl::Detection det = tr.getDetection(i);
+                associatedDetections.push_back(det.getName());
+                std::cout << "i: " << i << " Tracking id: " << track_id << " NumDetections: " << tr.getNumDetections() << " CountDet: " << tr.getCountDet() << " CountNoDet: " << tr.getCountNoDet() << " Name: " << det.getName() << std::endl;
+            }else{
+                std::cout << "i: " << i << " Tracking id: " << track_id << " NumDetections: " << tr.getNumDetections() << " CountDet: " << tr.getCountDet() << " CountNoDet: " << tr.getCountNoDet() << " Track doesnt have any detection for this frame" << std::endl;
+            }
         }
+        std::cout << std::endl;
         string ass_det_string = vectorToString(associatedDetections);
         
         // Escribir la nueva información de tracks
-        fout << x << " " << y << " " << dx << " " << dy << " " << frame_start << " " << frame_end << " " << track_id << " " << semantic_label << " " << ass_det_string << endl;
+        fout << x << " " << y << " " << z << " " << dx << " " << dy << " " << dz << " " << frame_start << " " << frame_end << " " << track_id << " " << semantic_label << " " << ass_det_string << endl;
     }
     fout.close();
 }
@@ -239,7 +248,6 @@ int main (int argc, const char * argv[]) {
 
             FrameData fdata = read_frame_data(entry.path());
 			scene_frames.push_back(fdata);
-            cout << endl;
 		}
     }
     
@@ -265,24 +273,26 @@ int main (int argc, const char * argv[]) {
     //****************************************************************************************
     // System and Measurement noise
     //****************************************************************************************
-    int dims_ = 2;      // Variables for the state vector: x, y
-    int derivs_ = 2;    // How many variables are derived: x, y
+    int dims_ = 3;      // Variables for the state vector: x, y, z
+    int derivs_ = 3;    // How many variables are derived: x, y, z
     
-    // System and measurement noise for dynamic variables: x, y
-    float system_noise_val_dev          = 0.1f;
+    // System and measurement noise for dynamic variables: x, y, z
+    float system_noise_val_dev          = 5.1f;
     float system_noise_deriv_dev        = 0.1f;
-	float groundTruth_meas_noise_dev    = 1.0f;
+	float groundTruth_meas_noise_dev    = 4.0f;
 
     // KF specific noise parameters
     // System noise for dynamic variables -> x, y, dx, dy
     std::vector<float> systemNoiseVar({
 		system_noise_val_dev * system_noise_val_dev,        // x
 		system_noise_val_dev * system_noise_val_dev,        // y
+		system_noise_val_dev * system_noise_val_dev,        // z
         system_noise_deriv_dev * system_noise_deriv_dev,    // dx
-        system_noise_deriv_dev * system_noise_deriv_dev     // dy
+        system_noise_deriv_dev * system_noise_deriv_dev,    // dy
+        system_noise_deriv_dev * system_noise_deriv_dev     // dz
     });
 	
-    // Measurement noise for dynamic variables -> x, y
+    // Measurement noise for dynamic variables -> x, y, z
 	std::vector<float> measurementNoiseVar;
 	for (int i = 0; i < dims_; i++) {
 		measurementNoiseVar.push_back(groundTruth_meas_noise_dev * groundTruth_meas_noise_dev);
@@ -303,7 +313,7 @@ int main (int argc, const char * argv[]) {
     // Fill-in parameters
 	params.associationFunction = associationFunction.get();
 	params.svDims = svd;	
-	params.maxNumTracks = 5;        // Maximun number of current tracks
+	params.maxNumTracks = 10;        // Maximun number of current tracks
 	params.num_min_instants_with_measurement = 2;       // if >= then birth
 	params.num_max_instants_without_measurement = 4;    // if > then kill
 	params.verbose = false;
@@ -317,11 +327,14 @@ int main (int argc, const char * argv[]) {
     //********************************************************************************************
     for (const auto& frame : scene_frames){
         int fk = frame.frame_num;
+        std::cout << "Frame " << fk << " --------------------" << std::endl;
         
         // For each frame get the observed data
+        std::cout << "Detections --------------------" << std::endl;
         vector<gtl::Detection> detections_;
         for (const auto& obj : frame.objects){
-            vector<float> measure_({obj.x, obj.y});
+            vector<float> measure_({obj.x, obj.y, obj.z});
+            std::cout << "object_id: " << obj.object_id << endl;
             gtl::Detection detection_(gtl::StateVector(measure_), 1.0, obj.semantic_label, obj.object_id);
             detections_.push_back(detection_);
         }
@@ -331,6 +344,7 @@ int main (int argc, const char * argv[]) {
 
 
         // Save data
+        std::cout << "Saving --------------------" << std::endl;
         string file_name = file_base_name + '_' + std::to_string(fk) + ".txt";
         fs::path file_path = input_folder_path / file_name;
         update_tracks_section(file_path, tracks);

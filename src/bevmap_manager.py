@@ -192,7 +192,7 @@ class BEVMapManager():
         with open(occ_path, "wb") as f:
             pickle.dump(occ_bev_masks, f)
     
-    def save_tracking_frame(self, frame_num:int, image_path:str, instance_pcds:dict):
+    def save_tracking_frame(self, frame_num:int, image_path:str, instance_pcds:dict, tracking_semantic_labels:List[str]):
         """Save files to perform object trackig
         The file format for each frame is:
         Frame_num: fk
@@ -219,6 +219,9 @@ class BEVMapManager():
             
             if not dynamic:
                 continue # It has no instance computation
+            
+            if label not in tracking_semantic_labels:
+                continue # Skip non selected label
 
             instances = semantic_data['instance_3dboxes']
             for i, inst in enumerate(instances):

@@ -74,11 +74,13 @@ class Detection:
     def __repr__(self):
         return self.__str__()
 class Track:
-    def __init__(self, x, y, dx, dy, frame_start, frame_end, tracking_id, semantic_label, object_id):
+    def __init__(self, x, y, z, dx, dy, dz, frame_start, frame_end, tracking_id, semantic_label, object_id):
         self.x = x
         self.y = y
+        self.z = z
         self.dx = dx
         self.dy = dy
+        self.dz = dz
         self.frame_start = frame_start
         self.frame_end = frame_end
         self.tracking_id = tracking_id
@@ -124,13 +126,13 @@ def load_tracking_data(file_path) -> Tuple[int, List[Detection], List[Track]]:
             object_id = parts[4]
             detections.append(Detection(x, y, z, semantic_label, object_id))
         elif parsing_tracks:
-            x, y, dx, dy = map(float, parts[:4])
+            x, y, z, dx, dy, dz = map(float, parts[:6])
             frame_start = int(parts[4])
             frame_end = int(parts[5])
             tracking_id = int(parts[6])
             semantic_label = parts[7]
             object_id = parts[8]
-            tracks.append(Track(x, y, dx, dy, frame_start, frame_end, tracking_id, semantic_label, object_id))
+            tracks.append(Track(x, y, z, dx, dy, dz, frame_start, frame_end, tracking_id, semantic_label, object_id))
     return frame_num, image_path, detections, tracks
 
 
@@ -155,39 +157,52 @@ def main(scene_folder_path:str):
     scene_openlabel_path    = os.path.join(scene_folder_path, "original_openlabel.json")
     raw2seg_bev = Raw2Seg_BEV("models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2", scene_openlabel_path, device=None)
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-    plt.ion()
-    plt.show()
+    #plt.ion()
+    #plt.show()
 
     frame_keys = list(frame_data.keys())
     frame_keys.sort()
     for fk in frame_keys:
         detections  = frame_data[fk]["detections"]
         tracks      = frame_data[fk]["tracks"]
+        
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         ax.cla() # Clear the current axes
+        ax.set_title(f"Frame {fk}")
         
-        image_path = frame_data[fk]["image_path"]
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)        
+        print(f"Frame: {fk} Num detections: {len(detections)} Num tracks: {len(tracks)}")
 
-        ax.imshow(image)
+
+        # image_path = frame_data[fk]["image_path"]
+        # image = cv2.imread(image_path)
+        # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)        
+        # ax.imshow(image)
         
-        for track in tracks:
-            track.frame_start
-            
-            aux = "fk_label_index"
-            
-            trk_st_frame, trk_label, trk_st_index = track.object_id.split('_')
+        # # Measurements projected onto the image
+        # points3d_Nx3 = np.array( [ (det.x, det.y, det.z)  for det in detections ] )
+        # camera = raw2seg_bev.scene.get_camera('CAM_FRONT', frame_num=fk)
+        # points3d_4xN = utils.add_homogeneous_row(points3d_Nx3.T)
+        # points3d_4xN, remove_outside = camera.project_points3d(points3d_4xN)
+        # ax.scatter(points3d_4xN[0, :], points3d_4xN[1, :])
 
+        # Measurements on the camera frame
+        dets = np.array( [ (det.x, det.y, det.z)  for det in detections ] )
+        ax.scatter(dets[:, 0], dets[:, 1], color="blue", s=15.0)
 
-        points3d_Nx3 = np.array( [ (det.x, det.y, det.z)  for det in detections ] )
-        camera = raw2seg_bev.scene.get_camera('CAM_FRONT', frame_num=fk)
-        points3d_4xN = utils.add_homogeneous_row(points3d_Nx3.T)
-        points3d_4xN, remove_outside = camera.project_points3d(points3d_4xN)
-        ax.scatter(points3d_4xN[0, :], points3d_4xN[1, :])
+        # Tracks on the camera frame
+        trks = np.array( [ (tr.x, tr.y, tr.z)  for tr in tracks ] )
+        ax.scatter(trks[:, 0], trks[:, 1], color="red", alpha=0.7)
+        
 
-        plt.draw()
-        plt.pause(0.001)
+        ax.set_xlim([-10, 10])
+        ax.set_ylim([-10, 10])
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(scene_folder_path, "debug", "tracking", f"tracking_{fk+1}.png"))
+        
+        # plt.draw()
+        # plt.pause(0.001)
+        plt.show()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Show tracking")
