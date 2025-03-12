@@ -343,16 +343,22 @@ def main(config:dict):
     
 
 if __name__ == "__main__":
+    DEFAULT_RAW2SEGMODEL_PATH   = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
+    DEFAULT_BEV2SEGMODEL_PATH   = "models/segformer_bev/raw2bevseg_mit-b0_v0.3"
+    DEFAULT_DEPTH_PRO_PATH      = "models/ml_depth_pro/depth_pro.pt" 
 
     # Definir los argumentos
     parser = argparse.ArgumentParser(description="Scene BEV Map")
     parser.add_argument('scene_path', type=str, help='Path to the scene Folder.')
+    parser.add_argument('--raw2segmodel_path',  required=False, type=str, default=DEFAULT_RAW2SEGMODEL_PATH,    help='Path to the raw2seg model.')
+    parser.add_argument('--bev2segmodel_path',  required=False, type=str, default=DEFAULT_BEV2SEGMODEL_PATH,    help='Path to the bev2seg model.')
+    parser.add_argument('--depth_pro_path',     required=False, type=str, default=DEFAULT_DEPTH_PRO_PATH,       help='Path to the depth_pro model.')
     args = parser.parse_args()
-
+    
     scene_path              = args.scene_path # "./tmp/my_scene"
-    raw2segmodel_path       = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
-    bev2segmodel_path       = "models/segformer_bev/raw2bevseg_mit-b0_v0.3"
-    depth_pro_path          = "./models/ml_depth_pro/depth_pro.pt" 
+    raw2segmodel_path       = args.raw2segmodel_path
+    bev2segmodel_path       = args.bev2segmodel_path
+    depth_pro_path          = args.depth_pro_path
 
     # BEVMap scene config
     config = {
