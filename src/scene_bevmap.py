@@ -346,7 +346,9 @@ if __name__ == "__main__":
     DEFAULT_RAW2SEGMODEL_PATH   = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
     DEFAULT_BEV2SEGMODEL_PATH   = "models/segformer_bev/raw2bevseg_mit-b0_v0.3"
     DEFAULT_DEPTH_PRO_PATH      = "models/ml_depth_pro/depth_pro.pt" 
-
+    
+    # CUDA_VISIBLE_DEVICES=7 python3 src/scene_bevmap.py ./tmp/carlota_alan --raw2segmodel_path ./models/segformer_nu_formatted/raw2segbev_mit-b2_v0.4 --bev2segmodel_path ./models/segformer_bev/raw2bevseg_mit-b2_v0.3
+    
     # Definir los argumentos
     parser = argparse.ArgumentParser(description="Scene BEV Map")
     parser.add_argument('scene_path', type=str, help='Path to the scene Folder.')
