@@ -101,6 +101,8 @@ def main(config: dict):
     optim_args              = config['training']['optim_args']              if 'optim_args' in config['training']               else {}
     lr_scheduler_type       = config['training']['lr_scheduler_type']       if 'lr_scheduler_type' in config['training']        else "linear"
     lr_scheduler_kwargs     = config['training']['lr_scheduler_kwargs']     if 'lr_scheduler_kwargs' in config['training']      else {}
+    gradient_accum_steps    = config['training']['gradient_accum_steps']    if 'gradient_accum_steps' in config['training']     else 1
+    
 
     
     # Data Augmentations
@@ -203,6 +205,7 @@ def main(config: dict):
         weight_decay = weight_decay, 
         per_device_train_batch_size=batch_size, # The batch size per GPU/TPU core/CPU 
         per_device_eval_batch_size=batch_size,
+        gradient_accumulation_steps=gradient_accum_steps,
         num_train_epochs=train_epochs,
 
     )
