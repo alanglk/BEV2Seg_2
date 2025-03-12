@@ -1,0 +1,31 @@
+# sccene_bevmap config
+
+[scene]
+scene_path = "tmp/carlota_alan"
+camera_name = "camera"  # Default: 'CAM_FRONT'
+
+[semantic]
+raw2segmodel_path = "models/segformer_nu_formatted/raw2segbev_mit-b2_v0.4"
+bev2segmodel_path = "models/segformer_bev/raw2bevseg_mit-b2_v0.3"
+merge_semantic_labels_flag = true
+
+[depth_estimation]
+depth_pro_path = "models/ml_depth_pro/depth_pro.pt"
+
+[scene_pcd]  # Empty dictionary (can be omitted)
+
+[instance_scene_pcd]
+dbscan_samples = 30
+dbscan_eps = 0.1
+dbscan_jobs = 10  # Will be converted to None in Python
+lims = [inf, inf, inf]  # Using TOML array for tuple
+min_samples_per_instance = 250
+max_distance = 50.0
+max_height = 2.0
+
+[tracking]
+tracking_semantic_labels = ["vehicle.car"]
+
+[odometry_stitching]
+pcd_semantic_labels = ["flat.driveable_surface", "movable_object.barrier"]
+cuboid_semantic_labels = ["vehicle.car"]

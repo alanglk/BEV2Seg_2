@@ -127,12 +127,18 @@ class InstanceScenePCD():
             if not seg_pcd['dynamic']:
                 continue
             
+            if verbose:
+                print(f"[InstanceScenePCD] Running DBSCAN for class {seg_pcd['label']}...")
+
             # Compute Clusters
             db = DBSCAN(eps=self.dbscan_eps, min_samples=self.dbscan_samples, n_jobs=self.dbscan_jobs).fit(seg_pcd['pcd'])
             color_map = self._get_cluster_colormap(db.labels_)
             clusters = defaultdict(list)
             for label, point_xyz in zip(db.labels_, seg_pcd['pcd']):
                 clusters[label].append(point_xyz)
+
+            if verbose:
+                print(f"[InstanceScenePCD] [CLUSTERS] Adding cluster pcds and 3dbboxes...")
 
             # Add cluster pointclouds and calc instance bbox
             seg_pcd['instance_pcds'] = []

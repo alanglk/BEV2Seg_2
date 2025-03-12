@@ -108,7 +108,7 @@ def get_pcds_of_semantic_label(instance_pcds:dict, semantic_labels:list = None):
 def save_class_pcds(scene_path:str, instance_pcds:dict, frame_num:int, semantic_labels:list = None):
     pcds = get_pcds_of_semantic_label(instance_pcds, semantic_labels= semantic_labels)
     vehicle_pcd = np.asarray(pcds.pop(0).points)
-    vehicle_pcd_path = os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{frame_num+1}.png")
+    vehicle_pcd_path = os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{frame_num+1}.pcd")
     o3d.io.write_point_cloud(filename=vehicle_pcd_path, pointcloud=vehicle_pcd, write_ascii=True)      
 
 def intersection_factor(mask1, mask2):

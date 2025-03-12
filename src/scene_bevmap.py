@@ -13,7 +13,7 @@ import depth_pro
 
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
-from my_utils import check_paths, merge_semantic_labels, get_blended_image, DEFAULT_MERGE_DICT
+from my_utils import check_paths, merge_semantic_labels, get_blended_image, save_class_pcds, create_plane_at_y, DEFAULT_MERGE_DICT
 from bev2seg_2 import Raw2Seg_BEV, Raw_BEV2Seg
 
 from bevmap_manager import BEVMapManager
@@ -37,6 +37,7 @@ from typing import List
 from tqdm import tqdm
 import argparse
 import pickle
+import toml
 import os
 
 
@@ -71,6 +72,68 @@ import os
         sb: normal -> semantic -> bev
         bs: normal -> bev -> semantic
 """
+
+"""
+    config = {
+        'scene':{
+            'scene_path': "scene_path",
+            'camera_name': 'camera' # 'CAM_FRONT'
+        },
+        'semantic':{
+            'raw2segmodel_path': DEFAULT_RAW2SEGMODEL_PATH,
+            'bev2segmodel_path': DEFAULT_BEV2SEGMODEL_PATH,
+            'merge_semantic_labels_flag': True,
+            'merge_dict': DEFAULT_MERGE_DICT
+        },
+        'depth_estimation':{
+            'depth_pro_path': DEFAULT_DEPTH_PRO_PATH
+        },
+        'scene_pcd':{},
+        'instance_scene_pcd':{
+            'dbscan_samples': 15,
+            'dbscan_eps': 0.1,
+            'dbscan_jobs': None,
+            'lims': (np.inf, np.inf, np.inf),
+            'min_samples_per_instance': 250,
+            'max_distance': 50.0,
+            'max_height': 2.0
+        },
+        'tracking':{
+            'tracking_semantic_labels': ['vehicle.car']
+        },
+        'odometry_stitching':{
+            'pcd_semantic_labels': ['flat.driveable_surface', 'movable_object.barrier'],
+            'cuboid_semantic_labels': ['vehicle.car']
+        }
+    }
+"""
+
+DEFAULT_RAW2SEGMODEL_PATH   = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
+DEFAULT_BEV2SEGMODEL_PATH   = "models/segformer_bev/raw2bevseg_mit-b0_v0.3"
+DEFAULT_DEPTH_PRO_PATH      = "models/ml_depth_pro/depth_pro.pt" 
+
+def load_config(file_path):
+    with open(file_path, "r") as f:
+        config = toml.load(f)
+
+    # Convert lims list to tuple and apply default values
+    config.setdefault("scene", {}).setdefault("camera_name", "CAM_FRONT")
+    config.setdefault("semantic", {}).setdefault("raw2segmodel_path", DEFAULT_RAW2SEGMODEL_PATH)
+    config.setdefault("semantic", {}).setdefault("bev2segmodel_path", DEFAULT_BEV2SEGMODEL_PATH)
+    config.setdefault("semantic", {}).setdefault("merge_dict", DEFAULT_MERGE_DICT)
+
+    config.setdefault("depth_estimation", {}).setdefault("depth_pro_path", DEFAULT_DEPTH_PRO_PATH)
+
+    if "lims" in config.get("instance_scene_pcd", {}):
+        config["instance_scene_pcd"]["lims"] = tuple(config["instance_scene_pcd"]["lims"])
+    else:
+        config.setdefault("instance_scene_pcd", {}).setdefault("lims", (np.inf, np.inf, np.inf))
+    
+    # Convert empty strings to None
+    if config.get("instance_scene_pcd", {}).get("dbscan_jobs") == "":
+        config["instance_scene_pcd"]["dbscan_jobs"] = None
+
+    return config
 
 def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:int, transform_4x4:np.ndarray, cuboid_semantic_labels:List[str] = None, initial_traslation_4x1: np.ndarray = None):
             global uid
@@ -247,8 +310,7 @@ def main(config:dict):
             pcd = SP.run(depth_dmap, camera_name, color_image=blended_image)
             BMM.save_pointcloud(raw_image_path, pcd)
         else:
-            pass
-            # pcd = BMM.load_pointcloud(raw_image_path)
+            pcd = BMM.load_pointcloud(raw_image_path)
 
         # ##############################################################
         # Generate panoptic pointcloud dict ############################
@@ -265,13 +327,12 @@ def main(config:dict):
             BMM.save_instance_pcds(raw_image_path, instance_pcds)
         else:
             instance_pcds = BMM.load_instance_pcds(raw_image_path)
-        # save_class_pcds(instance_pcds, fk, semantic_labels=["vehicle.car"]) # Save class pcds
         
         # ##############################################################
         # Draw cuboids and Occupancy/Oclusion on RAW image #############
         # Transform cuboids to BEV, compute ConectedComponents of the bev_mask and
         # calc occupancy/occlusion masks of each instance
-        print(f"# Generate Occupancy/Oclusion Instances {'#'*23}")
+        print(f"# Generate Occupancy/Oclusion Instances {'#'*24}")
         bev_image_cuboids = bev_image.copy()
         if BMM.gen_flags['all'] or BMM.gen_flags['occ_bev_mask']:
             instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
@@ -283,7 +344,7 @@ def main(config:dict):
         
         # ##############################################################
         # Apply tracking data to instances #############################
-        print(f"# Apply tracking data to instance dict {'#'*24}")
+        print(f"# Apply tracking data to instance dict {'#'*25}")
         if BMM.gen_flags['all'] or BMM.gen_flags['tracking']:
             BMM.save_tracking_frame(frame_num=fk, image_path=raw_image_path, instance_pcds=instance_pcds, tracking_semantic_labels=tracking_semantic_labels)
         # BMM.load_tracking_frame(frame_num=fk, instance_pcds=instance_pcds)
@@ -293,28 +354,34 @@ def main(config:dict):
         print(f"# Draw cuboids on RAW image {'#'*36}")
         raw_blended = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
         raw_image_cuboids = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
-        # pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
+        pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
         bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk) # Reproyectar cuboides en raw a bev
         
         # ##############################################################
         # Odometry Stitching ###########################################
-        print(f"# Draw cuboids on RAW image {'#'*36}")
-        accum_pcd = ODS.add_frame_pcd(instance_pcds, camera_name, fk, use_frame_color = False)
-        accum_cuboids = ODS.add_frame_cuboids(instance_pcds, camera_name, fk)
-        o3d.io.write_point_cloud(os.path.join(scene_path, "scene", "ground_scene_pcd.pcd"), accum_pcd)
+        # print(f"# Draw cuboids on RAW image {'#'*36}")
+        # accum_pcd = ODS.add_frame_pcd(instance_pcds, camera_name, fk, use_frame_color = False)
+        # accum_cuboids = ODS.add_frame_cuboids(instance_pcds, camera_name, fk)
+        # o3d.io.write_point_cloud(os.path.join(scene_path, "scene", "ground_scene_pcd.pcd"), accum_pcd)
 
         # ##############################################################
         # Visualization ################################################
-        # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
-        # all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
+        print(f"# Open3d Visualization {'#'*41}")
+        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+        all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
         # all_geometries = accum_cuboids + [accum_pcd]
-        # all_geometries = []
-        # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
+        all_geometries = []
+        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
         
+        # ##############################################################
+        # Write Debug ##################################################
+        print(f"# Writing debug files {'#'*43}")
         cv2.imwrite(os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"), bev_image_cuboids)
         cv2.imwrite(os.path.join(scene_path, "debug", "bev_occupancy_oclusion", f"bev_occ_{fk+1}.png"), bev_image_occ_ocl)
         cv2.imwrite(os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"), raw_image_cuboids)
         cv2.imwrite(os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"), bev_repoj_cuboids)
+        cv2.imwrite(os.path.join(scene_path, "debug", "semantic_colored_raw_mask", f"{fk+1}.png"),raw2seg_bev.mask2image(raw_mask))
+        save_class_pcds(instance_pcds, fk, semantic_labels=["vehicle.car"]) # debug -> pointcloud
         
         # Paola
         # cv2.imwrite(os.path.join(scene_path, "paola", "image_raw_cam_front",    f"{fk+1}.png"), raw_image)
@@ -335,64 +402,26 @@ def main(config:dict):
         
         # print()
         # Check for a key press (if a key is pressed, it returns the ASCII code)
-        # if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
-        #     break
+        if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
+            break
         
     # Release resources
     cv2.destroyAllWindows()
     
 
 if __name__ == "__main__":
-    DEFAULT_RAW2SEGMODEL_PATH   = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
-    DEFAULT_BEV2SEGMODEL_PATH   = "models/segformer_bev/raw2bevseg_mit-b0_v0.3"
-    DEFAULT_DEPTH_PRO_PATH      = "models/ml_depth_pro/depth_pro.pt" 
+
     
-    # CUDA_VISIBLE_DEVICES=7 python3 src/scene_bevmap.py ./tmp/carlota_alan --raw2segmodel_path ./models/segformer_nu_formatted/raw2segbev_mit-b2_v0.4 --bev2segmodel_path ./models/segformer_bev/raw2bevseg_mit-b2_v0.3
+    # CUDA_VISIBLE_DEVICES=7 python3 src/scene_bevmap.py ./config/my_scene.toml
     
     # Definir los argumentos
     parser = argparse.ArgumentParser(description="Scene BEV Map")
-    parser.add_argument('scene_path', type=str, help='Path to the scene Folder.')
-    parser.add_argument('--raw2segmodel_path',  required=False, type=str, default=DEFAULT_RAW2SEGMODEL_PATH,    help='Path to the raw2seg model.')
-    parser.add_argument('--bev2segmodel_path',  required=False, type=str, default=DEFAULT_BEV2SEGMODEL_PATH,    help='Path to the bev2seg model.')
-    parser.add_argument('--depth_pro_path',     required=False, type=str, default=DEFAULT_DEPTH_PRO_PATH,       help='Path to the depth_pro model.')
+    parser.add_argument('config_file', type=str, help='Configuration toml file for generating the scene')
     args = parser.parse_args()
     
-    scene_path              = args.scene_path # "./tmp/my_scene"
-    raw2segmodel_path       = args.raw2segmodel_path
-    bev2segmodel_path       = args.bev2segmodel_path
-    depth_pro_path          = args.depth_pro_path
-
     # BEVMap scene config
-    config = {
-        'scene':{
-            'scene_path':scene_path,
-            'camera_name': 'camera' # 'CAM_FRONT'
-        },
-        'semantic':{
-            'raw2segmodel_path': raw2segmodel_path,
-            'bev2segmodel_path': bev2segmodel_path,
-            'merge_semantic_labels_flag': True,
-            'merge_dict': DEFAULT_MERGE_DICT
-        },
-        'depth_estimation':{
-            'depth_pro_path': depth_pro_path
-        },
-        'scene_pcd':{},
-        'instance_scene_pcd':{
-            'dbscan_samples': 15,
-            'dbscan_eps': 0.1,
-            'dbscan_jobs': None,
-            'lims': (np.inf, np.inf, np.inf),
-            'min_samples_per_instance': 250,
-            'max_distance': 50.0,
-            'max_height': 2.0
-        },
-        'tracking':{
-            'tracking_semantic_labels': ['vehicle.car']
-        },
-        'odometry_stitching':{
-            'pcd_semantic_labels': ['flat.driveable_surface', 'movable_object.barrier'],
-            'cuboid_semantic_labels': ['vehicle.car']
-        }
-    }
+    config_path = args.config_file
+    config = load_config(config_path)
+
+    # Run scene generation
     main(config)
