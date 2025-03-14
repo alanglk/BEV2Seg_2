@@ -1,0 +1,94 @@
+\newgeometry{bottom=2cm}
+
+\begin{titlepage}
+    % Logo de la universidad
+    \begin{textblock*}{\textwidth}(10cm,0cm)
+        \includegraphics[width=7.5cm, height=3cm]{images/shared/Logo_EHU.jpg}
+    \end{textblock*}
+    
+    % Franja azul
+    \begin{tikzpicture}[remember picture, overlay]
+        \fill[ehu_blue] (current page.north west) ++ (0,-3.01cm) rectangle (\paperwidth,-3cm);
+    \end{tikzpicture}
+    
+    \begin{textblock*}{\paperwidth}(\dimexpr\parindent+\oddsidemargin+3em\relax,3.5cm)
+        \begin{minipage}{\dimexpr\linewidth-7.5cm\relax}
+            \color{white}
+            \noindent\rule{\linewidth}{0cm}
+            \textsf{ {\large MÁSTER EN \master}}
+            \newline
+            \newline \newline
+            \textsf{\textbf{ {\Huge TRABAJO FIN DE MÁSTER }}}
+        \end{minipage}
+    \end{textblock*}
+    
+    % Título del trabajo
+    \vspace*{3.5cm}
+    \begin{minipage}{\linewidth}
+        \setlength{\baselineskip}{1.7\baselineskip}
+        \centering
+        \textsf{ \textbf{ {\LARGE \titulo }}}
+    \end{minipage}
+
+    % Foto de portada
+    \vspace*{0.5cm}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=10cm, height=8cm]{\portada}
+    \end{figure}
+
+    % ODS
+    \vspace*{1cm}
+    % \begin{figure}[h]
+    % \centering
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/03.png}
+    %     \end{subfigure}
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/04.png}
+    %     \end{subfigure}
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/05.png}
+    %     \end{subfigure}
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/07.png}
+    %     \end{subfigure}
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/08.png}
+    %     \end{subfigure}
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/09.png}
+    %     \end{subfigure}
+    %     \begin{subfigure}[b]{0.135\textwidth}
+    %         \includegraphics[width=2cm, height=2cm]{images/iconos_ods/12.png}
+    %     \end{subfigure}
+    % 
+    %     \label{fig:ods-iconos}
+    % \end{figure}
+    
+    % Estudiante
+    \vspace{0.2cm}
+    \noindent {\footnotesize \textbf{Estudiante:} \estudiante}
+    \newline
+    \noindent\makebox[\linewidth]{\rule{\textwidth}{0.4pt}} % Línea horizontal
+
+    % Director
+    \nopagebreak
+    \vspace{0.3cm}
+    \nopagebreak
+    \noindent {\footnotesize \textbf{Director/Directora:} \director }
+
+    % Espacio para firmas
+    \vspace{0.5cm} % Espacio entre texto "Director/Directora" y espacio para firmas
+    \noindent 
+    \makebox[0.4\linewidth]{\hrulefill}
+    \hspace{0.2\linewidth}
+    \makebox[0.4\linewidth]{\hrulefill}
+
+    % Curso y Fecha
+    \vspace{0.1cm}    
+    \noindent {\footnotesize \textbf{Curso: } \curso \hfill \textbf{Fecha:} \today }
+\end{titlepage}
+
+\restoregeometry
+\setcounter{figure}{0}
