@@ -1,0 +1,208 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[english]{babel}             % Inglés para los nombres
+\usepackage[utf8]{inputenc}             % Codificación de entrada
+\usepackage[T1]{fontenc}                % Codificación de fuente (escribir castellano)
+\usepackage{lmodern}                    % Fuente (la default no es compatible con castellano)
+\usepackage{csquotes}                   % Para comillas y otras anotaciones del castellano
+\usepackage{fancyhdr}                   % Encabezado y Pie de pagina
+\usepackage{tocloft}                    % Puntos en los índices
+
+\usepackage{url}                        % 
+\usepackage{hyperref}                   % Links y referencias dentro del texto
+\usepackage{nameref}                    % Para poder referenciar por nombre
+\usepackage{acronym}                    % Para incluir las listas de abreviaturas
+\usepackage{multicol}                   % Permite crear espacios con columnas verticales
+\usepackage{booktabs} % Para mejores líneas horizontales en tablas
+\usepackage{parskip}                    % Eliminar sangrado y añadir espacio entre párrafos
+\usepackage{titlesec}                   % Crear subsubsub secciones
+\usepackage{amsmath}                    % Funciones para ecuaciones
+\usepackage{blkarray}                   % Matrices con anotaciones
+\usepackage{algorithm}                  % Algoritmos con formalismos
+\usepackage{algpseudocode}              % También para algoritmos
+\usepackage{listings}                   % Para insertar codigo
+
+\usepackage{array}                      % Para personalizar columnas de tabla
+\usepackage{tabularx}                   % Para tablas de ancho variable
+
+\usepackage{graphicx}                   % Para incluir imágenes
+\usepackage{subcaption}                 % Subfiguras
+\usepackage[table]{xcolor}              % Definir y utilizar colores
+\usepackage{tikz}                       % Dibujar formas, figuras, rectas, intersecciones...
+\usepackage[absolute,overlay]{textpos}  % Posición absoluta para textos
+\usepackage{geometry}                   % Para controlar los márgenes
+
+\usepackage{float}
+\usepackage{soul}                       % Para highligths \hl
+\usepackage{lipsum} 
+
+\usepackage[backend=biber, sorting=none]{biblatex} % Referencias (bibliografía / webgrafía)
+\selectlanguage{english}                % Seleccionar inglés
+\bibliography{referencias}              % Incluir el archivo de referencias
+
+\setlength{\emergencystretch}{3em}
+
+% Definición de nombres
+%\printbibliography[title={Bibliografía}]
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}} 
+\newcommand{\student}{García Justel, Alan}
+\newcommand{\director}{ Barrena Orueechebarria, Nagore; Elordi Hidalgo, Unai}
+\newcommand{\codirector}{Sánchez Juanola, Martí}
+\newcommand{\master}{ COMPUTATIONAL ENGINEERING AND INTELLIGENT SYSTEMS}
+\newcommand{\titulo}{VEHICLE SCENES PREANOTATION WITH MONOCULAR SEMANTIC SEGMENTATION}
+\newcommand{\portada}{images/shared/no_signal.jpg}
+\newcommand{\curso}{2024-2025}
+
+% Definición de Macros
+\newcommand*{\fullref}[1]{\hyperref[{#1}]{\autoref*{#1} \nameref*{#1}}} % One single link
+
+\newcommand{\aclink}[1]{% Crear links a acronimos
+  \ifcsdef{ac@#1}{%
+    \ifcsdef{mark@#1}{%
+      \hyperlink{acro:#1}{\acs{#1}}%
+    }{%
+      \hyperlink{acro:#1}{\ac{#1}}%
+      \expandafter\gdef\csname mark@#1\endcsname{}%
+    }%
+  }{%
+    \ac{#1}%
+    \expandafter\gdef\csname mark@#1\endcsname{}%
+  }%
+}
+
+% Notas en Figuras
+\newcommand\fnote[1]{\captionsetup{width=0.8\linewidth, font=footnotesize}\caption*{#1}}
+
+% Estilos de listings
+% Configuración del estilo para resaltar el código de ROS
+\lstdefinestyle{ros}{
+    backgroundcolor=\color{white}, % Cambiar el color de fondo
+    basicstyle=\small\ttfamily, % Texto más pequeño
+    breaklines=true,
+    language=C,
+    morekeywords={int32, float64},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!40!black},
+    stringstyle=\color{red},
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+% Crear subsubsub secciones
+\titleclass{\subsubsubsection}{straight}[\subsection]
+\newcounter{subsubsubsection}[subsubsection]
+\renewcommand\thesubsubsubsection{\thesubsubsection.\arabic{subsubsubsection}}
+\renewcommand\theparagraph{\thesubsubsubsection.\arabic{paragraph}} % optional; useful if paragraphs are to be numbered
+
+\titleformat{\subsubsubsection}
+  {\normalfont\normalsize\bfseries}{\thesubsubsubsection}{1em}{}
+\titlespacing*{\subsubsubsection}
+{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{5}{\z@}%
+  {3.25ex \@plus1ex \@minus.2ex}%
+  {-1em}%
+  {\normalfont\normalsize\bfseries}}
+\renewcommand\subparagraph{\@startsection{subparagraph}{6}{\parindent}%
+  {3.25ex \@plus1ex \@minus .2ex}%
+  {-1em}%
+  {\normalfont\normalsize\bfseries}}
+\def\toclevel@subsubsubsection{4}
+\def\toclevel@paragraph{5}
+\def\toclevel@paragraph{6}
+\def\l@subsubsubsection{\@dottedtocline{4}{7em}{4em}}
+\def\l@paragraph{\@dottedtocline{5}{10em}{5em}}
+\def\l@subparagraph{\@dottedtocline{6}{14em}{6em}}
+\makeatother
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+
+
+
+% Encabezado y Pie de pagina
+\pagestyle{fancy}                       % Estilo de las páginas
+\fancyhf{}
+\fancyhead[L]{Master's Thesis}
+\fancyhead[R]{\leftmark}
+\fancyfoot[L]{UPV/EHU}
+\fancyfoot[R]{\thepage}
+\renewcommand{\footrulewidth}{0.4pt} % Línea horizontal en el pie de página
+\setlength{\headheight}{15.5pt}
+
+% Definición de colores
+\definecolor{ehu_blue}{HTML}{376092}
+\definecolor{link_color}{HTML}{36AEB4}
+\definecolor{reference_color}{HTML}{0F3133}
+\definecolor{cite_color}{HTML}{ff7f42}
+\definecolor{table_gray}{HTML}{C0C0C0}
+\definecolor{table_red}{HTML}{fb4952}
+
+
+% Incluye todas las entradas del archivo .bib en la bibliografía
+\nocite{*}
+
+% Configuración de hyperref para diferentes tipos de enlaces
+\hypersetup{
+    colorlinks=true,
+    linkcolor=reference_color,
+    citecolor=cite_color,
+    filecolor=link_color,
+    urlcolor=link_color,
+}
+
+% #########################################################################
+% #                                  TFM                                  #
+% #########################################################################
+\begin{document}
+\include{title} % Incluimos el título
+
+% \newpage % BORRAR EN LA VERSIÓN FINAL
+% \input{notas}
+
+\newpage
+\markboth{Summary}{Summary}
+\input{summary.tex} % Incluimos el resumen tri-lingüe
+
+% Índices
+\tableofcontents\thispagestyle{empty}\newpage
+\listoffigures\thispagestyle{empty}\newpage
+\listoftables\thispagestyle{empty}\newpage
+
+% Abreviaturas
+\section*{Abbreviations}
+\markboth{Abbreviations}{Abbreviations}
+\addcontentsline{toc}{section}{Abbreviations}
+\input{abbreviations.tex}
+
+\section{Introduction}
+\label{Introduction}
+\input{sections/1-introduction.tex}
+
+\section{State of the art}
+\label{sota}
+\input{sections/2-sota.tex}
+
+\section{Metodology}
+\label{metodologia}
+\input{sections/3-metodology.tex}
+
+% \newpage
+% \section*{acknowledgements}
+% \label{acknowledgements}
+% \input{acknowledgements.tex}
+% 
+% \newpage
+% \section{Annexes}
+% \input{annexes}
+
+\newpage\printbibliography
+\addcontentsline{toc}{section}{References}
+
+\end{document}

@@ -87,5 +87,10 @@
         "typeinfo": "cpp",
         "valarray": "cpp",
         "variant": "cpp"
+    },
+    "latex-workshop.latex.outDir": "build",
+    "[latex]": {
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 80
     }
 }
