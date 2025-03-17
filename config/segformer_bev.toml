@@ -7,10 +7,10 @@ testing = false                     # if set, the 'mini' version of the dataset
 [model]
 output_path = "/models"
 model_name = "segformer_bev"
-pretrained = "nvidia/mit-b2"
+pretrained = "nvidia/mit-b4"
 
 [training]
-batch_size = 16
+batch_size = 8
 epochs = 200
 learning_rate = 0.00006
 weight_decay = 0.01
@@ -30,7 +30,7 @@ resume_from_checkpoint = false      # (optional) defaults to False.
                                     # example__path: "/models/segformer_bev/raw2bevseg_mit-b2_v0.1"
 ls_steps = 200                      # (optional) defaults to 200. 
                                     # Logging/Saving steps. batch_size:32 -> 100; batch_size:16 -> 200
-gradient_accum_steps = 1
+gradient_accum_steps = 2
 # *Available lr_schedulers: 
 # [ "linear", "cosine", "cosine_with_restarts", "polynomial", 
 #   "constant", "constant_with_warmup", "inverse_sqrt", 

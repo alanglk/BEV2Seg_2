@@ -13,7 +13,7 @@ import depth_pro
 
 from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
 from oldatasets.common.utils import target2image
-from my_utils import check_paths, merge_semantic_labels, get_blended_image, save_class_pcds, create_plane_at_y, DEFAULT_MERGE_DICT
+from my_utils import check_paths, merge_semantic_labels, get_blended_image, get_pcds_of_semantic_label, create_plane_at_y, DEFAULT_MERGE_DICT
 from bev2seg_2 import Raw2Seg_BEV, Raw_BEV2Seg
 
 from bevmap_manager import BEVMapManager
@@ -135,6 +135,10 @@ def load_config(file_path):
 
     return config
 
+def ensure_directory_exists(file_path):
+    """Ensure the directory for the given file path exists."""
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
 def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:int, transform_4x4:np.ndarray, cuboid_semantic_labels:List[str] = None, initial_traslation_4x1: np.ndarray = None):
             global uid
             initial_traslation_4x1 = np.zeros((4, 1)) if initial_traslation_4x1 is None else initial_traslation_4x1
@@ -178,10 +182,6 @@ def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:i
                                                     coordinate_system="odom")
                     vcd.add_object_data(uid, bbox_cuboid_img, frame_value=frame_num)
             return vcd
-
-
-
-
 
 
 def main(config:dict):   
@@ -366,22 +366,39 @@ def main(config:dict):
 
         # ##############################################################
         # Visualization ################################################
-        print(f"# Open3d Visualization {'#'*41}")
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
-        all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
-        # all_geometries = accum_cuboids + [accum_pcd]
-        all_geometries = []
-        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
+        # print(f"# Open3d Visualization {'#'*41}")
+        # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+        # all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
+        # # all_geometries = accum_cuboids + [accum_pcd]
+        # all_geometries = []
+        # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
         
         # ##############################################################
         # Write Debug ##################################################
         print(f"# Writing debug files {'#'*43}")
-        cv2.imwrite(os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"), bev_image_cuboids)
-        cv2.imwrite(os.path.join(scene_path, "debug", "bev_occupancy_oclusion", f"bev_occ_{fk+1}.png"), bev_image_occ_ocl)
-        cv2.imwrite(os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"), raw_image_cuboids)
-        cv2.imwrite(os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"), bev_repoj_cuboids)
-        cv2.imwrite(os.path.join(scene_path, "debug", "semantic_colored_raw_mask", f"{fk+1}.png"),raw2seg_bev.mask2image(raw_mask))
-        save_class_pcds(instance_pcds, fk, semantic_labels=["vehicle.car"]) # debug -> pointcloud
+        vechicles_pcd = get_pcds_of_semantic_label(instance_pcds, semantic_labels=["vehicle.car"])[0]
+        debug_file_paths = [
+            os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"),
+            os.path.join(scene_path, "debug", "bev_occupancy_oclusion", f"bev_occ_{fk+1}.png"),
+            os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"),
+            os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"),
+            os.path.join(scene_path, "debug", "semantic_colored_raw_mask", f"{fk+1}.png"),
+            os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{fk+1}.pcd")
+        ]
+        debug_files = [
+            (bev_image_cuboids, "image"),
+            (bev_image_occ_ocl, "image"),
+            (raw_image_cuboids, "image"),
+            (bev_repoj_cuboids, "image"),
+            (raw2seg_bev.mask2image(raw_mask), "image"),
+            (vechicles_pcd, "pcd")
+        ]
+        for file_path, (file, file_type) in zip(debug_file_paths, debug_files):
+            ensure_directory_exists(file_path)
+            if file_type == "image":
+                cv2.imwrite(file_path, file)
+            elif file_type == "pcd":
+                o3d.io.write_point_cloud(file_path, file)
         
         # Paola
         # cv2.imwrite(os.path.join(scene_path, "paola", "image_raw_cam_front",    f"{fk+1}.png"), raw_image)
@@ -395,15 +412,15 @@ def main(config:dict):
         
         # ##############################################################
         # Annotations ##################################################
-        print(f"# Annotating cuboids on vcd {'#'*36}")
-        transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
-        annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
-        vcd.save(os.path.join(scene_path, "scene", "detections_openlabel.json"))
+        # print(f"# Annotating cuboids on vcd {'#'*36}")
+        # transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
+        # annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
+        # vcd.save(os.path.join(scene_path, "scene", "detections_openlabel.json"))
         
-        # print()
-        # Check for a key press (if a key is pressed, it returns the ASCII code)
-        if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
-            break
+        # # print()
+        # # Check for a key press (if a key is pressed, it returns the ASCII code)
+        # if cv2.waitKey(100) & 0xFF == ord('q'):  # Press 'q' to quit
+        #     break
         
     # Release resources
     cv2.destroyAllWindows()
