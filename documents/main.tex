@@ -1,5 +1,5 @@
 \documentclass[12pt, a4paper]{article}
-\usepackage[spanish]{babel}             % Español para los nombres
+\usepackage[english]{babel}             % Inglés para los nombres
 \usepackage[utf8]{inputenc}             % Codificación de entrada
 \usepackage[T1]{fontenc}                % Codificación de fuente (escribir castellano)
 \usepackage{lmodern}                    % Fuente (la default no es compatible con castellano)
@@ -36,7 +36,7 @@
 \usepackage{lipsum} 
 
 \usepackage[backend=biber, sorting=none]{biblatex} % Referencias (bibliografía / webgrafía)
-\selectlanguage{spanish}                % Seleccionar español
+\selectlanguage{english}                % Seleccionar inglés
 \bibliography{referencias}              % Incluir el archivo de referencias
 
 \setlength{\emergencystretch}{3em}
@@ -44,14 +44,13 @@
 % Definición de nombres
 %\printbibliography[title={Bibliografía}]
 \renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}} 
-\renewcommand{\spanishtablename}{Tabla}
-\renewcommand{\spanishlisttablename}{Índice de tablas}
-\newcommand{\estudiante}{García Justel, Alan}
-\newcommand{\director}{}
-\newcommand{\master}{INGENIERÍA COMPUTACIONAL Y SISTEMAS INTELIGENTES}
-\newcommand{\titulo}{PREANOTACIÓN DE ESCENAS VEHICULARES CON SEGMENTACIÓN SEMÁNTICA EN VISTA TOP-DOWN}
+\newcommand{\student}{García Justel, Alan}
+\newcommand{\director}{ Barrena Orueechebarria, Nagore; Elordi Hidalgo, Unai}
+\newcommand{\codirector}{Sánchez Juanola, Martí}
+\newcommand{\master}{ COMPUTATIONAL ENGINEERING AND INTELLIGENT SYSTEMS}
+\newcommand{\titulo}{VEHICLE SCENES PREANOTATION WITH MONOCULAR SEMANTIC SEGMENTATION}
 \newcommand{\portada}{images/shared/no_signal.jpg}
-\newcommand{\curso}{2023-2024}
+\newcommand{\curso}{2024-2025}
 
 % Definición de Macros
 \newcommand*{\fullref}[1]{\hyperref[{#1}]{\autoref*{#1} \nameref*{#1}}} % One single link
@@ -130,7 +129,7 @@
 % Encabezado y Pie de pagina
 \pagestyle{fancy}                       % Estilo de las páginas
 \fancyhf{}
-\fancyhead[L]{Trabajo Fin de Máster}
+\fancyhead[L]{Master's Thesis}
 \fancyhead[R]{\leftmark}
 \fancyfoot[L]{UPV/EHU}
 \fancyfoot[R]{\thepage}
@@ -168,8 +167,8 @@
 % \input{notas}
 
 \newpage
-\markboth{Resumen}{Resumen}
-\input{resumen} % Incluimos el resumen tri-lingüe
+\markboth{Summary}{Summary}
+\input{summary.tex} % Incluimos el resumen tri-lingüe
 
 % Índices
 \tableofcontents\thispagestyle{empty}\newpage
@@ -177,26 +176,33 @@
 \listoftables\thispagestyle{empty}\newpage
 
 % Abreviaturas
-\section*{Abreviaturas}
-\markboth{Abreviaturas}{Abreviaturas}
-\addcontentsline{toc}{section}{Abreviaturas}
-\input{abreviaturas}
+\section*{Abbreviations}
+\markboth{Abbreviations}{Abbreviations}
+\addcontentsline{toc}{section}{Abbreviations}
+\input{abbreviations.tex}
 
-\section{Introducción}
-\input{secciones/1-introduccion.tex}
+\section{Introduction}
+\label{Introduction}
+\input{sections/1-introduction.tex}
 
-\section{Estado del arte}
-\input{secciones/2-sota.tex}
+\section{State of the art}
+\label{sota}
+\input{sections/2-sota.tex}
+
+\section{Metodology}
+\label{metodologia}
+\input{sections/3-metodology.tex}
 
 % \newpage
-% \section*{Agradecimientos}
-% \input{agradecimientos}
+% \section*{acknowledgements}
+% \label{acknowledgements}
+% \input{acknowledgements.tex}
 % 
 % \newpage
-% \section{Anexos}
-% \input{anexos}
+% \section{Annexes}
+% \input{annexes}
 
 \newpage\printbibliography
-\addcontentsline{toc}{section}{Referencias}
+\addcontentsline{toc}{section}{References}
 
 \end{document}

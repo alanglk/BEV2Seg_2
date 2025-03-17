@@ -1,0 +1,17 @@
+% ================================================
+% =                INTRODUCTION                  =
+% ================================================ 
+
+The development of \aclink{ADS} have been a hot topic in the automotive industry for the last years. One of the fundamental aspects of an \aclink{ADS} is its perception system, as it is responsible for performing the obstacle detection and to provide a good environment representation for other systems. This perception system can be divided in two main tasks: 3D object detection and local \aclink{BEV} map generation. 
+
+3D object detection is usually based on pointclouds obtained from \aclink{LiDAR} sensors, but as this sensors are costly a lot of research has been made in the field of camera 3D object detection. This approach has been gaining a lot of popularity carried by the improvemnts of the computer vision techniques with deeplearning. \hl{references for 3d camera object detection. Also add some context about how bev3d detection is performed.}
+
+On the other hand, the \aclink{BEV} segmentation has the objective of creating a semantic view of the vehicle's surroundings. This is a key component of an \aclink{ADS} perception system as it gives an overall local representation of the environment and can be used for map reconstruction and localization task, prediction of agent intentionality or vehicle path path planning. In this field, "lift splat shoot" \cite{dummy} proposes an unified framework for fusing multicamera images into an unified \acl{BEV} representation of the scene and shows that their method is suitable for end-to-end motion plannig.
+
+\hl{Add references to introduce the question. Say that lift-shoot-splat and many other models perform a typical pipeline of segmenting-IPM or training a model with normal input and bev output, but no previous work was found on tasks were a normal semantic model was trained with bev images.}
+
+\hl{something aboud preanotation?.}
+
+This maste's thesis addresses the question: \textit{Does a model directly trained with semantic BEV images outperforms a typical segmentation model for plannar elements?}. Also, this work explores an technical aplication of semantic \aclink{BEV} segmetation for preanotating vehicular scenes with occupancy, oclussion and driveable masks, exploring the monocular 3D object detection field.
+
+
