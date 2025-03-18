@@ -3,7 +3,7 @@ En esta sección se detallan los experimentos realizados para abordar las cuesti
 
 Este proyecto puede dividirse en 3 bloques principales: experimentación con la segmentación semántica en BEV, diseño e implementación de un sistema de anotación semiautomático de máscaras de área conducible y un tercer bloque de experimentación para evaluar el rendimiento del sistema implementado.
 
-\subsection{Diseño del experimento de segmentación: BEV2Seg\_2}
+\subsection{Segmentation experiment design: BEV2Seg\_2}
 \label{bev2seg_2}
 
 Para abordar la hipótesis de "Un modelo de segmentación semántica entrenado con imágenes BEV segmenta mejor los elementos planares", se ha diseñado el proceso descrito en la Figura \ref{fig:beg2seg_2_flow}. En él se siguen dos rutas principales: la segmentación de imágenes RGB normales y su reproyección con \aclink{IPM} a BEV y realizar \aclink{IPM} de la imagen original para luego realizar la segmentación semántica con el modelo.
@@ -29,7 +29,7 @@ La implementación de segformer que se ha seleccionado es la proporcionada por h
 
 \hl{hablar sobre cómo es el preprocesado de las imágenes para segformer. También el tema de <<reduce labels>> e <<ignore index>> y cual es la configuración de los modelos pre entrenados. También hay que ver si los pesos preentrenados se congelan o se siguen ajustando. En el caso de segmentar con imágenes BEV, los pesos del encoder deberían reajustarse; en el caso de las imágenes normales creo que da más igual}.
 
-\subsubsection{Dataset de entrenamiento}
+\subsubsection{Dataset}
 Existen numerosos datasets 
 
 City
@@ -39,7 +39,7 @@ City
 Se ha utilizado mIou per class para la evaluación durante el entrenamiento y la comparación de los dos aproaches.
 
 
-\subsection{Anotación semiautomática del área conducible}
+\subsection{ Driveable area automatic annotation}
 \label{aplicacion}
 
 \subsubsection{Depth estimation}
@@ -47,10 +47,10 @@ Se ha utilizado mIou per class para la evaluación durante el entrenamiento y la
 \subsubsection{Instance scene PCD}
 \subsubsection{Instance BEV mask}
 
-\subsection{Metodología de evaluación}
+\subsection{Evaluation methodology}
 \label{evaluacion}
 
-\subsubsection{Evaluación de detecciones 3d}
+\subsubsection{3D detections evaluations}
 \subsubsection{¿Evaluación de máscaras BEV?}
 \hl{se podrían generar las máscaras BEV a partir del groundtruth}
 
