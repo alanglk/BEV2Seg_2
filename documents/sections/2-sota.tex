@@ -37,7 +37,23 @@ Este \aclink{TFM} se desarrolla en el contexto de la segmentación semántica en
 
 \subsection{BEV semantic segmentation}
 
-% TODO
+% TODO: Esto es una piedra de ChatGPT y hay varios errores. Reescribir todo.
+%       Alguna imagen no estaría de más.
+%
 
-MonoLayout \cite{mono_layout} intenta solucionar el problema de la oclusion y se "inventa" lo que no se ve de forma similar a como lo haría una persona.
+Traditional methods (3D\_Traffic\_Scene\_Understanding) estimate local BEV maps using multi-camera input under the flat-ground assumption, applying Inverse Perspective Mapping (IPM). However, these methods require accurate camera parameters, which has led to research focusing on camera parameter estimation for BEV transformation (BEV\_Params\_Estimation1, BEV\_Params\_Estimation2).
+
+Cam2BEV applies IPM to transform multi-camera input images into BEV space and refines the representation using homographies fed into the model. To handle occlusions, Cam2BEV introduces an additional semantic class that explicitly marks occluded areas from all vehicle-mounted cameras, improving the final BEV estimation.
+
+HDMapNet generates high-definition semantic maps from multi-camera input by employing a feature projection module that transforms image features into BEV space. It models the 3D environment implicitly using an MLP and explicitly incorporates camera extrinsic parameters to project image-space features correctly into BEV. The model first extracts image features with a shared MLP backbone, transforms them into the camera coordinate system, and then projects them into BEV using camera extrinsics.
+
+PYVA introduces a cross-view transformer that projects features from the front-view domain to the BEV domain. While similar to HDMapNet, PYVA differs in that it does not rely on camera parameters in the second transformation stage. Instead, it employs a GAN-based framework to manage occlusions, making it applicable for monocular settings but less suitable for multi-camera fusion.
+
+Other approaches propose different architectures for BEV semantic segmentation. VPN introduces a two-layer MLP for multi-camera feature fusion, followed by a decoder for semantic segmentation in indoor environments. LSS presents a unified framework that lifts 2D images into 3D space by learning an implicit depth distribution, making it effective for end-to-end motion planning. M²BEV transforms 2D image features into 3D voxels along projection rays to generate an efficient BEV representation that supports tasks such as semantic segmentation and 3D object detection. BEVFormer, on the other hand, employs a transformer-based approach that aggregates spatial-temporal features from multi-view cameras and historical BEV frames, enhancing occlusion reasoning.
+
+MonoLayout tackles occlusion estimation by employing a standard encoder-decoder framework combined with adversarial training, enabling it to predict amodal layouts of the driving scene. BEVFormer similarly enhances occlusion reasoning by leveraging attention mechanisms to fuse multi-view spatial-temporal features from historical BEV maps.
+
+Several methods integrate multiple sensor modalities to improve BEV representations. FishingNet extends VPN by incorporating data from additional sensors, while HDMapNet also supports LiDAR fusion, allowing for a more detailed understanding of the driving environment.
+
+To the best of our knowledge, Cam2BEV is the closest approach to this thesis. However, our work differs in several key aspects. Instead of applying semantic segmentation after transforming images into BEV space, we study whether training a segmentation model directly on BEV images improves the representation of planar elements compared to the traditional segmentation-first-then-IPM approach. Furthermore, we treat occupancy and occlusion mask generation as a post-processing step applied to BEV semantic segmentation. This is integrated into a pre-annotation pipeline for vehicle scenes, contributing to advancements in monocular 3D object detection.
 
