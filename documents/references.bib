@@ -88,29 +88,92 @@
   doi={10.1109/IVS.2016.7535402}
 }
 
-@article{segformer,
-  author    = {Enze Xie and Wenhai Wang and Zhiding Yu and Anima Anandkumar and Jose M. Alvarez and Ping Luo},
-  title     = {SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers},
-  journal   = {CoRR},
-  volume    = {abs/2105.15203},
-  year      = {2021},
-  url       = {https://arxiv.org/abs/2105.15203},
-  eprinttype = {arXiv},
-  eprint    = {2105.15203},
-  timestamp = {Wed, 02 Jun 2021 11:46:42 +0200},
-  biburl    = {https://dblp.org/rec/journals/corr/abs-2105-15203.bib},
-  bibsource = {dblp computer science bibliography, https://dblp.org}
+% SoTA 2.1 ===================================================================
+@InProceedings{Long_2015_CVPR,
+  author = {Long, Jonathan and Shelhamer, Evan and Darrell, Trevor},
+  title = {Fully Convolutional Networks for Semantic Segmentation},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2015}
+} 
+
+@InProceedings{u_net,
+  author="Ronneberger, Olaf and Fischer, Philipp and Brox, Thomas",
+  editor="Navab, Nassir and Hornegger, Joachim and Wells, William M. and Frangi, Alejandro F.",
+  title="U-Net: Convolutional Networks for Biomedical Image Segmentation",
+  booktitle="Medical Image Computing and Computer-Assisted Intervention -- MICCAI 2015",
+  year="2015",
+  publisher="Springer International Publishing",
+  address="Cham",
+  pages="234--241",
+  abstract="There is large consent that successful training of deep networks requires many thousand annotated training samples. In this paper, we present a network and training strategy that relies on the strong use of data augmentation to use the available annotated samples more efficiently. The architecture consists of a contracting path to capture context and a symmetric expanding path that enables precise localization. We show that such a network can be trained end-to-end from very few images and outperforms the prior best method (a sliding-window convolutional network) on the ISBI challenge for segmentation of neuronal structures in electron microscopic stacks. Using the same network trained on transmitted light microscopy images (phase contrast and DIC) we won the ISBI cell tracking challenge 2015 in these categories by a large margin. Moreover, the network is fast. Segmentation of a 512x512 image takes less than a second on a recent GPU. The full implementation (based on Caffe) and the trained networks are available at http://lmb.informatik.uni-freiburg.de/people/ronneber/u-net.",
+  isbn="978-3-319-24574-4"
 }
 
-@inproceedings{huggingface,
-    title = "Transformers: State-of-the-Art Natural Language Processing",
-    author = "Thomas Wolf and Lysandre Debut and Victor Sanh and Julien Chaumond and Clement Delangue and Anthony Moi and Pierric Cistac and Tim Rault and Rémi Louf and Morgan Funtowicz and Joe Davison and Sam Shleifer and Patrick von Platen and Clara Ma and Yacine Jernite and Julien Plu and Canwen Xu and Teven Le Scao and Sylvain Gugger and Mariama Drame and Quentin Lhoest and Alexander M. Rush",
-    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations",
-    year = "2020",
-    address = "Online",
-    publisher = "Association for Computational Linguistics",
-    url = "https://www.aclweb.org/anthology/2020.emnlp-demos.6",
-    pages = "38--45"
+
+
+
+% SoTA 2.2 ===================================================================
+@ARTICLE{3d_traffic_scene_understanding,
+  author={Geiger, Andreas and Lauer, Martin and Wojek, Christian and Stiller, Christoph and Urtasun, Raquel},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, 
+  title={3D Traffic Scene Understanding From Movable Platforms}, 
+  year={2014},
+  volume={36},
+  number={5},
+  pages={1012-1025},
+  keywords={Roads;Vehicles;Layout;Three-dimensional displays;Semantics;Splines (mathematics);Hidden Markov models;Autonomous vehicles;Scene Analysis;Image Processing and Computer Vision;Robotics;3D scene understanding;autonomous driving;3D scene layout estimation},
+  doi={10.1109/TPAMI.2013.185}
+}
+
+@Article{BEV_params_estimation1,
+  AUTHOR = {Lin, Chien-Chuan and Wang, Ming-Shi},
+  TITLE = {A Vision Based Top-View Transformation Model for a Vehicle Parking Assistant},
+  JOURNAL = {Sensors},
+  VOLUME = {12},
+  YEAR = {2012},
+  NUMBER = {4},
+  PAGES = {4431--4446},
+  URL = {https://www.mdpi.com/1424-8220/12/4/4431},
+  PubMedID = {22666038},
+  ISSN = {1424-8220},
+  ABSTRACT = {This paper proposes the Top-View Transformation Model for image coordinate transformation, which involves transforming a perspective projection image into its corresponding bird’s eye vision. A fitting parameters searching algorithm estimates the parameters that are used to transform the coordinates from the source image. Using this approach, it is not necessary to provide any interior and exterior orientation parameters of the camera. The designed car parking assistant system can be installed at the rear end of the car, providing the driver with a clearer image of the area behind the car. The processing time can be reduced by storing and using the transformation matrix estimated from the first image frame for a sequence of video images. The transformation matrix can be stored as the Matrix Mapping Table, and loaded into the embedded platform to perform the transformation. Experimental results show that the proposed approaches can provide a clearer and more accurate bird’s eye view to the vehicle driver.},
+  DOI = {10.3390/s120404431}
+}
+
+@misc{BEV_params_estimation2,
+  title={A Geometric Approach to Obtain a Bird's Eye View from an Image}, 
+  author={Ammar Abbas and Andrew Zisserman},
+  year={2020},
+  eprint={1905.02231},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/1905.02231}, 
+}
+
+@INPROCEEDINGS{Cam2BEV,
+  author={L. {Reiher} and B. {Lampe} and L. {Eckstein}},
+  booktitle={2020 IEEE 23rd International Conference on Intelligent Transportation Systems (ITSC)}, 
+  title={A Sim2Real Deep Learning Approach for the Transformation of Images from Multiple Vehicle-Mounted Cameras to a Semantically Segmented Image in Bird’s Eye View}, 
+  year={2020},
+  doi={10.1109/ITSC45102.2020.9294462}
+}
+
+@misc{HDMapNet,
+  title={HDMapNet: An Online HD Map Construction and Evaluation Framework}, 
+  author={Qi Li and Yue Wang and Yilun Wang and Hang Zhao},
+  year={2022},
+  eprint={2107.06307},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/2107.06307}, 
+}
+
+@InProceedings{PYVA,
+  author    = {Yang, Weixiang and Li, Qi and Liu, Wenxi and Yu, Yuanlong and Ma, Yuexin and He, Shengfeng and Pan, Jia},
+  title     = {Projecting Your View Attentively: Monocular Road Scene Layout Estimation via Cross-View Transformation},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2021},
+  pages     = {15536-15545}
 }
 
 @ARTICLE{view_parsing_network,
@@ -149,6 +212,51 @@
   author = {Mani, Kaustubh and Daga, Swapnil and Garg, Shubhika and Narasimhan, Sai Shankar and Krishna, Madhava and Jatavallabhula, Krishna Murthy},
   title = {MonoLayout: Amodal scene layout from a single image},
   booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
-  month = {March},
   year = {2020}
 } 
+
+@misc{BEVFormer,
+  title={BEVFormer: Learning Bird's-Eye-View Representation from Multi-Camera Images via Spatiotemporal Transformers}, 
+  author={Zhiqi Li and Wenhai Wang and Hongyang Li and Enze Xie and Chonghao Sima and Tong Lu and Qiao Yu and Jifeng Dai},
+  year={2022},
+  eprint={2203.17270},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/2203.17270}, 
+}
+
+@misc{fishingnet,
+      title={FISHING Net: Future Inference of Semantic Heatmaps In Grids}, 
+      author={Noureldin Hendy and Cooper Sloan and Feng Tian and Pengfei Duan and Nick Charchut and Yuesong Xie and Chuang Wang and James Philbin},
+      year={2020},
+      eprint={2006.09917},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2006.09917}, 
+}
+
+% Metodology 3.1 =============================================================
+@article{segformer,
+  author    = {Enze Xie and Wenhai Wang and Zhiding Yu and Anima Anandkumar and Jose M. Alvarez and Ping Luo},
+  title     = {SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers},
+  journal   = {CoRR},
+  volume    = {abs/2105.15203},
+  year      = {2021},
+  url       = {https://arxiv.org/abs/2105.15203},
+  eprinttype = {arXiv},
+  eprint    = {2105.15203},
+  timestamp = {Wed, 02 Jun 2021 11:46:42 +0200},
+  biburl    = {https://dblp.org/rec/journals/corr/abs-2105-15203.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+
+@inproceedings{huggingface,
+    title = "Transformers: State-of-the-Art Natural Language Processing",
+    author = "Thomas Wolf and Lysandre Debut and Victor Sanh and Julien Chaumond and Clement Delangue and Anthony Moi and Pierric Cistac and Tim Rault and Rémi Louf and Morgan Funtowicz and Joe Davison and Sam Shleifer and Patrick von Platen and Clara Ma and Yacine Jernite and Julien Plu and Canwen Xu and Teven Le Scao and Sylvain Gugger and Mariama Drame and Quentin Lhoest and Alexander M. Rush",
+    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations",
+    year = "2020",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/2020.emnlp-demos.6",
+    pages = "38--45"
+}
