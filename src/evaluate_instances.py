@@ -16,7 +16,7 @@ from my_utils import get_pallete, DEFAULT_MERGE_DICT, parse_mtl, parse_obj_with_
 from three_d_metrics.open3d_addon import * # 3d metrics
 
 
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 from scipy.spatial import Delaunay
 import copy
 
@@ -237,9 +237,11 @@ def get_types_in_obj_inf(objs_inf:AnnotationInfo) -> list:
 
     return list(distinct_types.items())
 
-def get_camera_fov_polygon(camera:scl.Camera, camera_depth:float, fov_coord_sys:str, scene:scl.Scene, frame_num) -> np.ndarray:
+def get_camera_fov_polygon(scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num) -> np.ndarray:
     """Get the FOV area of a camera
     """
+    camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
+
     h, w = camera.height, camera.width
     d = camera_depth
     K_3x3 = camera.K_3x3
@@ -255,6 +257,78 @@ def get_camera_fov_polygon(camera:scl.Camera, camera_depth:float, fov_coord_sys:
     fov_poly_4xN_t = scene.transform_points3d_4xN(fov_poly_4xN, cs_src=fov_coord_sys, cs_dst='odom', frame_num=frame_num)
     fov_poly_3d_t = fov_poly_4xN_t[:3].T  # X, Y, Z
     return fov_poly_3d_t[:, :2]
+
+
+def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, bbox:List[float]) -> np.ndarray:
+    #bbox: [ x, y, z, rx, ry, rz, sx, sy, sz ]
+    center      = bbox[:3]
+    rotation    = bbox[3:6]
+    size        = bbox[6:9]
+    corners_3d  = bbox_3d_corners(center, size, rotation)
+    bbox_footprint = Polygon(project_to_xy(corners_3d)).buffer(0)
+    assert bbox_footprint.contains(bbox_footprint.centroid)
+    fx, fy = bbox_footprint.exterior.xy # For plotting
+
+    _, num_rays, num_steps = rays_points.shape
+    for j in range(num_rays):
+        plt.plot(fx, fy, color="orange", label="bbox_poly")
+        for k in range(num_steps):
+            point_2d = Point(rays_points[0, j, k], rays_points[1, j, k])
+            point_2d = bbox_footprint.centroid
+
+            intersections[j, k] = bbox_footprint.contains(point_2d)
+        xs, ys = np.where(intersections == True)
+        xs, ys = rays_points[0, xs, ys], rays_points[1, xs, ys]
+        plt.scatter(rays_points[0, j, :], rays_points[1, j, :], color="blue", label="ray point")
+        plt.scatter(xs, ys, color="red", label="ray point")
+
+        plt.show()
+    return intersections
+
+def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num) -> List[np.ndarray]:
+    """Get the occlusion of 3d objects by projecting rays in the top-view
+    """
+    camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
+
+    h, w = camera.height, camera.width
+    d = camera_depth
+    K_3x3 = camera.K_3x3
+    fx = K_3x3[0, 0]
+    alpha = np.arctan((w/2)/fx)
+    
+    # Launch rays
+    num_rays    = 100
+    h           = 0.01    # Longitud de paso
+    steps       = int(d / h)
+    
+    rays_orig   = np.array([[0], [0], [0]]).reshape(3, 1, 1)        # Shape (3, 1, 1)
+    rays_angles = np.linspace(-alpha, alpha, num_rays)              # Shape (num_rays,)
+    rays_dirs   = np.stack([np.sin(rays_angles), 
+                            np.zeros_like(rays_angles),
+                            np.cos(rays_angles)], axis=0)           # Shape (3, num_rays)
+    rays_dirs   = rays_dirs[:, :, np.newaxis]                       # Shape (3, num_rays, 1)
+    rays_steps  = np.linspace(0.0, d, steps)                        # Shape (steps,)
+    rays_steps  = rays_steps.reshape(1, 1, -1)                      # Shape (1, 1, steps)
+    rays_points = rays_orig + rays_dirs * rays_steps                # Shape (3, num_rays, steps)
+    rays_3xN    = rays_points.reshape(3, -1)                        # Shape (3, num_rays * steps)
+    
+    # Transform rays points to odom frame 
+    rays_4xN        = utils.add_homogeneous_row(rays_3xN)
+    transform_4x4   = scene.get_transform(fov_coord_sys, 'odom', frame_num)[0]
+    rays_trans_4xN  = transform_4x4 @ rays_4xN
+    rays_trans_3xN  = rays_trans_4xN[:3]
+    rays_points     = rays_trans_3xN.flatten().reshape((3, num_rays, steps)) # ((x,y,z), ray index, step index)
+    intersections   = np.zeros((num_rays, steps)) # (ray index, step index)
+
+    # Point intersection?
+    for i in range(len(objs_data)):
+        bbox = objs_data[i]['val']
+        if objs_data[i]['coordinate_system'] != 'odom':
+            bbox = scene.transform_cuboid(bbox, cs_src=objs_data[i]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
+        intersections = bbox_intersects_with_rays(rays_points, intersections, bbox)
+
+    return intersections
+
 
 def rotate_3d(points, angles):
     """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
@@ -280,13 +354,14 @@ def bbox_3d_corners(center, size, rotation):
         [-sx, -sy, -sz], [sx, -sy, -sz], [sx, sy, -sz], [-sx, sy, -sz],
         [-sx, -sy, sz],  [sx, -sy, sz],  [sx, sy, sz],  [-sx, sy, sz]
     ])
+
     rotated_corners = rotate_3d(corners, rotation) # Rotate corners
     rotated_corners += np.array([x, y, z]) # Translate to final position
     return rotated_corners
 def project_to_xy(corners):
     """ Project 3D points onto the XY plane """
     return [(x, y) for x, y, z in corners]
-def check_intersection(polygon:Polygon, bbox:List[float]) -> bool:
+def check_intersection_with_fov_poly(polygon:Polygon, bbox:List[float]) -> bool:
     """ Check if the 2D projection of the 3D bounding box intersects with the polygon """
     center = bbox[:3]
     rotation = bbox[3:6]
@@ -315,7 +390,7 @@ def get_obj_indices_in_fov(objs_data:List[dict], fov_poly:np.ndarray, camera_nam
         bbox_t = obj_data['val']
         if obj_data['coordinate_system'] != 'odom':
             bbox_t = scene.transform_cuboid(obj_data['val'], obj_data['coordinate_system'], camera_name, frame_num)
-        if check_intersection(fov_poly, bbox_t):
+        if check_intersection_with_fov_poly(fov_poly, bbox_t):
             in_indices.append(i)
     return in_indices
 
@@ -1273,10 +1348,9 @@ def main(
             if len(gt_objs_data) == 0 or len(dt_objs_data) == 0:
                 continue # Skip
             
-            camera = scene.get_camera(camera_name=camera_name, frame_num=fk)
 
 
-            fov_poly = get_camera_fov_polygon(camera, camera_depth, camera_name, scene, fk) # (O, A, B )in odom cs
+            fov_poly = get_camera_fov_polygon(scene, camera_depth, camera_name, fk) # (O, A, B )in odom cs
             gt_in_indices = get_obj_indices_in_fov(gt_objs_data, fov_poly, camera_name, scene, fk)
             dt_in_indices = get_obj_indices_in_fov(dt_objs_data, fov_poly, camera_name, scene, fk)
 
@@ -1285,6 +1359,7 @@ def main(
             gt_in_objs_data = [gt_objs_data[i] for i in gt_in_indices]
             dt_in_objs_data = [dt_objs_data[i] for i in dt_in_indices]
 
+            gt_in_cc_polys = get_occlusion_polys(gt_in_objs_data, scene, camera_depth, camera_name, fk)
 
             cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
@@ -1339,9 +1414,9 @@ def main(
         vcd.add_metadata_properties({'eval_config': eval_config})
         vcd.save(save_openlabel_path)
     
-    # Save evaluation data
-    with open(save_data_path, "wb") as f:
-        pickle.dump(data, f)
+    # # Save evaluation data
+    # with open(save_data_path, "wb") as f:
+    #     pickle.dump(data, f)
     
 
 if __name__ == "__main__":   
