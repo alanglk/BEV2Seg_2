@@ -1,5 +1,7 @@
-Estructura principal de la memoria del TFM:
 
+# Thesis Structure
+
+Estructura principal de la memoria del TFM:
 
 ## 1. Introducción
 
@@ -73,4 +75,58 @@ Estructura principal de la memoria del TFM:
     Mejoras en la segmentación BEV (más datos, modelos más avanzados).
     Integración con sensores LiDAR o radares.
     Optimización del pipeline en tiempo real.
+
+
+
+# 1. Introduction
+...
+
+# 2. State of The Art
+...
+
+## 2.1 Image Semantic Segmentation
+The goal of semantic segmentation is to assign a semantic category to each pixel in an input image based on a predefined label set. The main difference between image classification and semantic segmentation is that semantic segmentation works in the pixel-level of the image. Instance segmentation is another task where a multiobject detector detects multiple objects and then this objects are segmented to obtain the pixel level boundaries of the detected instances. Then, a fusion between semantic and instance segmentation tasks is made and is named as panoptic segmentation, where the input image gets not only a pixel level semantic label but also differentiates between different instances of the same classes.
+
+This thesis focuses on the semantic segmentation task, for which there has been a lot of research about.
+
+Early methods relied on hand-crafted features but the introduction of Fully Convolutional Networks (FCNs) boosted semantic segmentation as convolutional layers in FCNs enables a data-driven feature extraction from images enabling pixel-wise predictions suitable for segmentation tasks. Additionaly, U-Net further impoved this by incorporating an encoder-decoder architecture with skip connections to refine segmented object boundaries and preserve spatial information.
+
+Furthermore, the introduction of image classification backbones like VGG and ResNet into segmentation models further boosted performance. This backbones are known by their strong feature extraction capabilities, and also the residual connections in ResNets helped mitigate the vanishing gradient problem, improving the learning of deep features and enhancing segmentation results.
+
+From that point, semantic segmentation started to been framed as a structured prediction problem and the development of specific modules and architectures for this task was made. That's the case of dilated convolution (atrous convolution), which increase the receptive field by "inflating" the CNN kernels with holes allowing models to capture more spatial context in their prediction.
+
+Also, Transformers have been adapted from NLP to vision tasks, starting with Vision Transformers (ViTs), which model images as patch sequences using self-attention. For semantic segmentation, architectures like SETR replace CNN backbones with transformer for a better global understangin, while hybrid models like Swin Transformer and MaskFormer balance efficiency and context modeling. These advancements enable improved segmentation performance, particularly in tasks requiring both fine details and long-range dependencies.
+
+
+## 2.2 BEV Semantic Segmentation
+Traditional methods (3d_traffic_scene_understanding) estimate local BEV maps using camera inputs under the flat-ground assumption applying IPM. However, these methods require accurate camera parameters which has led to research focusing on camera parameter estimation for BEV transformation (BEV_params_estimation1, BEV_params_estimation2). Another key challenge in BEV map generation is handling object occupancy and occlusion. ADS must be aware of objects dimensions and should account for uncertainty in vehicular scenes. However, estimating vehicle occupancy is non-trivial as the necessary perspective views of objects are often unavailable. In this context, there are many reseachs that addresses the local semantic map estimation with different approaches.
+
+Cam2BEV applies IPM to transform multi-camera segmented input images into the BEV domain which is feeded into the model to refine the BEV representation. To handle occlusions, Cam2BEV introduces an additional semantic class that explicitly marks occluded areas from all vehicle-mounted cameras. As the input of the model are already segmented images, an extra CNN was employed to test the method in real-world data.  
+
+HDMapNet generates high-definition semantic maps from multi-camera input by employing a feature projection module that transforms image features into BEV space. The model first extracts image features and transforms them into the camera coordinate system with a shared MLP backbone, and then projects them into BEV using camera extrinsics. Finally a semantic segmentation decoder is used.
+
+PYVA introduces a cross-view transformer that projects features from the front-view domain to the BEV domain. While similar to HDMapNet, PYVA differs in that it does not rely on camera parameters in the second transformation stage as the model is cappable of learning this transformation. Different to other methods, this work uses a GAN-based framework to manage occluions by estimating the vehicle's top view masks. However, this method is not suitable for multi-camera fusion.
+
+Other approaches propose different architectures for BEV semantic segmentation. VPN introduces a two-layer MLP module for multi-camera feature fusion, followed by a decoder for semantic segmentation in indoor scenes. LSS proposes a unified framework that lifts 2D images into a 3D space by learning an implicit depth distribution and shows that their method is suitable for end-to-end motion plannig. M²BEV transforms 2D image features into 3D voxels along projection rays and obtains an efficient BEV representation which supports multiple end tasks such as semantic segmentation or object 3D detection.
+
+MonoLayout tackles occlusion estimation by employing a standard encoder-decoder framework combined with adversarial training, making it suittable for predicting amodal layouts of the driving scene. BEVFormer similarly enhances occlusion reasoning by leveraging attention mechanisms to fuse multi-view spatial-temporal features from historical BEV maps.
+
+There are also methods that combines information form multiple sensor such as FishingNet which extends VPN to use multiple sensors, or HDMapNet which is also cappable of using LiDAR sensors.  
+
+In summary, existing approaches to local BEV map estimation typically follow one of two strategies: (1) performing early-stage segmentation on input images before refining the BEV representation, or (2) learning to embed image features into BEV space before passing them through a semantic segmentation decoder. However, to the best of our knowledge, no previous work directly trains a model on already-reprojected BEV images.
+
+Instead of applying semantic segmentation before transforming images into BEV space, we study whether training a segmentation model directly on BEV images improves the representation of planar elements compared to the traditional segmentation-first-then-IPM approach. Furthermore, we treat occupancy and occlusion mask generation as a post-processing step applied to BEV semantic segmentation, where 3D object detection is performed. This is integrated into a pre-annotation pipeline for vehicle scenes, contributing to advancements in monocular 3D object detection. 
+
+
+# 3. Methodology
+
+This section details the experiments and implementations made to address the problems described in section (Introduction). On the first hand, the experimental design is introduced, tackling the model and dataset selection, how data augmentations are performed and the training and validation processes. Afterward, the implementation of the occupancy and occlusion masks preannotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
+
+Thus, this project can be divided into three main blocks: (BEV) semantic segmentation experimentation, design and implementation of the preannotation pipeline and a thrid block of how the system is evaluated.
+
+## 3.1 Segementation experiment design: BEV2Seg_2
+
+
+
+
 

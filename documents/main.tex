@@ -37,7 +37,7 @@
 
 \usepackage[backend=biber, sorting=none]{biblatex} % Referencias (bibliografía / webgrafía)
 \selectlanguage{english}                % Seleccionar inglés
-\bibliography{referencias}              % Incluir el archivo de referencias
+\bibliography{references}               % Incluir el archivo de referencias
 
 \setlength{\emergencystretch}{3em}
 
@@ -48,7 +48,7 @@
 \newcommand{\director}{ Barrena Orueechebarria, Nagore; Elordi Hidalgo, Unai}
 \newcommand{\codirector}{Sánchez Juanola, Martí}
 \newcommand{\master}{ COMPUTATIONAL ENGINEERING AND INTELLIGENT SYSTEMS}
-\newcommand{\titulo}{VEHICLE SCENES PREANOTATION WITH MONOCULAR SEMANTIC SEGMENTATION}
+\newcommand{\titulo}{BEV2SEG\_2: DRIVEABLE AREA SEGMENTATION FOR PREANNOTATION TASKS}
 \newcommand{\portada}{images/shared/no_signal.jpg}
 \newcommand{\curso}{2024-2025}
 
@@ -176,22 +176,25 @@
 \listoftables\thispagestyle{empty}\newpage
 
 % Abreviaturas
-\section*{Abbreviations}
-\markboth{Abbreviations}{Abbreviations}
-\addcontentsline{toc}{section}{Abbreviations}
-\input{abbreviations.tex}
+\section*{Acronyms}
+\markboth{Acronyms}{Acronyms}
+\addcontentsline{toc}{section}{Acronyms}
+\input{acronyms.tex}
 
 \section{Introduction}
 \label{Introduction}
 \input{sections/1-introduction.tex}
+\newpage
 
 \section{State of the art}
 \label{sota}
 \input{sections/2-sota.tex}
+\newpage
 
 \section{Metodology}
 \label{metodologia}
 \input{sections/3-metodology.tex}
+\newpage
 
 % \newpage
 % \section*{acknowledgements}

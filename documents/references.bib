@@ -1,10 +1,3 @@
-@article{dummy,
-  author    = {Alan García},
-  title     = {Dummy citation},
-  year      = {2025},
-}
-
-
 @ARTICLE{survey_AutomatedDriving1,
   author={Yurtsever, Ekim and Lambert, Jacob and Carballo, Alexander and Takeda, Kazuya},
   journal={IEEE Access}, 
@@ -30,21 +23,18 @@
 }
 
 @Inbook{AD_Technical_Standards,
-author="Grubm{\"u}ller, Stephanie
-and Plihal, Jiri
-and Nedoma, Pavel",
-editor="Watzenig, Daniel
-and Horn, Martin",
-title="Automated Driving from the View of Technical Standards",
-bookTitle="Automated Driving: Safer and More Efficient Future Driving",
-year="2017",
-publisher="Springer International Publishing",
-address="Cham",
-pages="29--40",
-abstract="This chapter provides a short overview of driving automation for on-road vehicles from the standardization point of view with a focus on various levels of automation. The content of this chapter gives information about current technical standards and future standardization topics. Furthermore, it gives a plea for worldwide harmonized standardization and legislative efforts regarding automated driving in near future. The main target is to reach a harmonized regulatory approach for automated driving at the European Union (EU) level that would allow for innovation and, also, improve safety, efficiency, and environment while preserving the comfort of the passengers.",
-isbn="978-3-319-31895-0",
-doi="10.1007/978-3-319-31895-0_3",
-url="https://doi.org/10.1007/978-3-319-31895-0_3"
+  author="Grubm{\"u}ller, Stephanie and Plihal, Jiri and Nedoma, Pavel",
+  editor="Watzenig, Daniel and Horn, Martin",
+  title="Automated Driving from the View of Technical Standards",
+  bookTitle="Automated Driving: Safer and More Efficient Future Driving",
+  year="2017",
+  publisher="Springer International Publishing",
+  address="Cham",
+  pages="29--40",
+  abstract="This chapter provides a short overview of driving automation for on-road vehicles from the standardization point of view with a focus on various levels of automation. The content of this chapter gives information about current technical standards and future standardization topics. Furthermore, it gives a plea for worldwide harmonized standardization and legislative efforts regarding automated driving in near future. The main target is to reach a harmonized regulatory approach for automated driving at the European Union (EU) level that would allow for innovation and, also, improve safety, efficiency, and environment while preserving the comfort of the passengers.",
+  isbn="978-3-319-31895-0",
+  doi="10.1007/978-3-319-31895-0_3",
+  url="https://doi.org/10.1007/978-3-319-31895-0_3"
 }
 
 @INPROCEEDINGS{fallback_strategy,
@@ -68,21 +58,22 @@ url="https://doi.org/10.1007/978-3-319-31895-0_3"
   number={4},
   pages={1364-1384},
   keywords={Task analysis;Pipelines;Training;Neural networks;Autonomous vehicles;Roads;Automobiles;Autonomous driving;end-to-end;neural networks},
-  doi={10.1109/TNNLS.2020.3043505}}
+  doi={10.1109/TNNLS.2020.3043505}
+}
 
 
 @Article{machines5010006,
-AUTHOR = {Pendleton, Scott Drew and Andersen, Hans and Du, Xinxin and Shen, Xiaotong and Meghjani, Malika and Eng, You Hong and Rus, Daniela and Ang, Marcelo H.},
-TITLE = {Perception, Planning, Control, and Coordination for Autonomous Vehicles},
-JOURNAL = {Machines},
-VOLUME = {5},
-YEAR = {2017},
-NUMBER = {1},
-ARTICLE-NUMBER = {6},
-URL = {https://www.mdpi.com/2075-1702/5/1/6},
-ISSN = {2075-1702},
-ABSTRACT = {Autonomous vehicles are expected to play a key role in the future of urban transportation systems, as they offer potential for additional safety, increased productivity, greater accessibility, better road efﬁciency, and positive impact on the environment. Research in autonomous systems has seen dramatic advances in recent years, due to the increases in available computing power and reduced cost in sensing and computing technologies, resulting in maturing technological readiness level of fully autonomous vehicles. The objective of this paper is to provide a general overview of the recent developments in the realm of autonomous vehicle software systems. Fundamental components of autonomous vehicle software are reviewed, and recent developments in each area are discussed.},
-DOI = {10.3390/machines5010006}
+  AUTHOR = {Pendleton, Scott Drew and Andersen, Hans and Du, Xinxin and Shen, Xiaotong and Meghjani, Malika and Eng, You Hong and Rus, Daniela and Ang, Marcelo H.},
+  TITLE = {Perception, Planning, Control, and Coordination for Autonomous Vehicles},
+  JOURNAL = {Machines},
+  VOLUME = {5},
+  YEAR = {2017},
+  NUMBER = {1},
+  ARTICLE-NUMBER = {6},
+  URL = {https://www.mdpi.com/2075-1702/5/1/6},
+  ISSN = {2075-1702},
+  ABSTRACT = {Autonomous vehicles are expected to play a key role in the future of urban transportation systems, as they offer potential for additional safety, increased productivity, greater accessibility, better road efﬁciency, and positive impact on the environment. Research in autonomous systems has seen dramatic advances in recent years, due to the increases in available computing power and reduced cost in sensing and computing technologies, resulting in maturing technological readiness level of fully autonomous vehicles. The objective of this paper is to provide a general overview of the recent developments in the realm of autonomous vehicle software systems. Fundamental components of autonomous vehicle software are reviewed, and recent developments in each area are discussed.},
+  DOI = {10.3390/machines5010006}
 }
 
 @INPROCEEDINGS{functional_architectures,
@@ -97,15 +88,181 @@ DOI = {10.3390/machines5010006}
   doi={10.1109/IVS.2016.7535402}
 }
 
+% SoTA 2.1 ===================================================================
+@InProceedings{FCNs,
+  author = {Long, Jonathan and Shelhamer, Evan and Darrell, Trevor},
+  title = {Fully Convolutional Networks for Semantic Segmentation},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2015}
+} 
+
+@InProceedings{u_net,
+  author="Ronneberger, Olaf and Fischer, Philipp and Brox, Thomas",
+  editor="Navab, Nassir and Hornegger, Joachim and Wells, William M. and Frangi, Alejandro F.",
+  title="U-Net: Convolutional Networks for Biomedical Image Segmentation",
+  booktitle="Medical Image Computing and Computer-Assisted Intervention -- MICCAI 2015",
+  year="2015",
+  publisher="Springer International Publishing",
+  address="Cham",
+  pages="234--241",
+  abstract="There is large consent that successful training of deep networks requires many thousand annotated training samples. In this paper, we present a network and training strategy that relies on the strong use of data augmentation to use the available annotated samples more efficiently. The architecture consists of a contracting path to capture context and a symmetric expanding path that enables precise localization. We show that such a network can be trained end-to-end from very few images and outperforms the prior best method (a sliding-window convolutional network) on the ISBI challenge for segmentation of neuronal structures in electron microscopic stacks. Using the same network trained on transmitted light microscopy images (phase contrast and DIC) we won the ISBI cell tracking challenge 2015 in these categories by a large margin. Moreover, the network is fast. Segmentation of a 512x512 image takes less than a second on a recent GPU. The full implementation (based on Caffe) and the trained networks are available at http://lmb.informatik.uni-freiburg.de/people/ronneber/u-net.",
+  isbn="978-3-319-24574-4"
+}
+
+@misc{VGG,
+  title={Very Deep Convolutional Networks for Large-Scale Image Recognition}, 
+  author={Karen Simonyan and Andrew Zisserman},
+  year={2015},
+  eprint={1409.1556},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/1409.1556}, 
+}
+
+@InProceedings{ResNet,
+  author = {He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian},
+  title = {Deep Residual Learning for Image Recognition},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2016}
+} 
+
+@misc{ditaled_conv,
+  title={Multi-Scale Context Aggregation by Dilated Convolutions}, 
+  author={Fisher Yu and Vladlen Koltun},
+  year={2016},
+  eprint={1511.07122},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/1511.07122}, 
+}
+
+% SoTA 2.2 ===================================================================
+@ARTICLE{3d_traffic_scene_understanding,
+  author={Geiger, Andreas and Lauer, Martin and Wojek, Christian and Stiller, Christoph and Urtasun, Raquel},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, 
+  title={3D Traffic Scene Understanding From Movable Platforms}, 
+  year={2014},
+  volume={36},
+  number={5},
+  pages={1012-1025},
+  keywords={Roads;Vehicles;Layout;Three-dimensional displays;Semantics;Splines (mathematics);Hidden Markov models;Autonomous vehicles;Scene Analysis;Image Processing and Computer Vision;Robotics;3D scene understanding;autonomous driving;3D scene layout estimation},
+  doi={10.1109/TPAMI.2013.185}
+}
+
+@Article{BEV_params_estimation1,
+  AUTHOR = {Lin, Chien-Chuan and Wang, Ming-Shi},
+  TITLE = {A Vision Based Top-View Transformation Model for a Vehicle Parking Assistant},
+  JOURNAL = {Sensors},
+  VOLUME = {12},
+  YEAR = {2012},
+  NUMBER = {4},
+  PAGES = {4431--4446},
+  URL = {https://www.mdpi.com/1424-8220/12/4/4431},
+  PubMedID = {22666038},
+  ISSN = {1424-8220},
+  ABSTRACT = {This paper proposes the Top-View Transformation Model for image coordinate transformation, which involves transforming a perspective projection image into its corresponding bird’s eye vision. A fitting parameters searching algorithm estimates the parameters that are used to transform the coordinates from the source image. Using this approach, it is not necessary to provide any interior and exterior orientation parameters of the camera. The designed car parking assistant system can be installed at the rear end of the car, providing the driver with a clearer image of the area behind the car. The processing time can be reduced by storing and using the transformation matrix estimated from the first image frame for a sequence of video images. The transformation matrix can be stored as the Matrix Mapping Table, and loaded into the embedded platform to perform the transformation. Experimental results show that the proposed approaches can provide a clearer and more accurate bird’s eye view to the vehicle driver.},
+  DOI = {10.3390/s120404431}
+}
+
+@misc{BEV_params_estimation2,
+  title={A Geometric Approach to Obtain a Bird's Eye View from an Image}, 
+  author={Ammar Abbas and Andrew Zisserman},
+  year={2020},
+  eprint={1905.02231},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/1905.02231}, 
+}
+
+@INPROCEEDINGS{Cam2BEV,
+  author={L. {Reiher} and B. {Lampe} and L. {Eckstein}},
+  booktitle={2020 IEEE 23rd International Conference on Intelligent Transportation Systems (ITSC)}, 
+  title={A Sim2Real Deep Learning Approach for the Transformation of Images from Multiple Vehicle-Mounted Cameras to a Semantically Segmented Image in Bird’s Eye View}, 
+  year={2020},
+  doi={10.1109/ITSC45102.2020.9294462}
+}
+
+@misc{HDMapNet,
+  title={HDMapNet: An Online HD Map Construction and Evaluation Framework}, 
+  author={Qi Li and Yue Wang and Yilun Wang and Hang Zhao},
+  year={2022},
+  eprint={2107.06307},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/2107.06307}, 
+}
+
+@InProceedings{PYVA,
+  author    = {Yang, Weixiang and Li, Qi and Liu, Wenxi and Yu, Yuanlong and Ma, Yuexin and He, Shengfeng and Pan, Jia},
+  title     = {Projecting Your View Attentively: Monocular Road Scene Layout Estimation via Cross-View Transformation},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2021},
+  pages     = {15536-15545}
+}
+
+@ARTICLE{view_parsing_network,
+  author={Pan, Bowen and Sun, Jiankai and Leung, Ho Yin Tiga and Andonian, Alex and Zhou, Bolei},
+  journal={IEEE Robotics and Automation Letters}, 
+  title={Cross-View Semantic Segmentation for Sensing Surroundings}, 
+  year={2020},
+  volume={5},
+  number={3},
+  pages={4867-4873},
+  keywords={Semantics;Image segmentation;Virtual private networks;Adaptation models;Robot sensing systems;Task analysis;Semantic scene understanding;deep learning for visual perception;visual learning;visual-based navigation;computer vision for other robotic applications},
+  doi={10.1109/LRA.2020.3004325}
+}
+
+@InProceedings{lift_splat_shoot,
+  author="Philion, Jonah and Fidler, Sanja",
+  editor="Vedaldi, Andrea and Bischof, Horst and Brox, Thomas and Frahm, Jan-Michael",
+  title="Lift, Splat, Shoot: Encoding Images from Arbitrary Camera Rigs by Implicitly Unprojecting to 3D",
+  booktitle="Computer Vision -- ECCV 2020",
+  year="2020",
+  publisher="Springer International Publishing",
+  address="Cham",
+  pages="194--210",
+  abstract="The goal of perception for autonomous vehicles is to extract semantic representations from multiple sensors and fuse these representations into a single ``bird's-eye-view'' coordinate frame for consumption by motion planning. We propose a new end-to-end architecture that directly extracts a bird's-eye-view representation of a scene given image data from an arbitrary number of cameras. The core idea behind our approach is to ``lift'' each image individually into a frustum of features for each camera, then ``splat'' all frustums into a rasterized bird's-eye-view grid. By training on the entire camera rig, we provide evidence that our model is able to learn not only how to represent images but how to fuse predictions from all cameras into a single cohesive representation of the scene while being robust to calibration error. On standard bird's-eye-view tasks such as object segmentation and map segmentation, our model outperforms all baselines and prior work. In pursuit of the goal of learning dense representations for motion planning, we show that the representations inferred by our model enable interpretable end-to-end motion planning by ``shooting'' template trajectories into a bird's-eye-view cost map output by our network. We benchmark our approach against models that use oracle depth from lidar. Project page with code: https://nv-tlabs.github.io/lift-splat-shoot.",
+  isbn="978-3-030-58568-6"
+}
+
+@article{m2bev,
+  title={M\^{} 2BEV: Multi-Camera Joint 3D Detection and Segmentation with Unified Birds-Eye View Representation},
+  author={Xie, Enze and Yu, Zhiding and Zhou, Daquan and Philion, Jonah and Anandkumar, Anima and Fidler, Sanja and Luo, Ping and Alvarez, Jose M},
+  journal={arXiv preprint arXiv:2204.05088},
+  year={2022}
+}
+
+@InProceedings{mono_layout,
+  author = {Mani, Kaustubh and Daga, Swapnil and Garg, Shubhika and Narasimhan, Sai Shankar and Krishna, Madhava and Jatavallabhula, Krishna Murthy},
+  title = {MonoLayout: Amodal scene layout from a single image},
+  booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  year = {2020}
+} 
+
+@misc{BEVFormer,
+  title={BEVFormer: Learning Bird's-Eye-View Representation from Multi-Camera Images via Spatiotemporal Transformers}, 
+  author={Zhiqi Li and Wenhai Wang and Hongyang Li and Enze Xie and Chonghao Sima and Tong Lu and Qiao Yu and Jifeng Dai},
+  year={2022},
+  eprint={2203.17270},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/2203.17270}, 
+}
+
+@misc{fishingnet,
+      title={FISHING Net: Future Inference of Semantic Heatmaps In Grids}, 
+      author={Noureldin Hendy and Cooper Sloan and Feng Tian and Pengfei Duan and Nick Charchut and Yuesong Xie and Chuang Wang and James Philbin},
+      year={2020},
+      eprint={2006.09917},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2006.09917}, 
+}
+
+% Metodology 3.1 =============================================================
 @article{segformer,
-  author    = {Enze Xie and
-               Wenhai Wang and
-               Zhiding Yu and
-               Anima Anandkumar and
-               Jose M. Alvarez and
-               Ping Luo},
-  title     = {SegFormer: Simple and Efficient Design for Semantic Segmentation with
-               Transformers},
+  author    = {Enze Xie and Wenhai Wang and Zhiding Yu and Anima Anandkumar and Jose M. Alvarez and Ping Luo},
+  title     = {SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers},
   journal   = {CoRR},
   volume    = {abs/2105.15203},
   year      = {2021},
@@ -121,11 +278,9 @@ DOI = {10.3390/machines5010006}
     title = "Transformers: State-of-the-Art Natural Language Processing",
     author = "Thomas Wolf and Lysandre Debut and Victor Sanh and Julien Chaumond and Clement Delangue and Anthony Moi and Pierric Cistac and Tim Rault and Rémi Louf and Morgan Funtowicz and Joe Davison and Sam Shleifer and Patrick von Platen and Clara Ma and Yacine Jernite and Julien Plu and Canwen Xu and Teven Le Scao and Sylvain Gugger and Mariama Drame and Quentin Lhoest and Alexander M. Rush",
     booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations",
-    month = oct,
     year = "2020",
     address = "Online",
     publisher = "Association for Computational Linguistics",
     url = "https://www.aclweb.org/anthology/2020.emnlp-demos.6",
     pages = "38--45"
 }
-
