@@ -3,6 +3,7 @@ from scipy.optimize import linear_sum_assignment
 import numpy as np
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import seaborn as sns
 import open3d as o3d
 import textwrap
@@ -16,8 +17,12 @@ from my_utils import get_pallete, DEFAULT_MERGE_DICT, parse_mtl, parse_obj_with_
 from three_d_metrics.open3d_addon import * # 3d metrics
 
 
-from shapely.geometry import Polygon, Point
+from shapely.geometry import MultiPolygon, Polygon, MultiPoint, Point
+from sklearn.cluster import DBSCAN
+from scipy.spatial.distance import pdist, squareform
 from scipy.spatial import Delaunay
+import networkx as nx
+
 import copy
 
 from tqdm import tqdm
@@ -258,7 +263,6 @@ def get_camera_fov_polygon(scene:scl.Scene, camera_depth:float, fov_coord_sys:st
     fov_poly_3d_t = fov_poly_4xN_t[:3].T  # X, Y, Z
     return fov_poly_3d_t[:, :2]
 
-
 def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, bbox:List[float]) -> np.ndarray:
     #bbox: [ x, y, z, rx, ry, rz, sx, sy, sz ]
     center      = bbox[:3]
@@ -267,31 +271,104 @@ def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, 
     corners_3d  = bbox_3d_corners(center, size, rotation)
     bbox_footprint = Polygon(project_to_xy(corners_3d)).buffer(0)
     assert bbox_footprint.contains(bbox_footprint.centroid)
-    fx, fy = bbox_footprint.exterior.xy # For plotting
 
     _, num_rays, num_steps = rays_points.shape
     for j in range(num_rays):
-        plt.plot(fx, fy, color="orange", label="bbox_poly")
         for k in range(num_steps):
             point_2d = Point(rays_points[0, j, k], rays_points[1, j, k])
-            point_2d = bbox_footprint.centroid
-
-            intersections[j, k] = bbox_footprint.contains(point_2d)
-        xs, ys = np.where(intersections == True)
-        xs, ys = rays_points[0, xs, ys], rays_points[1, xs, ys]
-        plt.scatter(rays_points[0, j, :], rays_points[1, j, :], color="blue", label="ray point")
-        plt.scatter(xs, ys, color="red", label="ray point")
-
-        plt.show()
+            intersections[j, k] = 1.0 if bbox_footprint.contains(point_2d) else intersections[j, k]
+        ks = np.where(intersections[j] == 1.0)[0]
+        if len(ks) > 0 and len(intersections[j, ks[-1]:]) > 1: 
+            intersections[j, ks[-1]:] = 2.0 # Occlusion
+    
+    # # Debug plotting
+    # plt.tight_layout()
+    # fx, fy = bbox_footprint.exterior.xy
+    # plt.plot(fx, fy, color="orange")
+    # plt.scatter(rays_points[0, :, :], rays_points[1, :, :], s=0.5, color="blue", label="ray point")
+    # js, ks = np.where(intersections == 1.0)
+    # plt.scatter(rays_points[0, js, ks], rays_points[1, js, ks], s=0.5, color="red", label="intersection")
+    # js, ks = np.where(intersections == 2.0)
+    # plt.scatter(rays_points[0, js, ks], rays_points[1, js, ks], s=0.5, color="black", label="occlusion")
+    # plt.legend()
+    # plt.show()
     return intersections
+def grid_downsampling(xy_points:np.ndarray, grid_size = (10, 10)):
+    # Downsampling
+    x_min, x_max = xy_points[:, 0].min(), xy_points[:, 0].max()
+    y_min, y_max = xy_points[:, 1].min(), xy_points[:, 1].max()
 
+    # Create grid of x and y values based on the min/max bounds
+    x_bins = np.linspace(x_min, x_max, grid_size[0] + 1)
+    y_bins = np.linspace(y_min, y_max, grid_size[1] + 1)
+    x_indices = np.digitize(xy_points[:, 0], x_bins) - 1  # Get x-bin indices
+    y_indices = np.digitize(xy_points[:, 1], y_bins) - 1  # Get y-bin indices
+
+    # Get unique grid cells (we are selecting one point from each cell)
+    unique_cells = np.unique(list(zip(x_indices, y_indices)), axis=0)
+
+    downsampled_points = []
+    for cell in unique_cells:
+        cell_points = xy_points[(x_indices == cell[0]) & (y_indices == cell[1])]
+        downsampled_points.append(cell_points[0])  
+    return np.array(downsampled_points)
+
+def create_multipolygon(rays_points:np.ndarray, js, ks) -> MultiPolygon:
+    # rays_points[(x, y, z), num_ray, num_step]
+    xy_points = rays_points[:2, js, ks].T 
+    db = DBSCAN(eps=0.5, n_jobs=2).fit(xy_points)
+    
+    # Find connected components
+    n_clusters_ = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
+    n_noise_ = list(db.labels_).count(-1)
+    original_indices = list(zip(js, ks))  # Emparejar los índices js y ks con las etiquetas
+    print(f"n_clusters: {n_clusters_} | n_noise: {n_noise_}")
+
+    # Crear un diccionario para almacenar los índices de los puntos que pertenecen a cada cluster
+    clustered_points = {}
+    for idx, label in zip(original_indices, db.labels_):
+        if label == -1:  # Ignorar ruido (-1)
+            continue
+        if label not in clustered_points:
+            clustered_points[label] = []
+        clustered_points[label].append(idx)
+
+    polygons = []
+    for _, indices in clustered_points.items():
+        js_cluster, ks_cluster = zip(*indices)
+        js_cluster, ks_cluster = np.array(js_cluster), np.array(ks_cluster)
+        
+        pts = np.empty((0, 2))
+        pts = np.vstack([ pts, rays_points[:2, js_cluster.min(), ks_cluster ].T ])
+        pts = np.vstack([ pts, rays_points[:2, js_cluster.max(), ks_cluster ].T ])
+        pts = np.vstack([ pts, rays_points[:2, js_cluster, ks_cluster[0]    ].T ])
+        pts = np.vstack([ pts, rays_points[:2, js_cluster, ks_cluster[-1]   ].T ])
+        poly = MultiPoint(pts).convex_hull
+
+        aux = rays_points[:2, js_cluster, ks_cluster].T 
+        plt.scatter(xy_points[:, 0], xy_points[:, 1], s=0.5, color="black", label="original")
+        plt.scatter(aux[:, 0], aux[:, 1], color="red", label="cluster")
+        
+        plt.scatter(pts[:, 0], pts[:, 1], color="blue", label="border")
+        plt.legend()
+        plt.show()
+
+        if poly.is_valid:
+            polygons.append(poly)
+    return MultiPolygon(polygons)
+def plot_ray_polys(ax:Axes, multipolygon:MultiPolygon, color:str, label:str = ""):
+    for poly in multipolygon.geoms:
+        fx, fy = poly.exterior.xy
+        ax.plot(fx, fy, color=color)
+        ax.fill(fx, fy, color=color, alpha=0.3, label=label)
+    return ax
 def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num) -> List[np.ndarray]:
     """Get the occlusion of 3d objects by projecting rays in the top-view
     """
     camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
 
     h, w = camera.height, camera.width
-    d = camera_depth
+    d = 30.0 # camera_depth
     K_3x3 = camera.K_3x3
     fx = K_3x3[0, 0]
     alpha = np.arctan((w/2)/fx)
@@ -326,8 +403,33 @@ def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coor
         if objs_data[i]['coordinate_system'] != 'odom':
             bbox = scene.transform_cuboid(bbox, cs_src=objs_data[i]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
         intersections = bbox_intersects_with_rays(rays_points, intersections, bbox)
+    
+    # Build a Graph -> Identify connected components -> Create Multipolygons
+    js, ks = np.where(intersections == 0.0) # visible
+    visible_points  = rays_points[:, js, ks]
+    visible_polys   = create_multipolygon(rays_points, js, ks)
 
-    return intersections
+    js, ks = np.where(intersections == 1.0) # occuped
+    occuped_points  = rays_points[:, js, ks]
+    occuped_polys   = create_multipolygon(rays_points, js, ks)
+
+    js, ks = np.where(intersections == 2.0) # occluded
+    occluded_points = rays_points[:, js, ks]
+    occluded_polys  = create_multipolygon(rays_points, js, ks)
+    
+    # Debug plotting
+    plt.tight_layout()
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    plt.scatter(visible_points[0],  visible_points[1],  s=0.5, color="blue", label="visible")
+    plt.scatter(occuped_points[0],  occuped_points[1],  s=0.5, color="red", label="intersection")
+    plt.scatter(occluded_points[0], occluded_points[1], s=0.5, color="black", label="occlusion")
+    plot_ray_polys(ax, visible_polys, "blue", label = "visible poly")
+    plot_ray_polys(ax, occuped_polys, "red")
+    plot_ray_polys(ax, occluded_polys, "black")
+    plt.legend()
+    plt.show()
+
+    return rays_points, intersections
 
 
 def rotate_3d(points, angles):
@@ -377,8 +479,6 @@ def check_intersection_with_fov_poly(polygon:Polygon, bbox:List[float]) -> bool:
         # plt.plot(px, py, color="blue")
         # plt.plot(fx, fy, color="orange")
         # plt.show()
-
-
     return polygon.intersects(footprint_2d) # Check intersection
 def get_obj_indices_in_fov(objs_data:List[dict], fov_poly:np.ndarray, camera_name:str, scene:scl.Scene, frame_num:int) -> List[int]:
     """Return the list of indices that intersects with fov_poly on the XY plane
