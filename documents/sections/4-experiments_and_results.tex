@@ -1,0 +1,8 @@
+
+
+
+\subsection{BEV2Seg\_2}
+No se han congelado las capas del encoder para realizar el fine-tuning en el task de segmentación. El preprocesado de las imágenes se ha realizado con \textit{SegformerImageProcessor} aplicando un cambio de tamaño de la imagen a $512 \times 512$, un re-escalado con un factor de $1/255$y un normalizado con los valores de media y desviación típica de ImageNet. De esta forma, aseguramos que el preprocesado realizado es el mismo que el esperado por el encoder.
+
+Además, a la hora de proporcionar las máscaras semánticas de entrenamiento, el parámetro "reduce\_labels" se ha mantenido en \textit{False}, ya que no contamos con la clase "background". Aquellas zonas que no se quieren inferir, como son el fondo y las áreas no etiquetadas, tienen el label "ignore" así que no se calcula gradiente para ellas.
+

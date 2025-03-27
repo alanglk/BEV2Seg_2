@@ -27,16 +27,29 @@ Como se ha analizado en el estado del arte \ref{sota}, existen numerosas técnic
 
 Explicar cómo funciona segformer por encima.
 
-La estrategia de entrenamiento consiste en utilizar encoders ya entrenados de Segformer y finetunearlos para el task específico: segmentación semántica de escenas vehiculares. Concretamente, encontramos 6 tamaños de encoders MIT (Mix Transformer encoder): mit-b0, mit-b1, mit-b2, mit-b3, mit-b4, y mit-b5. Estos encoders están preentrenados en el dataset ImageNet-1K.
+La estrategia de entrenamiento consiste en utilizar encoders ya entrenados de Segformer y finetunearlos para el task específico: segmentación semántica de escenas vehiculares. Concretamente, encontramos 6 tamaños de encoders MIT (Mix Transformer encoder) de segformer: mit-b0, mit-b1, mit-b2, mit-b3, mit-b4, y mit-b5. Estos encoders están preentrenados en el dataset ImageNet-1K.
 
 La implementación de segformer que se ha seleccionado es la proporcionada por huggingface \cite{huggingface}, ya que cuenta con una API sencilla para entrenar y evaluar los modelos, permite el entrenamiento paralelizado en varias GPU y la utilización de varias CPU y también permite ajustar los hyperparámetros y definir funciones específicas para el entrenamiento.
 
-\hl{hablar sobre cómo es el preprocesado de las imágenes para segformer. También el tema de <<reduce labels>> e <<ignore index>> y cual es la configuración de los modelos pre entrenados. También hay que ver si los pesos preentrenados se congelan o se siguen ajustando. En el caso de segmentar con imágenes BEV, los pesos del encoder deberían reajustarse; en el caso de las imágenes normales creo que da más igual}.
+Para realizar los experimentos, se han utilizado los siguientes encoders y se han añadido los lightweight MLP decoder heads de la siguiente tabla. 
 
 \subsubsection{Dataset}
-Existen numerosos datasets 
+There are multiple Datasets for the semantic segmentation task on vehicular images such as 
+In order to train the model on the segmentation task, a valid dataset must be selected. 
 
-City
+CityScapes [] defines $30$ semantic classes and provides $5000$ frames with pixel-level high-quality annotations and $20000$ weakly annotated images. 
+
+KITTI [] provices $400$ annotated images with a $0.5$ split for training and validation following the CityScape annotation format. 
+
+ApolloScape \cite{ApolloScape} which provides $146.997$ frames with corresponding pixel-level annonations and pose information for 25 labels taken from calibrated cameras whose parameters are available.
+
+NuImages, a subset of NuScenes, contains annotated images on 26 different labels.
+
+There are other benchmarks (cite wildDash and search for others) but in orther to train the models a rich dataset is needed. Despite CityScapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it porvided very accurate ego poses and camera parameters and it has a very good documentation.
+
+
+For all of them, the ego pose and camera parameters metadata are provided. 
+
 
 \subsubsection{Data augmentations}
 \subsubsection{Validación y comparación}

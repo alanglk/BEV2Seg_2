@@ -51,7 +51,7 @@ Estructura principal de la memoria del TFM:
 - **Métricas de evaluación**:
     Qué métricas se usan para comparar la calidad de segmentación (IoU, precisión, recall, etc.).
 
-## 5. Evaluación y Resultados
+## 4. Evaluación y Resultados
 
 - **Análisis comparativo de la segmentación BEV**:
     Desempeño de ambos enfoques con gráficos y tablas.
@@ -65,7 +65,7 @@ Estructura principal de la memoria del TFM:
     Interpretación de los resultados en contexto.
     Comparación con estudios previos.
 
-## 6. Conclusiones y Trabajo Futuro
+## 5. Conclusiones y Trabajo Futuro
 
 - **Resumen de hallazgos clave**:
     ¿Cuál enfoque de segmentación BEV funciona mejor y por qué?
