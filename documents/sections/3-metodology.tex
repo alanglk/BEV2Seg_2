@@ -10,7 +10,7 @@ Thus, this project can be divided into three main blocks: \aclink{BEV} semantic 
 \subsection{Segmentation experiment design: BEV2Seg\_2}
 \label{bev2seg_2}
 
-Para abordar la hipótesis de "Un modelo de segmentación semántica entrenado con imágenes BEV segmenta mejor los elementos planares", se ha diseñado el proceso descrito en la Figura \ref{fig:beg2seg_2_flow}. En él se siguen dos rutas principales: la segmentación de imágenes RGB normales y su reproyección con \aclink{IPM} a BEV y realizar \aclink{IPM} de la imagen original para luego realizar la segmentación semántica con el modelo.
+To address the hypotesis that "A semantic segmentation model trained with BEV images better segments planar elements" the process represented in Figure \ref{fig:beg2seg_2_flow} has been designed. It follows two main approaches: first, performing image segmentation on regular RGB images and then reprojecting them to \aclink{BEV}; second, applying \aclink{IPM} to the original images and then segmenting them with the model.
 
 \begin{figure}[h!]
     \centering
@@ -19,10 +19,14 @@ Para abordar la hipótesis de "Un modelo de segmentación semántica entrenado c
     \label{fig:beg2seg_2_flow}
 \end{figure}
 
-Considerando este diagrama de flujo surgen tres cuestiones principales: (1) qué modelo de segmentación utilizar; (2) con qué base de datos entrenar los modelos y (3) cómo realizar la comparación entre los modelos entrenados.
-
+Considering this flowchart, three main questions arises: (1) which segmentation model to use, (2) which dataset to train the models with, and (3) how to compare the train models and select the optimal output of the pipeline. 
 
 \subsubsection{Segformer}
+There are multiple techniques and estrategies which address the semantic segmentation task in regular and \aclink{BEV} images \ref{sota_semantic_segmentation} \ref{sota_BEV_semantic_segmentation}. 
+
+After some quick inference tests on some models 
+
+
 Como se ha analizado en el estado del arte \ref{sota}, existen numerosas técnicas para abordar el task de la segmentación semántica y varias de estas técnicas ya se han aplicado al contexto de la segmentación semántica en BEV en el contexto de los \aclink{ADS}. En este punto nos encontramos ante una gran variedad de opciones entre las que elegir. Una de ellas es si optar por modelos CNN o ViT. Tras varias pruebas de distintos modelos \cite{dummy} \cite{dummy} \cite{dummy} se ha tomado la decisión de utilizar segformer \cite{segformer}, un ViT para segmentación semántica que destaca por su eficiencia y rendimiento que consigue resultados del estado del arte.
 
 Explicar cómo funciona segformer por encima.
@@ -45,7 +49,11 @@ ApolloScape \cite{ApolloScape} which provides $146.997$ frames with correspondin
 
 NuImages, a subset of NuScenes, contains annotated images on 26 different labels.
 
-There are other benchmarks (cite wildDash and search for others) but in orther to train the models a rich dataset is needed. Despite CityScapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it porvided very accurate ego poses and camera parameters and it has a very good documentation.
+There are other benchmarks (cite wildDash and search for others) but in orther to train the models a rich dataset is needed. Despite CityScapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it porvided very accurate ego poses and camera parameters and it has a very good documentation. Also, 
+
+
+
+
 
 
 For all of them, the ego pose and camera parameters metadata are provided. 
