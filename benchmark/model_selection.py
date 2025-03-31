@@ -82,7 +82,7 @@ def segformer(segformer_out_path:str):
             image_pil, label_pil = cs_eval_dataset.__getitem__(idx)
             image_path = cs_eval_dataset.images[idx]
             image_name = os.path.basename(image_path).replace("_leftImg8bit.png", "_gtFine_labelIds.png") 
-            print(image_name)
+            
             # Image preprocessing
             encoding = feature_extractor(images=image_pil, return_tensors="pt")  
             encoding = {k: v.to(device) for k, v in encoding.items()}  
@@ -135,3 +135,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
