@@ -15,57 +15,86 @@ To address the hypotesis that "A semantic segmentation model trained with BEV im
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./images/metodology/bev2seg_2_flow.png}
-    \caption{bev2seg\_2 diagram flow}
+    \caption{bev2seg\_2 diagram flow.}
     \label{fig:beg2seg_2_flow}
 \end{figure}
 
 Considering this flowchart, three main questions arises: (1) which segmentation model to use, (2) which dataset to train the models with, and (3) how to compare the train models and select the optimal output of the pipeline. 
 
 \subsubsection{Segformer}
-There are multiple techniques and estrategies which address the semantic segmentation task in regular and \aclink{BEV} images \ref{sota_semantic_segmentation} \ref{sota_BEV_semantic_segmentation}. 
+There are multiple techniques and strategies for tackling semantic segmentation in both regular and \aclink{BEV} images \ref{sota}.  
 
-After some quick inference tests on some models 
+Several models could be chosen to address the proposed hypothesis. The current state of the art includes both \aclink{CNN} and \aclink{ViT}-based models that achieve competitive results. As shown in Figure \ref{tab:model_comparison}, there is no significant difference in accuracy and inference speed among the top-performing models. Moreover, many of these models have already been applied in the context of \aclink{ADS}. In this work, Segformer \cite{segformer} has been selected as the semantic segmentation model due to its balance between performance and efficiency. Additionally, it is integrated into the Huggingface \cite{huggingface} ecosystem, which provides an optimized, parallelized implementation, facilitating distributed training.  
 
-
-Como se ha analizado en el estado del arte \ref{sota}, existen numerosas técnicas para abordar el task de la segmentación semántica y varias de estas técnicas ya se han aplicado al contexto de la segmentación semántica en BEV en el contexto de los \aclink{ADS}. En este punto nos encontramos ante una gran variedad de opciones entre las que elegir. Una de ellas es si optar por modelos CNN o ViT. Tras varias pruebas de distintos modelos \cite{dummy} \cite{dummy} \cite{dummy} se ha tomado la decisión de utilizar segformer \cite{segformer}, un ViT para segmentación semántica que destaca por su eficiencia y rendimiento que consigue resultados del estado del arte.
-
-Explicar cómo funciona segformer por encima.
-
-La estrategia de entrenamiento consiste en utilizar encoders ya entrenados de Segformer y finetunearlos para el task específico: segmentación semántica de escenas vehiculares. Concretamente, encontramos 6 tamaños de encoders MIT (Mix Transformer encoder) de segformer: mit-b0, mit-b1, mit-b2, mit-b3, mit-b4, y mit-b5. Estos encoders están preentrenados en el dataset ImageNet-1K.
-
-La implementación de segformer que se ha seleccionado es la proporcionada por huggingface \cite{huggingface}, ya que cuenta con una API sencilla para entrenar y evaluar los modelos, permite el entrenamiento paralelizado en varias GPU y la utilización de varias CPU y también permite ajustar los hyperparámetros y definir funciones específicas para el entrenamiento.
-
-Para realizar los experimentos, se han utilizado los siguientes encoders y se han añadido los lightweight MLP decoder heads de la siguiente tabla. 
-
-\subsubsection{Dataset}
-There are multiple Datasets for the semantic segmentation task on vehicular images such as 
-In order to train the model on the segmentation task, a valid dataset must be selected. 
-
-CityScapes [] defines $30$ semantic classes and provides $5000$ frames with pixel-level high-quality annotations and $20000$ weakly annotated images. 
-
-KITTI [] provices $400$ annotated images with a $0.5$ split for training and validation following the CityScape annotation format. 
-
-ApolloScape \cite{ApolloScape} which provides $146.997$ frames with corresponding pixel-level annonations and pose information for 25 labels taken from calibrated cameras whose parameters are available.
-
-NuImages, a subset of NuScenes, contains annotated images on 26 different labels.
-
-There are other benchmarks (cite wildDash and search for others) but in orther to train the models a rich dataset is needed. Despite CityScapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it porvided very accurate ego poses and camera parameters and it has a very good documentation. Also, 
+\begin{table}[h]
+    \centering
+    \resizebox{\linewidth}{!}{%
+    \begin{tabular}{l l c c c}
+        \toprule
+        \textbf{Model Name} & \textbf{Encoder} & \textbf{Params (M)} $\downarrow$ & \textbf{FPS} $\uparrow$ & \textbf{Cityscapes test mIoU ($\%$)} $\uparrow$ \\
+        \midrule
+        DDRNet-39       & -             & 32.3      & -         & 80.4 \\
+        PIDNet-L        & -             & 36.9      & -         & 80.6 \\      
+        DeeplabV3+      & ResNet-101    & 62.7      & 1.2       & 80.9 \\
+        SETR            & ViT-Large     & 318.3     & 0.5       & 82.2 \\
+        Segformer       & MiT-B4        & 64.1      & 3.0       & 83.8 \\
+        \bottomrule
+    \end{tabular}%
+    }
+    \caption{Comparison of different models. Results are obtained from \cite{DDRNet} \cite{PIDNet} \cite{segformer}.  }
+    \label{tab:model_comparison}
+\end{table}
 
 
+The Segformer model consists on an hierarchical Transformer  encoder, which extract coarse and fine features, and a lightweight \aclink{MLP} decoder to directly fuse these multiscale features and predict the segmentation mask (Figure \ref{fig:segformer_architecture}). Segformer comes with a series of Mix Transformer encoders (MiT) that share the same architecture but have different sizes: from MiT-B0 as the lightweigtest encoder for realtime inference, to MiT-B5 for best performance.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{images/metodology/segformer_architecture.png}
+    \caption{Segformer architecture}
+    \label{fig:segformer_architecture}
+\end{figure}
+
+The training strategy involves using pretrained encoders from ImageNet-1K, attaching an untrained segmentation head decoder, and fine-tuning the entire model for semantic segmentation of vehicular scenes. Since the objective is to train the models directly on \aclink{BEV} images, which differ significantly from standard perspective images, the encoder layers will remain trainable rather than being frozen.
 
 
+\subsubsection{BEVDataset}
+In order to train the model on the segmentation task, a valid dataset must be selected. There are several semantic segmentation datasets for the \aclink{ADS} context such as Cityscapes \cite{Cityscapes}, that defines $30$ semantic classes and provides $5.000$ frames with pixel-level high-quality annotations and $20.000$ weakly annotated images; KITTI \cite{KITTI}, which provices $400$ annotated images with a $0.5$ split for training and validation following the Cityscapes annotation format; ApolloScape \cite{ApolloScape}, that provides $146.997$ frames with corresponding pixel-level annonations and pose information for $25$ labels; or NuImages, a subset of NuScenes \cite{nuscenes}, that contains annotated images on $26$ different labels. For all of them, the ego pose and camera parameters metadata are provided. 
 
+There are other benchmarks \cite{WildDash} \cite{CamVid} but in orther to train the models a rich dataset is needed. Despite Cityscapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it provides very accurate ego poses and camera parameters, it has 3D annotations and it has a very good documentation.
 
-For all of them, the ego pose and camera parameters metadata are provided. 
+NuImages contains around $93.000$ samples with aproximately $80\%$ reserved for the training set and $20\%$ for validation. Additionally, NuImages includes a private test set reserved for benchmark evaluations, whose annotations are not publicly available.
+
+To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset named BEVDataset. This dataset has all front-camera images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further splitted to ensure fair comparisons between models from different pipelines.
+
+The conversion process is performed using a custom parser named "OLDatasets", which transforms NuImages samples into the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format, where metadata for each frame is stored. In the case of BEVDataset, images are reprojected into the \aclink{BEV} domain using the \aclink{VCD} library. This library provides tools to handle OpenLABEL annotations and manage both 2D and 3D data efficiently.
+
+The "OLDatasets" parser extracts the camera parameters for each sample and computes a \aclink{LUT} to apply \aclink{IPM} reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the \aclink{BEV} space. Since this reprojection involves image warping, the interpolation method must be carefully chosen:
+\begin{itemize}
+    \item Linear interpolation is applied to images.
+    \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
+\end{itemize}
+
+The virtual \aclink{BEV} camera parameters are fixed: the \aclink{BEV} reprojection is generated using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the camera and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
+
+Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure \ref{fig:bev_dataset}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{images/metodology/BEVDataset.png}
+    \caption{BEVDataset structure and mini set samples}
+    \label{fig:bev_dataset}
+\end{figure}
 
 
 \subsubsection{Data augmentations}
-\subsubsection{Validación y comparación}
-Se ha utilizado mIou per class para la evaluación durante el entrenamiento y la comparación de los dos aproaches.
+Data augmentations in \aclink{BEV} are not an easy task...
 
+\subsubsection{Validation and comparison}
+Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.
 
 \subsection{ Driveable area automatic annotation}
-\label{aplicacion}
+\label{aplication}
 
 \subsubsection{Depth estimation}
 \subsubsection{Scene PCD}
@@ -77,6 +106,6 @@ Se ha utilizado mIou per class para la evaluación durante el entrenamiento y la
 
 \subsubsection{3D detections evaluations}
 \subsubsection{BEV masks evaluation}
-\hl{se podrían generar las máscaras BEV a partir del groundtruth}
+\hl{Groundtruth BEV masks could be generated from annotations}
 
 

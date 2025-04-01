@@ -129,4 +129,22 @@ Thus, this project can be divided into three main blocks: (BEV) semantic segment
 
 
 
+### 3.1.2 Dataset
+
+NuImages contains **93,000** samples, with approximately **80%** allocated for the training set and **20%** for validation. Additionally, NuImages includes a private test set reserved for benchmark evaluations, whose annotations are not publicly available.
+
+To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset called **BEVDataset**. This dataset includes all front-facing images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further split to ensure fair comparisons between models from different pipelines.
+
+The conversion process is performed using a custom parser named **"oldatasets"**, which transforms NuImages into the structured **OpenLABEL** format, where metadata for each frame or sample is stored. In the case of BEVDataset, images are reprojected into the **BEV** domain using the **Video Content Descriptor (VCD)** library. This library provides tools to handle OpenLABEL annotations and manage both **2D** and **3D** data efficiently.
+
+The "oldatasets" parser extracts the camera parameters for each sample and computes a **lookup table (LUT)** to apply **Inverse Perspective Mapping (IPM)** reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the BEV space. Since this reprojection involves **image warping**, the interpolation method must be carefully chosen:
+- **Linear interpolation** is applied to images.
+- **Nearest neighbor interpolation** is used for masks to preserve pixel class integrity.
+
+The virtual BEV camera parameters remain fixed, as shown in Table \ref{tab:bev_camera_params}.
+
+The final BEVDataset contains a total of **16,427 images**, distributed as follows:
+- **80%** for training,
+- **10%** for validation,
+- **10%** for testing.
 

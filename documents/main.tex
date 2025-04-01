@@ -144,6 +144,17 @@
 \definecolor{table_gray}{HTML}{C0C0C0}
 \definecolor{table_red}{HTML}{fb4952}
 
+% Palette colors
+\definecolor{palette_red_1}{HTML}{F44336}
+\definecolor{palette_red_2}{HTML}{EF5350}
+\definecolor{palette_red_3}{HTML}{F1464E}
+\definecolor{palette_yellow_1}{HTML}{FF9800}
+\definecolor{palette_green_1}{HTML}{4CAF50}
+\definecolor{palette_green_2}{HTML}{86BB48}
+\definecolor{palette_green_3}{HTML}{39C39E}
+\definecolor{palette_blue_1}{HTML}{0277BD}
+\definecolor{palette_blue_2}{HTML}{0097A7}
+\definecolor{palette_blue_3}{HTML}{2AB0D2}
 
 % Incluye todas las entradas del archivo .bib en la bibliografía
 \nocite{*}
@@ -205,12 +216,13 @@
 % \section*{acknowledgements}
 % \label{acknowledgements}
 % \input{acknowledgements.tex}
-% 
 % \newpage
-% \section{Annexes}
-% \input{annexes}
+%
 
 \newpage\printbibliography
 \addcontentsline{toc}{section}{References}
+\newpage
 
+\section*{Annexes}
+\input{annexes.tex}
 \end{document}
