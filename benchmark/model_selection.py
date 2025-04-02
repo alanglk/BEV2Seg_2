@@ -76,7 +76,8 @@ def segformer(segformer_out_path:str):
     # Measure FPS
     inference_times = []
     fps_values = []
-    
+
+
     with torch.no_grad():
         for idx in tqdm(range(cs_num_images), desc="Evaluating"):
             image_pil, label_pil = cs_eval_dataset.__getitem__(idx)

@@ -75,7 +75,7 @@ The "OLDatasets" parser extracts the camera parameters for each sample and compu
     \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
 \end{itemize}
 
-The virtual \aclink{BEV} camera parameters are fixed: the \aclink{BEV} reprojection is generated using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the camera and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
+The virtual \aclink{BEV} camera parameters are fixed: \aclink{BEV} reprojection is generated using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the camera and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
 
 Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure \ref{fig:bev_dataset}.
 
@@ -88,7 +88,75 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
 
 
 \subsubsection{Data augmentations}
-Data augmentations in \aclink{BEV} are not an easy task...
+Data augmentations are commonly used in deep learning models to mitigate overfittings during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
+
+Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
+
+Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image can lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure \ref{fig:bev_cropping}). Similarly, applying random horizontal flipping to a \aclink{BEV} image would merely create the illusion that the image was captured from a rear-facing camera rather than providing meaningful variation.
+
+% TODO: Las imagenes y máscaras no coinciden
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{c c c c c c c c}
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_0.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_0_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_4.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_6.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_1_7.png} \\ 
+        
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_0.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_0_1.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_2.png} &
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_3.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_4.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_5.png} &
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_6.png} &
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_1_7.png} \\ 
+    \end{tabular}
+    
+    \caption{Random cropping and horizontal flipping on BEV images}
+    \label{fig:bev_cropping}
+\end{figure}
+
+In this context, a different approach was considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique enables the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure \ref{fig:bev_data_aug}).
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{c c c c c c}
+        & $-0.25$ rad & $-0.125$ rad & $0.0$ rad & $0.125$ rad & $0.25$ rad \\ 
+        
+        \rotatebox{90}{\textbf{Yaw}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.25_4.png} \\ 
+        
+        \rotatebox{90}{\textbf{Pitch}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.25_4.png} \\ 
+        
+        \rotatebox{90}{\textbf{Roll}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.25_4.png} \\ 
+    \end{tabular}
+    
+    \caption{Effect of camera transformations on BEV projection. The first row shows variations in the yaw axis, the second in pitch, and the third in roll.}
+    \label{fig:bev_data_aug}
+\end{figure}
 
 \subsubsection{Validation and comparison}
 Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.

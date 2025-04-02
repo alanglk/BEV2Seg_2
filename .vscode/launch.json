@@ -9,6 +9,7 @@
             "args": ["${file}"],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
+                "REQUESTS_CA_BUNDLE": "/usr/local/share/ca-certificates/fireware-https-proxy-ca.crt"
                 
             },
             "justMyCode": true
@@ -22,6 +23,7 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // Establecer el PYTHONPATH para todo el proyecto
+                "REQUESTS_CA_BUNDLE": "/usr/local/share/ca-certificates/fireware-https-proxy-ca.crt",
                 "CUDA_VISIBLE_DEVICES": "1,2"
             }
         },
@@ -32,7 +34,8 @@
             "program": "${workspaceFolder}/src/main.py", // Esto ejecuta el archivo que esté abierto
             "console": "integratedTerminal",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}" // Establecer el PYTHONPATH para todo el proyecto
+                "PYTHONPATH": "${workspaceFolder}", // Establecer el PYTHONPATH para todo el proyecto
+                "REQUESTS_CA_BUNDLE": "/usr/local/share/ca-certificates/fireware-https-proxy-ca.crt",
             }
         },
         {
