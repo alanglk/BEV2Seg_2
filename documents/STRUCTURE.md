@@ -51,7 +51,7 @@ Estructura principal de la memoria del TFM:
 - **Métricas de evaluación**:
     Qué métricas se usan para comparar la calidad de segmentación (IoU, precisión, recall, etc.).
 
-## 5. Evaluación y Resultados
+## 4. Evaluación y Resultados
 
 - **Análisis comparativo de la segmentación BEV**:
     Desempeño de ambos enfoques con gráficos y tablas.
@@ -65,7 +65,7 @@ Estructura principal de la memoria del TFM:
     Interpretación de los resultados en contexto.
     Comparación con estudios previos.
 
-## 6. Conclusiones y Trabajo Futuro
+## 5. Conclusiones y Trabajo Futuro
 
 - **Resumen de hallazgos clave**:
     ¿Cuál enfoque de segmentación BEV funciona mejor y por qué?
@@ -129,4 +129,30 @@ Thus, this project can be divided into three main blocks: (BEV) semantic segment
 
 
 
+### 3.1.2 Dataset
 
+NuImages contains **93,000** samples, with approximately **80%** allocated for the training set and **20%** for validation. Additionally, NuImages includes a private test set reserved for benchmark evaluations, whose annotations are not publicly available.
+
+To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset called **BEVDataset**. This dataset includes all front-facing images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further split to ensure fair comparisons between models from different pipelines.
+
+The conversion process is performed using a custom parser named **"oldatasets"**, which transforms NuImages into the structured **OpenLABEL** format, where metadata for each frame or sample is stored. In the case of BEVDataset, images are reprojected into the **BEV** domain using the **Video Content Descriptor (VCD)** library. This library provides tools to handle OpenLABEL annotations and manage both **2D** and **3D** data efficiently.
+
+The "oldatasets" parser extracts the camera parameters for each sample and computes a **lookup table (LUT)** to apply **Inverse Perspective Mapping (IPM)** reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the BEV space. Since this reprojection involves **image warping**, the interpolation method must be carefully chosen:
+- **Linear interpolation** is applied to images.
+- **Nearest neighbor interpolation** is used for masks to preserve pixel class integrity.
+
+The virtual BEV camera parameters remain fixed, as shown in Table \ref{tab:bev_camera_params}.
+
+The final BEVDataset contains a total of **16,427 images**, distributed as follows:
+- **80%** for training,
+- **10%** for validation,
+- **10%** for testing.
+
+### 3.1.3 Data Augmentations
+Data augmentations are commonly used in deep learning models to mitigate overfittings during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in BEV is not an easy task, as IPM images are already homographies of camera images, resulting in inherent distorsions.
+
+Filtering operations can be applied to both standard and \aclink{BEV} images, though they come with certain drawbacks. For camera domain images, geometric transformations were selected as the primary data augmentation method, following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.  
+
+Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image can lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure \ref{fig:bev_cropping}). Similarly, applying random horizontal flipping to a \aclink{BEV} image would merely create the illusion that the image was captured from a rear-facing camera rather than providing meaningful variation.  
+
+In light of these challenges, a different approach was considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique enables the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure \ref{fig:bev_data_aug}).

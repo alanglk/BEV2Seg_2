@@ -10,41 +10,159 @@ Thus, this project can be divided into three main blocks: \aclink{BEV} semantic 
 \subsection{Segmentation experiment design: BEV2Seg\_2}
 \label{bev2seg_2}
 
-Para abordar la hipótesis de "Un modelo de segmentación semántica entrenado con imágenes BEV segmenta mejor los elementos planares", se ha diseñado el proceso descrito en la Figura \ref{fig:beg2seg_2_flow}. En él se siguen dos rutas principales: la segmentación de imágenes RGB normales y su reproyección con \aclink{IPM} a BEV y realizar \aclink{IPM} de la imagen original para luego realizar la segmentación semántica con el modelo.
+To address the hypotesis that "A semantic segmentation model trained with BEV images better segments planar elements" the process represented in Figure \ref{fig:beg2seg_2_flow} has been designed. It follows two main approaches: first, performing image segmentation on regular RGB images and then reprojecting them to \aclink{BEV}; second, applying \aclink{IPM} to the original images and then segmenting them with the model.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./images/metodology/bev2seg_2_flow.png}
-    \caption{bev2seg\_2 diagram flow}
+    \caption{bev2seg\_2 diagram flow.}
     \label{fig:beg2seg_2_flow}
 \end{figure}
 
-Considerando este diagrama de flujo surgen tres cuestiones principales: (1) qué modelo de segmentación utilizar; (2) con qué base de datos entrenar los modelos y (3) cómo realizar la comparación entre los modelos entrenados.
-
+Considering this flowchart, three main questions arises: (1) which segmentation model to use, (2) which dataset to train the models with, and (3) how to compare the train models and select the optimal output of the pipeline. 
 
 \subsubsection{Segformer}
-Como se ha analizado en el estado del arte \ref{sota}, existen numerosas técnicas para abordar el task de la segmentación semántica y varias de estas técnicas ya se han aplicado al contexto de la segmentación semántica en BEV en el contexto de los \aclink{ADS}. En este punto nos encontramos ante una gran variedad de opciones entre las que elegir. Una de ellas es si optar por modelos CNN o ViT. Tras varias pruebas de distintos modelos \cite{dummy} \cite{dummy} \cite{dummy} se ha tomado la decisión de utilizar segformer \cite{segformer}, un ViT para segmentación semántica que destaca por su eficiencia y rendimiento que consigue resultados del estado del arte.
+There are multiple techniques and strategies for tackling semantic segmentation in both regular and \aclink{BEV} images \ref{sota}.  
 
-Explicar cómo funciona segformer por encima.
+Several models could be chosen to address the proposed hypothesis. The current state of the art includes both \aclink{CNN} and \aclink{ViT}-based models that achieve competitive results. As shown in Figure \ref{tab:model_comparison}, there is no significant difference in accuracy and inference speed among the top-performing models. Moreover, many of these models have already been applied in the context of \aclink{ADS}. In this work, Segformer \cite{segformer} has been selected as the semantic segmentation model due to its balance between performance and efficiency. Additionally, it is integrated into the Huggingface \cite{huggingface} ecosystem, which provides an optimized, parallelized implementation, facilitating distributed training.  
 
-La estrategia de entrenamiento consiste en utilizar encoders ya entrenados de Segformer y finetunearlos para el task específico: segmentación semántica de escenas vehiculares. Concretamente, encontramos 6 tamaños de encoders MIT (Mix Transformer encoder): mit-b0, mit-b1, mit-b2, mit-b3, mit-b4, y mit-b5. Estos encoders están preentrenados en el dataset ImageNet-1K.
+\begin{table}[h]
+    \centering
+    \resizebox{\linewidth}{!}{%
+    \begin{tabular}{l l c c c}
+        \toprule
+        \textbf{Model Name} & \textbf{Encoder} & \textbf{Params (M)} $\downarrow$ & \textbf{FPS} $\uparrow$ & \textbf{Cityscapes test mIoU ($\%$)} $\uparrow$ \\
+        \midrule
+        DDRNet-39       & -             & 32.3      & -         & 80.4 \\
+        PIDNet-L        & -             & 36.9      & -         & 80.6 \\      
+        DeeplabV3+      & ResNet-101    & 62.7      & 1.2       & 80.9 \\
+        SETR            & ViT-Large     & 318.3     & 0.5       & 82.2 \\
+        Segformer       & MiT-B4        & 64.1      & 3.0       & 83.8 \\
+        \bottomrule
+    \end{tabular}%
+    }
+    \caption{Comparison of different models. Results are obtained from \cite{DDRNet} \cite{PIDNet} \cite{segformer}.  }
+    \label{tab:model_comparison}
+\end{table}
 
-La implementación de segformer que se ha seleccionado es la proporcionada por huggingface \cite{huggingface}, ya que cuenta con una API sencilla para entrenar y evaluar los modelos, permite el entrenamiento paralelizado en varias GPU y la utilización de varias CPU y también permite ajustar los hyperparámetros y definir funciones específicas para el entrenamiento.
 
-\hl{hablar sobre cómo es el preprocesado de las imágenes para segformer. También el tema de <<reduce labels>> e <<ignore index>> y cual es la configuración de los modelos pre entrenados. También hay que ver si los pesos preentrenados se congelan o se siguen ajustando. En el caso de segmentar con imágenes BEV, los pesos del encoder deberían reajustarse; en el caso de las imágenes normales creo que da más igual}.
+The Segformer model consists on an hierarchical Transformer  encoder, which extract coarse and fine features, and a lightweight \aclink{MLP} decoder to directly fuse these multiscale features and predict the segmentation mask (Figure \ref{fig:segformer_architecture}). Segformer comes with a series of Mix Transformer encoders (MiT) that share the same architecture but have different sizes: from MiT-B0 as the lightweigtest encoder for realtime inference, to MiT-B5 for best performance.
 
-\subsubsection{Dataset}
-Existen numerosos datasets 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{images/metodology/segformer_architecture.png}
+    \caption{Segformer architecture}
+    \label{fig:segformer_architecture}
+\end{figure}
 
-City
+The training strategy involves using pretrained encoders from ImageNet-1K, attaching an untrained segmentation head decoder, and fine-tuning the entire model for semantic segmentation of vehicular scenes. Since the objective is to train the models directly on \aclink{BEV} images, which differ significantly from standard perspective images, the encoder layers will remain trainable rather than being frozen.
+
+
+\subsubsection{BEVDataset}
+In order to train the model on the segmentation task, a valid dataset must be selected. There are several semantic segmentation datasets for the \aclink{ADS} context such as Cityscapes \cite{Cityscapes}, that defines $30$ semantic classes and provides $5.000$ frames with pixel-level high-quality annotations and $20.000$ weakly annotated images; KITTI \cite{KITTI}, which provices $400$ annotated images with a $0.5$ split for training and validation following the Cityscapes annotation format; ApolloScape \cite{ApolloScape}, that provides $146.997$ frames with corresponding pixel-level annonations and pose information for $25$ labels; or NuImages, a subset of NuScenes \cite{nuscenes}, that contains annotated images on $26$ different labels. For all of them, the ego pose and camera parameters metadata are provided. 
+
+There are other benchmarks \cite{WildDash} \cite{CamVid} but in orther to train the models a rich dataset is needed. Despite Cityscapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it provides very accurate ego poses and camera parameters, it has 3D annotations and it has a very good documentation.
+
+NuImages contains around $93.000$ samples with aproximately $80\%$ reserved for the training set and $20\%$ for validation. Additionally, NuImages includes a private test set reserved for benchmark evaluations, whose annotations are not publicly available.
+
+To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset named BEVDataset. This dataset has all front-camera images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further splitted to ensure fair comparisons between models from different pipelines.
+
+The conversion process is performed using a custom parser named "OLDatasets", which transforms NuImages samples into the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format, where metadata for each frame is stored. In the case of BEVDataset, images are reprojected into the \aclink{BEV} domain using the \aclink{VCD} library. This library provides tools to handle OpenLABEL annotations and manage both 2D and 3D data efficiently.
+
+The "OLDatasets" parser extracts the camera parameters for each sample and computes a \aclink{LUT} to apply \aclink{IPM} reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the \aclink{BEV} space. Since this reprojection involves image warping, the interpolation method must be carefully chosen:
+\begin{itemize}
+    \item Linear interpolation is applied to images.
+    \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
+\end{itemize}
+
+The virtual \aclink{BEV} camera parameters are fixed: \aclink{BEV} reprojection is generated using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the camera and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
+
+Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure \ref{fig:bev_dataset}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{images/metodology/BEVDataset.png}
+    \caption{BEVDataset structure and mini set samples}
+    \label{fig:bev_dataset}
+\end{figure}
+
 
 \subsubsection{Data augmentations}
-\subsubsection{Validación y comparación}
-Se ha utilizado mIou per class para la evaluación durante el entrenamiento y la comparación de los dos aproaches.
+Data augmentations are commonly used in deep learning models to mitigate overfittings during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
 
+Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
+
+Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image can lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure \ref{fig:bev_cropping}). Similarly, applying random horizontal flipping to a \aclink{BEV} image would merely create the illusion that the image was captured from a rear-facing camera rather than providing meaningful variation.
+
+% TODO: Las imagenes y máscaras no coinciden
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{c c c c c c c c}
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_0.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_0_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_4.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_6.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_1_7.png} \\ 
+        
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_0.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_0_1.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_2.png} &
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_3.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_4.png} & 
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_5.png} &
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_6.png} &
+        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_1_7.png} \\ 
+    \end{tabular}
+    
+    \caption{Random cropping and horizontal flipping on BEV images}
+    \label{fig:bev_cropping}
+\end{figure}
+
+In this context, a different approach was considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique enables the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure \ref{fig:bev_data_aug}).
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{c c c c c c}
+        & $-0.25$ rad & $-0.125$ rad & $0.0$ rad & $0.125$ rad & $0.25$ rad \\ 
+        
+        \rotatebox{90}{\textbf{Yaw}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.25_4.png} \\ 
+        
+        \rotatebox{90}{\textbf{Pitch}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.25_4.png} \\ 
+        
+        \rotatebox{90}{\textbf{Roll}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.25_4.png} \\ 
+    \end{tabular}
+    
+    \caption{Effect of camera transformations on BEV projection. The first row shows variations in the yaw axis, the second in pitch, and the third in roll.}
+    \label{fig:bev_data_aug}
+\end{figure}
+
+\subsubsection{Validation and comparison}
+Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.
 
 \subsection{ Driveable area automatic annotation}
-\label{aplicacion}
+\label{aplication}
 
 \subsubsection{Depth estimation}
 \subsubsection{Scene PCD}
@@ -56,6 +174,6 @@ Se ha utilizado mIou per class para la evaluación durante el entrenamiento y la
 
 \subsubsection{3D detections evaluations}
 \subsubsection{BEV masks evaluation}
-\hl{se podrían generar las máscaras BEV a partir del groundtruth}
+\hl{Groundtruth BEV masks could be generated from annotations}
 
 
