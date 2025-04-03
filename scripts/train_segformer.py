@@ -93,7 +93,8 @@ def main(config: dict):
 
     # Optional args
     ls_steps                = config['training']['ls_steps']                if 'ls_steps' in config['training']                 else 100
-    data_augmentations      = config['training']['data_augmentations']      if 'data_augmentations' in config['training']       else False
+    data_augmentation       = config['training']['data_augmentation']       if 'data_augmentation' in config['training']        else False
+    data_augmentation_type  = config['training']['data_augmentation_type']  if 'data_augmentation_type' in config['training']   else "use_torch_transforms"
     num_workers             = config['training']['dataloader_num_workers']  if 'dataloader_num_workers' in config['training']   else 0
     val_acc_steps           = config['training']['val_acc_steps']           if 'val_acc_steps' in config['training']            else None
     resume_from_checkpoint  = config['training']['resume_from_checkpoint']  if 'resume_from_checkpoint' in config['training']   else False
@@ -107,23 +108,35 @@ def main(config: dict):
     
     # Data Augmentations
     transforms = None 
-    if data_augmentations:
+    if data_augmentation:
         # Defined depending on the Dataset Type
         if dataset_type == 'BEVDataset':
-            transforms = {
-                'multiple_rotations':False,
-                'use_random': True,
-                'rx': (0.0, 0.0),
-                'ry': (-0.25, 0.25),
-                'rz': (-0.25, 0.25)
-            }
+            if data_augmentation_type == "use_torch_transforms":
+                transforms = v2.Compose([
+                    v2.RandomResizedCrop(size=(512, 512), ratio=(0.5, 2.0)),
+                    v2.RandomHorizontalFlip(p=0.5)
+                ])
+            elif data_augmentation_type == "use_custom_bev_transforms":
+                transforms = {
+                    'multiple_rotations':False,
+                    'use_random': True,
+                    'rx': (0.0, 0.0),
+                    'ry': (-0.25, 0.25),
+                    'rz': (-0.25, 0.25)
+                }
+            else:
+                raise Exception(f"ERROR: Unknow data augmentation type: {data_augmentation_type}")
+            
         elif dataset_type == 'NuImages':
             pass
         elif dataset_type == 'NuImagesFormatted':
-            transforms = v2.Compose([
-                v2.RandomResizedCrop(size=(512, 512), ratio=(0.5, 2.0)),
-                v2.RandomHorizontalFlip(p=0.5)
-            ])
+            if data_augmentation_type == "use_torch_transforms":
+                transforms = v2.Compose([
+                    v2.RandomResizedCrop(size=(512, 512), ratio=(0.5, 2.0)),
+                    v2.RandomHorizontalFlip(p=0.5)
+                ])
+            else:
+                raise Exception(f"ERROR: Unknow data augmentation type: {data_augmentation_type}")
     
     # Image Processor
     image_processor = SegformerImageProcessor(reduce_labels=False)
