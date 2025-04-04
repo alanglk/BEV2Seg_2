@@ -1,9 +1,8 @@
-
-% En esta sección se detallan los experimentos realizados para abordar las cuestiones propuestas en la sección \ref{Introduction}. En primer lugar, se introducen los detalles del diseño de la experimentación: la selección del modelo de segmentación, dataset elegido, procesos de entrenamiento y validación, etc. Después, se detalla el pipeline implementado para realizar la anotación semiautomática de las máscaras de ocupación, oclusión y área conducible. Finalmente, se aborda la metodología seguida para evaluar tanto la generación de las máscaras semánticas en \aclink{BEV}, como las detecciones 3D a partir de imágenes monoculares para la evaluación final del pipeline de anotación semiautomática.
+% ================================================
+% =                 METHODOLOGY                  =
+% ================================================ 
 
 This section details the experiments and implementations made to address the problems described in section \ref{Introduction}. On the first hand, the experimental design is introduced, tackling the model and dataset selection, how data augmentations are performed and the training and validation processes. Afterward, the implementation of the occupancy and occlusion masks preannotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
-
-% Este proyecto puede dividirse en 3 bloques principales: experimentación con la segmentación semántica en BEV, diseño e implementación de un sistema de anotación semiautomático de máscaras de área conducible y un tercer bloque de experimentación para evaluar el rendimiento del sistema implementado.
 
 Thus, this project can be divided into three main blocks: \aclink{BEV} semantic segmentation experimentation, design and implementation of the preannotation pipeline and a thrid block of how the system is evaluated.
 
@@ -15,7 +14,7 @@ To address the hypotesis that "A semantic segmentation model trained with BEV im
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./images/metodology/bev2seg_2_flow.png}
-    \caption{bev2seg\_2 diagram flow.}
+    \caption{bev2seg\_2 flow diagram.}
     \label{fig:beg2seg_2_flow}
 \end{figure}
 
@@ -67,7 +66,7 @@ NuImages contains around $93.000$ samples with aproximately $80\%$ reserved for 
 
 To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset named BEVDataset. This dataset has all front-camera images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further splitted to ensure fair comparisons between models from different pipelines.
 
-The conversion process is performed using a custom parser named "OLDatasets", which transforms NuImages samples into the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format, where metadata for each frame is stored. In the case of BEVDataset, images are reprojected into the \aclink{BEV} domain using the \aclink{VCD} library. This library provides tools to handle OpenLABEL annotations and manage both 2D and 3D data efficiently.
+The conversion process is performed using a custom parser named "OLDatasets", which transforms NuImages samples into the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format, where metadata for each frame is stored. In the case of BEVDataset, images are reprojected into the \aclink{BEV} domain using the \aclink{VCD} library \cite{VCD}. This library provides tools to handle OpenLABEL annotations and manage both 2D and 3D data efficiently.
 
 The "OLDatasets" parser extracts the camera parameters for each sample and computes a \aclink{LUT} to apply \aclink{IPM} reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the \aclink{BEV} space. Since this reprojection involves image warping, the interpolation method must be carefully chosen:
 \begin{itemize}
@@ -92,43 +91,55 @@ Data augmentations are commonly used in deep learning models to mitigate overfit
 
 Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
 
-Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image can lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure \ref{fig:bev_cropping}). Similarly, applying random horizontal flipping to a \aclink{BEV} image would merely create the illusion that the image was captured from a rear-facing camera rather than providing meaningful variation.
+Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image may lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure \ref{fig:bev_cropping}). 
 
-% TODO: Las imagenes y máscaras no coinciden
 \begin{figure}[h]
     \centering
     % Row labels
-    \renewcommand{\arraystretch}{1.5}
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
     \begin{tabular}{c c c c c c c c}
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_0.png} & 
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_0_1.png} & 
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_2.png} &
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_3.png} & 
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_4.png} & 
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_5.png} &
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_6.png} &
-        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_1_7.png} \\ 
+
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_0_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_1_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_2_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_3_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_4_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_5_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_6_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/mini/mini_7_bev.png} \\ 
         
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_0.png} & 
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_0_1.png} & 
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_2.png} &
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_3.png} & 
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_4.png} & 
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_5.png} &
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_6.png} &
-        % \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_1_7.png} \\ 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_0_9.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_1_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_2_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_3_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_4_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_5_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_6_1.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_image_7_2.png} \\ 
+
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_0_9.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_1_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_2_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_3_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_4_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_5_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_6_1.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/data_augmentations/bev_crop_mask_7_2.png} \\
+
     \end{tabular}
     
-    \caption{Random cropping and horizontal flipping on BEV images}
+    \caption{Random cropping and horizontal flipping on BEV images. Original BEV images on first row; random flipped and cropped images on second row and corresponding semantic masks on last row.}
     \label{fig:bev_cropping}
 \end{figure}
 
-In this context, a different approach was considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique enables the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure \ref{fig:bev_data_aug}).
+In this context, a different approach was also considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique may enable the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure \ref{fig:bev_data_aug}).
 
 \begin{figure}[h]
     \centering
     % Row labels
-    \renewcommand{\arraystretch}{1.5}
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
     \begin{tabular}{c c c c c c}
         & $-0.25$ rad & $-0.125$ rad & $0.0$ rad & $0.125$ rad & $0.25$ rad \\ 
         
@@ -158,15 +169,112 @@ In this context, a different approach was considered: applying geometric transfo
     \label{fig:bev_data_aug}
 \end{figure}
 
-\subsubsection{Validation and comparison}
+\hl{This raises an important question: \textit{Which approach is more effective: traditional geometric data augmentation techniques or the modification of extrinsic parameters?}}
+
+\subsubsection{Validation and comparison: Selection module}
 Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.
 
-\subsection{ Driveable area automatic annotation}
+\hl{Fusion module in the pipeline. Semantic masks are selected from each model depending on its mIoU in the test set?}
+
+
+\subsection{Driveable area automatic annotation}
 \label{aplication}
 
+This section details the selected approach used to automatically annotate occupancy and occlusion masks in vehicular scenes. The method employs a 2D-to-3D approach, using estimated depth maps from monocular images to approximate object dimensions and compute the corresponding masks.
+
+As shown in Figure \ref{fig:application_flow_diagram}, the method can be divided into four main stages: depth estimation, where a depth map is generated from monocular front images; frame point cloud estimation, which creates a 3D representation of the current scene; projection of the perspective semantic mask onto the 3D point cloud to infer object instances for each selected semantic class; and the final computation of occupancy, occluded, and drivable areas by combining 3D object information with BEV semantic masks.
+
+The system's output is annotated in the OpenLABEL format and integrated with the WebLABEL \cite{weblabel} ecosystem, enabling further fine annotations by the user. Additionally, a visualization tool has been developed using the Open3D \cite{open3d} library to facilitate the rendering process of vehicular scenes.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{images/metodology/Application_flow_diagram.png}
+    \caption{Annotation flow diagram.}
+    \label{fig:application_flow_diagram}
+\end{figure}
+
 \subsubsection{Depth estimation}
+In order to obtain a depth estimation from monocular images, Depth-Pro \cite{depth-pro} has been selected as the estimation model which is " a foundation model for zero-shot metric monocular depth estimation"
+
+
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c c c}
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_0.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_3.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_4.png} &   
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_6.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/original_image_7.png} \\
+
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_0.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_3.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_4.png} &   
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_6.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/depth_images/colored_depth_map_7.png} \\
+    \end{tabular}    
+    \caption{Depht maps estimated with Depth-Pro model.}
+    \label{fig:depth_images}
+\end{figure}
+
 \subsubsection{Scene PCD}
+In order to compute the scene pointcloud given an image $I_{h \times w}$ and it's corresponding depth map $D_{h \times w}$ and the intrinsics parameters of the camera $K$ it is prety straight forward. The approach employed for this task is represented in Algorithm \ref{algorithm:scene_pcd_hloop} where the 3D points of the image are calculated for each image column. The resulting dense pointcloud can be seen in Figure \ref{fig:pcd_scene_images}.
+
+\hl{mention that the h-loop strategy was selected as it has greater performance.}
+
+\begin{algorithm}
+    \caption{Pointcloud calculation}
+    \label{algorithm:scene_pcd_hloop}
+    \footnotesize
+
+    \begin{algorithmic}[1]
+        \State \textbf{Input:} Depth map $D_{\left[h \times w\right]}$, camera intrinsics $K$ 
+        \State \textbf{Output:} Pointcloud $P_{\left[3 \times h \times w\right]}$
+        
+        \State Initialize $P_{\left[3 \times h \times w\right]} \gets \mathbf{0}$
+
+        \For{$i \text{ in } \left[0, 1, \dots, h-1\right]$}
+            \State $pix\_coords_{3 \times w} \gets \begin{bmatrix} \text{0:w-1} & \mathbf{i}_w & \mathbf{1}_w \end{bmatrix}$
+            \State $cam\_rays_{3 \times w} \gets K^{-1} \cdot pix\_coords$
+            
+            \State $P[:, i, :] \gets cam\_rays \cdot D[i, :]$  \Comment{Update the $i$-th row of $P$}
+        \EndFor
+        
+        \State \Return $P$
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c c c}
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_0.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_3.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_4.png} &   
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_6.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/pcd_images/frame_7.png} \\
+
+    \end{tabular}    
+    \caption{Poinclouds.}
+    \label{fig:pcd_scene_images}
+\end{figure}
+
 \subsubsection{Instance scene PCD}
+
 \subsubsection{Instance BEV mask}
 
 \subsection{Evaluation methodology}
