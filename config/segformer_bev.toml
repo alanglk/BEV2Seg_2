@@ -7,15 +7,18 @@ testing = false                     # if set, the 'mini' version of the dataset
 [model]
 output_path = "/models"
 model_name = "segformer_bev"
-pretrained = "nvidia/mit-b4"
+pretrained = "nvidia/mit-b0"
 
 [training]
-batch_size = 8
+batch_size = 16
 epochs = 200
 learning_rate = 0.00006
 weight_decay = 0.01
-data_augmentations = true           # (optional) defaults to False. 
-                                    # If set, the dataset_type specific data augmentation functions are applied
+
+# Data augmentation
+data_augmentation = true                            # (optional) defaults to False. 
+                                                    # If set, the dataset_type specific data augmentation functions are applied
+data_augmentation_type = "use_torch_transforms"     # (optional) defaults to "use_torch_transforms". ["use_torch_transforms", "use_custom_bev_transforms"]. 
 
 # Optimizer
 optim = "adamw_torch"               # (optional) defaults to "adamw_torch"
@@ -30,7 +33,7 @@ resume_from_checkpoint = false      # (optional) defaults to False.
                                     # example__path: "/models/segformer_bev/raw2bevseg_mit-b2_v0.1"
 ls_steps = 200                      # (optional) defaults to 200. 
                                     # Logging/Saving steps. batch_size:32 -> 100; batch_size:16 -> 200
-gradient_accum_steps = 2
+gradient_accum_steps = 1
 # *Available lr_schedulers: 
 # [ "linear", "cosine", "cosine_with_restarts", "polynomial", 
 #   "constant", "constant_with_warmup", "inverse_sqrt", 
