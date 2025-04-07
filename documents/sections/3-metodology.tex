@@ -238,7 +238,7 @@ In order to compute the scene pointcloud given an image $I_{h \times w}$ and it'
 
     \begin{algorithmic}[1]
         \State \textbf{Input:} Depth map $D_{\left[h \times w\right]}$, camera intrinsics $K$ 
-        \State \textbf{Output:} Pointcloud $P_{\left[3 \times h \times w\right]}$
+        \State \textbf{Output:} Pointcloud $P^{raw}_{\left[3 \times h \times w\right]}$
         
         \State Initialize $P_{\left[3 \times h \times w\right]} \gets \mathbf{0}$
 
@@ -246,10 +246,10 @@ In order to compute the scene pointcloud given an image $I_{h \times w}$ and it'
             \State $pix\_coords_{3 \times w} \gets \begin{bmatrix} \text{0:w-1} & \mathbf{i}_w & \mathbf{1}_w \end{bmatrix}$
             \State $cam\_rays_{3 \times w} \gets K^{-1} \cdot pix\_coords$
             
-            \State $P[:, i, :] \gets cam\_rays \cdot D[i, :]$  \Comment{Update the $i$-th row of $P$}
+            \State $P^{raw}[:, i, :] \gets cam\_rays[2, :] \cdot D[i, :]$  \Comment{Update the $i$-th row of $P$. The ray's z-value is the depht}
         \EndFor
         
-        \State \Return $P$
+        \State \Return $P^{raw}$
     \end{algorithmic}
 \end{algorithm}
 
@@ -274,8 +274,140 @@ In order to compute the scene pointcloud given an image $I_{h \times w}$ and it'
 \end{figure}
 
 \subsubsection{Instance scene PCD}
+The objective of this module is to compute an intance pcd from the already computed pointcloud of the scene and the correspondin semantic mask of the input perspective image taken from the BEV2Seg\_2 module \ref{bev2seg_2}. This data gets feeded into the module and a instance differenciation for certain classes is performed, allowing to isolate instance pointclouds and to compute their enclosing cuboids. The resulting panoptic pointcloud would serve as input for future modules and contains the 3D object detection of the scene starting from just a monocular image.
+
+The input semantic mask is preprocessed with a label merging process for merging into the same class simmilar labels. With this process, some ambiguities and similar label preddictions of the model are mitigated to reduce noise which would affect the following instance estimation processes. The merging policy is default defined as follows and as it can be seen, the target class "vehicle.car" represents all NuScenes vehicles similar to cars.
+
+DEFAULT_MERGE_DICT = {
+    'vehicle.car': [
+        "vehicle.bus.bendy", 
+        "vehicle.bus.rigid", 
+        "vehicle.car", 
+        "vehicle.construction", 
+        "vehicle.emergency.ambulance", 
+        "vehicle.emergency.police", 
+        "vehicle.trailer", 
+        "vehicle.truck"
+    ],
+    "vehicle.motorcycle":[
+        "vehicle.bicycle",
+        "vehicle.motorcycle"
+    ]
+}
+
+Once the semantic mask is preprocessed and the computed pointcloud is computed, a pre-filtering process is performed to remove those points out of some bounds (by default $\left[10, 5, 30\right]$ meters in $x$, $y$ and $z$). Then, the semantic mask is projected into the pointcloud to obtain a semantic pointcloud. This is pretty straight forward as each 3D point is accessed with the same indices for its corresponding pixel semantic label. With this process, each semantic label has its corresponding pointcloud associated.
+
+\hl{Include a Figure of this results}
+
+Also, each semantic pointcloud is marked with a 'dynamic' flag which relates each semantic class with if the object may move or not. Only semantic pointclouds with this label setted gets pass throught the instance detection process. This is to avoid performing those process on labels like background, road barriers, driveable area...
+
+Finally, a clusterization algorithm is used to extract the different instances of each dynamic semantic pointcloud. The selected algorithm is DBSCAN \footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html#sklearn.cluster.DBSCAN}} which creates good instance clusters and removes part of the trail left by the depht estimation on object edges.
+
+With this, for each computed instance pointcloud, the minimal containing oriented 3D bounding boxes are calculated using the Jylanki algorithm.
+
+Finally, a filtering process is made to ensure there are no noisy instances, redundant instances, or too far away or floating instances.
+
+
+\begin{algorithm}
+    \caption{Instance filtering}
+    \label{algorithm:instance_filter}
+    \footnotesize
+
+    \begin{algorithmic}[1]
+        \State \textbf{Input:} $P^{inst}$ panoptic pointcloud
+        \State \textbf{Output:} $P^{inst}$ filtered panoptic pointcloud
+        
+        \For{$label \text{ in } P^{inst}$}
+            \For{$i \text{ in } P^{inst}\left[label\right]$}
+                \State $B \gets $
+            
+            \EndFor
+        \EndFor
+        
+        \State \Return $P$
+    \end{algorithmic}
+\end{algorithm}
+
+
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c c c}
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_4.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_5.png} &   
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_6.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_7.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_8.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/raw_cuboids/raw_cuboid_9.png} \\
+        
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} & 
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} & 
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} &
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} &   
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} & 
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} &
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} &
+        \includegraphics[width=0.12\textwidth]{images/shared/no_signal.jpg} \\
+    \end{tabular}    
+    \caption{Instances}
+    \label{fig:instance_scene_images}
+\end{figure}
+
 
 \subsubsection{Instance BEV mask}
+Once the 3D instance detecction is performed and the panoptic pointcloud is generated the final occupancy and occlusion masks can be estimated with the use of the semantic BEV masks. 
+
+To do that, the BEV semantic masks are feeded into a conected components labeling algorithm in order to obtain different non connected masks in the semantic mask. Then, the base of the 3D bounding box is taken for each instance in the panoptic pointcloud and an intersection factor is computed for each pair of base bounding boxes and connected masks. Finally, base\_polys and connected masks are associated based on the calculated intersection factor and the final occupancy, marked as the base of the 3D bounding box, and occlusion, marked as the distorded semantic masks of the object in BEV perspective is created.
+
+This method estimates the vehicle dimensions dealing with ambiguities at some point: when a vehicle, for example, is perfectly aligned with the camera only the rear width dimension and height are vissible so the depht is ambiguous, but when the vehicle gets some relative rotation respect to the camera, the vehicle dimensions can be more or less estimated with the 3D detection phase making the resulting masks more accurate. 
+
+\begin{algorithm}
+    \caption{Occupancy Occlusion masks}
+    \label{algorithm:occ_masks}
+    \footnotesize
+
+    \begin{algorithmic}[1]
+        \State \textbf{Input:} 
+        \State \textbf{Output:} 
+        \State \Return $x$
+    \end{algorithmic}
+\end{algorithm}
+
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c c c}
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_4.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_5.png} &   
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_6.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_7.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_8.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_reproj_cuboids/bev_reproj_cuboid_9.png} \\
+        
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_4.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_5.png} &   
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_6.png} & 
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_7.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_8.png} &
+        \includegraphics[width=0.12\textwidth]{images/metodology/bev_occupancy_oclusion/bev_occ_9.png} \\
+    \end{tabular}
+    \caption{occupancy and occlusion masks in BEV perspective}
+    \label{fig:bev_occupancy_occlusion}
+\end{figure}
+
+
 
 \subsection{Evaluation methodology}
 \label{evaluacion}

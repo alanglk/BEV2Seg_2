@@ -166,9 +166,88 @@ class InstanceScenePCD():
                 bbox_height = np.abs(np.max(inst_pcd[:, 1]) - np.min(inst_pcd[:, 1]))
                 bbox_depth = np.abs(np.max(inst_pcd[:, 2]) - np.min(inst_pcd[:, 2]))
                 
+                # Oriented 3D bounding box
+                # obb = o3d.geometry.OrientedBoundingBox.create_from_points(points=o3d.utility.Vector3dVector(inst_pcd), robust=False)
+                # 
+                # R = obb.R
+                # x, y, z = obb.center
+                # sx, sy, sz = obb.extent
+                # rx, ry, rz = 0.0, 0.0, 0.0
+                # if np.abs(R[2, 0]) != 1:
+                #     rho_1 = - np.arcsin(R[2, 0])
+                #     rho_2 = np.pi - rho_1
+                #     cos_rho_1 = np.cos(rho_1)
+                #     # cos_rho_2 = np.cos(rho_2)
+                #     psi_1 = np.arctan2(R[2, 1] / cos_rho_1,  R[2, 2] / cos_rho_1)
+                #     # psi_2 = np.arctan2(R[2, 1] / cos_rho_2,  R[2, 2] / cos_rho_2)
+                #     phi_1 = np.arctan2(R[1, 0] / cos_rho_1,  R[0, 0] / cos_rho_1)
+                #     # phi_2 = np.arctan2(R[1, 0] / cos_rho_2,  R[0, 0] / cos_rho_2)
+                #     rx, ry, rz = psi_1, rho_1, phi_1
+                # else:
+                #     # This leads to cos rho = 0
+                #     phi = 0.0
+                #     if R[2,0] == -1:
+                #         rho = np.pi / 2
+                #         psi = phi + np.arctan2(R[0, 1], R[0, 2])
+                #     else:
+                #         rho = -np.pi / 2
+                #         psi = - phi + np.arctan2(-R[0, 1], -R[0, 2])
+                #     rx, ry, rz = psi, rho, phi
+
+                from scipy.spatial import ConvexHull
+                from shapely.geometry import Polygon
+                from shapely.affinity import rotate as shapely_rotate
+                def get_yaw_fixed_obb(points):
+                    # Step 1: Project points to YZ plane
+                    points_xz = points[:, [1, 2]]
+
+                    # Step 2: Compute convex hull
+                    hull = ConvexHull(points_xz)
+                    hull_points = points_xz[hull.vertices]
+
+                    # Step 3: Find minimum area rectangle using shapely
+                    poly = Polygon(hull_points)
+                    min_area = float('inf')
+                    best_angle = 0
+                    
+                    for angle in np.linspace(0, 180, num=180):
+                        rotated = shapely_rotate(poly, angle, origin='centroid', use_radians=False)
+                        bounds = rotated.bounds  # (minx, miny, maxx, maxy)
+                        area = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
+                        if area < min_area:
+                            min_area = area
+                            best_angle = angle
+
+                    # Convert angle to radians and build rotation matrix around Z axis
+                    yaw = -np.deg2rad(best_angle)  # Negative to match right-hand rule
+
+                    cos_yaw = np.cos(yaw)
+                    sin_yaw = np.sin(yaw)
+
+                    # Rotación en Z
+                    R = np.array([
+                        [cos_yaw,   -sin_yaw, 0],
+                        [sin_yaw,   cos_yaw, 0],
+                        [0, 0, 1]
+                    ])
+
+                    # Step 4: Rotate all points using best yaw to align with XY axes
+                    rotated_points = (R.T @ points.T).T
+                    min_bound = np.min(rotated_points, axis=0)
+                    max_bound = np.max(rotated_points, axis=0)
+
+                    center_local = (min_bound + max_bound) / 2
+                    sz, sy, sx = max_bound - min_bound # 10z, 5y, 1x
+                    # Transform center back to world coordinates
+                    x, y, z = (R @ center_local.T).T
+                    rx, ry, rz = 0.0, yaw, 0.0
+
+                    return x, y, z, rx, ry, rz, sx, sy, sz
+                x, y, z, rx, ry, rz, sx, sy, sz = get_yaw_fixed_obb(inst_pcd)
                 data = {'inst_id': inst_id, 
                         'center': (x_pos, y_pos, z_pos), 
-                        'dimensions': (bbox_width, bbox_height, bbox_depth)
+                        'dimensions': (bbox_width, bbox_height, bbox_depth),
+                        'vals': [x, y, z, rx, ry, rz, sx, sy, sz] 
                         }
                 seg_pcd['instance_3dboxes'].append(data)
         
@@ -426,9 +505,10 @@ class InstanceRAWDrawer():
         return raw_image
 
     def run_on_pointcloud(self, instance_pcds:dict, edge_color:tuple = (0.0, 1.0, 0.0)):
-        selected_pcds = []
-        all_bboxes = []
-        
+        selected_pcds   = []
+        all_bboxes      = []
+        oriented_bboxes = []
+
         # Draw cuboids on Pointcoud
         for semantic_pcd in instance_pcds:
             # skip non dynamic objects
@@ -447,8 +527,18 @@ class InstanceRAWDrawer():
             for bbox_data in semantic_pcd['instance_3dboxes']:
                 inst_3dbox = create_cuboid_edges(bbox_data['center'], bbox_data['dimensions'], color=edge_color)
                 all_bboxes.append(inst_3dbox) 
-                
-        return selected_pcds, all_bboxes
+
+                if 'vals' in bbox_data:
+                    x, y, z, rx, ry, rz, sx, sy, sz = bbox_data['vals']
+                    center  = [x, y, z] 
+                    size    = [sx, sy, sz]
+                    rotation = o3d.geometry.get_rotation_matrix_from_xyz([rx, ry, rz])
+                    obx = o3d.geometry.OrientedBoundingBox(center, rotation, size)
+                    obx = o3d.geometry.LineSet.create_from_oriented_bounding_box(obx)
+                    obx.paint_uniform_color((1.0, 0.0, 0.0))
+                    oriented_bboxes.append(obx)
+
+        return selected_pcds, all_bboxes, oriented_bboxes
     
 
 

@@ -238,8 +238,8 @@ def main(config:dict):
     BMM = BEVMapManager(scene_path=scene_path, gen_flags={
             'all': False, 
             'pointcloud': False, 
-            'instances': False, 
-            'occ_bev_mask': False, 
+            'instances': True, 
+            'occ_bev_mask': True, 
             'tracking': False
         })
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
@@ -353,8 +353,8 @@ def main(config:dict):
         # Draw cuboids on RAW image ####################################
         print(f"# Draw cuboids on RAW image {'#'*36}")
         raw_blended = get_blended_image(raw_image, raw2seg_bev.mask2image(raw_mask))
-        raw_image_cuboids = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
-        pcd_semantic, pcd_cuboids = IRD.run_on_pointcloud(instance_pcds)
+        raw_image_cuboids                               = IRD.run_on_image(raw_blended, instance_pcds, frame_num=fk)
+        pcd_semantic, pcd_cuboids, pcd_oriented_cuboids = IRD.run_on_pointcloud(instance_pcds)
         bev_repoj_cuboids = raw2seg_bev.inverse_perspective_mapping(raw_image_cuboids, camera_name, fk) # Reproyectar cuboides en raw a bev
         
         # ##############################################################
@@ -366,12 +366,13 @@ def main(config:dict):
 
         # ##############################################################
         # Visualization ################################################
-        # print(f"# Open3d Visualization {'#'*41}")
-        # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
-        # all_geometries = pcd_semantic + pcd_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
-        # # all_geometries = accum_cuboids + [accum_pcd]
+        print(f"# Open3d Visualization {'#'*41}")
+        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+        all_geometries = pcd_semantic + pcd_cuboids + pcd_oriented_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
+        # all_geometries = accum_cuboids + [accum_pcd]
         # all_geometries = []
-        # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
+        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
+        
         
         # ##############################################################
         # Write Debug ##################################################
