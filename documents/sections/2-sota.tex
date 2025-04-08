@@ -2,29 +2,13 @@
 % =              STATE OF THE ART                =
 % ================================================ 
 
-% Actualmente, la industria de la automoción está impulsando el desarrollo de los \aclink{ADS} con la promesa de reducir los accidentes en carretera y minimizar los costes tanto humanos como económicos que estos suponen \cite{survey_AutomatedDriving1}. Sin embargo, a pesar de que la conducción automatizada haya incrementado recientemente la atención de la industria por el auge del DeepLearning y la visión por ordenador, lo cierto es que lleva presente más de 20 años.
-
 Currently, the automotive industry is driving the development of \aclink{ADS} with the promise of reducing road accidents and minimizing both the human and economic costs associated with them \cite{survey_AutomatedDriving1}. However, although automated driving has recently gained increased attention from the industry due to the rise of Deep Learning and computer vision, it has actually been present for more than 20 years.
-
-% Algunas de las primeras competiciones de conducción automatizada, como los DARPA Challenges en 2003 y 2005 o el Grand DARPA Urban challenge de 2007, impulsaron enormemente el desarrollo de los \aclink{ADS}, atrayendo la atención tanto de empresas tecnológicas como del sector automotriz \cite{survey_AutomatedDriving2}. Este avance ha sido acompañado por la definición de buenas prácticas y procesos de estandarización para garantizar la seguridad y fiabilidad de los \aclink{ADS}. En este contexto, la \aclink{SAE} ha establecido una escala progresiva de automatización, desde el nivel 0 (sin automatización) hasta el nivel 5 (automatización total), definiendo el grado de intervención del conductor en cada etapa \cite{AD_Technical_Standards}. 
 
 Some of the earliest automated driving competitions, such as the DARPA Challenges in 2003 and 2005 or the Grand DARPA Urban Challenge in 2007, significantly boosted the development of \aclink{ADS}, attracting the attention of both technology companies and the automotive sector \cite{survey_AutomatedDriving2}. This progress has been accompanied by the establishment of best practices and standardization processes to ensure the safety and reliability of \aclink{ADS}. In this context, the \aclink{SAE} has defined a progressive scale of automation, ranging from Level 0 (no automation) to Level 5 (full automation), specifying the degree of driver intervention required at each stage \cite{AD_Technical_Standards}.
 
-% Hoy en día, la mayoría de los vehículos incorporan sistemas avanzados de asistencia a la conducción \aclink{ADAS}, que operan en los niveles \aclink{SAE} 2 y 3. No obstante, ya existen \aclink{ADS} de nivel 4, como los desarrollados por Waymo y Cruise para robotaxis, o los autobuses autónomos desplegados en algunas ciudades, cuyos sistemas están diseñados para gestionar el fallback de manera autónoma, sin necesidad de intervención humana \cite{fallback_strategy}.
-
 Today, most vehicles incorporate Advanced Driver Assistance Systems (\aclink{ADAS}), which operate at \aclink{SAE} Levels 2 and 3. However, Level 4 \aclink{ADS} already exist, such as those developed by Waymo and Cruise for robotaxis, as well as autonomous buses deployed in some cities. These systems are designed to manage fallback autonomously, without the need for human intervention \cite{fallback_strategy}.
 
-% Este desarrollo ha llevado a la creación de distintas estrategias y arquitecturas para los \aclink{ADS}. En los últimos años, ha habido grandes avances en soluciones \mbox{End-to-End}, que combinan técnicas de aprendizaje profundo y aprendizaje por refuerzo para obtener las acciones de control del vehículo partiendo diréctamente de los datos de los sensores \cite{end_to_end_driving}. Sin embargo, la mayoría de los enfoques optan por soluciones modulares más tradicionales, que dividen el problema de la conducción automatizada en \mbox{sub-tareas} específicas, integrando soluciones de campos como la robótica, visión por ordenador, deep learning y control automático.
-
 This development has led to the creation of various strategies and architectures for \aclink{ADS}. In recent years, significant progress has been made in \mbox{End-to-End} solutions, which combine deep learning and reinforcement learning techniques to derive vehicle control actions directly from sensor data \cite{end_to_end_driving}. However, most approaches favor more traditional modular solutions, which divide the automated driving problem into specific \mbox{sub-tasks}, integrating solutions from fields such as robotics, computer vision, deep learning, and automatic control.
-
-% En el contexto de las arquitecturas modulares, la adopción de buenas prácticas ha facilitado la categorización de estas \mbox{sub-tareas} en tres grupos principales \cite{machines5010006}\cite{functional_architectures}: 
-% \begin{itemize}
-%     \item Percepción, que se refiere a la capacidad del sistema autónomo para recolectar información del entorno y extraer conocimiento relevante, como la ubicación de obstáculos, señales de tráfico y la localización del vehículo.
-%     \item Planificación del comportamiento, que consiste en tomar decisiones para alcanzar los objetivos del vehículo, como llegar de un punto a otro evitando obstáculos y optimizando la trayectoria.
-%     \item Ejecución de movimientos, que se refiere a la capacidad del vehículo para ejecutar las acciones planificadas por el sistema, controlando la dirección, velocidad y maniobras necesarias.
-% \end{itemize}
-% Además, estas \mbox{sub-tareas} interactúan entre sí, con el hardware del vehículo y con sistemas de comunicación como \aclink{V2I} o \aclink{V2X} en el caso de los vehículos conectados.
 
 In the context of modular architectures, the adoption of best practices has facilitated the categorization of these \mbox{sub-tasks} into three main groups \cite{machines5010006}\cite{functional_architectures}:  
 
@@ -40,27 +24,19 @@ Furthermore, these \mbox{sub-tasks} interact with each other, with the vehicle's
     \centering
     \includegraphics[width=\linewidth]{images/sota/ADS_information_flow.png}
     \label{sota_ads_information_flow}
-    \caption{Arquitectura modular de un ADS. TEMPORAL!!!}
+    \caption{Typical ADS modular architecture.}
 \end{figure}
-
-% En este tipo de arquitecturas, un error en una \mbox{sub-tarea} puede propagarse y afectar el desempeño de otras, comprometiendo así el funcionamiento del sistema. Esto es especialmente crítico en el módulo de percepción, ya que la calidad de la información obtenida impacta directamente en tareas posteriores como la localización, el mapeo y la planificación. Por ello, garantizar sistemas de percepción robustos es fundamental para el rendimiento y la seguridad de los \aclink{ADS}.
 
 In these types of architectures, an error in one \mbox{sub-task} can propagate and affect the performance of others, potentially compromising the overall system functionality. This is particularly critical in the perception module, as the quality of the obtained information directly impacts subsequent tasks such as localization, mapping, and planning. Therefore, ensuring robust perception systems is essential for the performance and safety of \aclink{ADS}.
 
-% Dos de las tareas principales de los sistemas de percepción en los \aclink{ADS} son la detección 3D de objetos y la segmentación en \aclink{BEV}. La detección 3D de objetos es una de las tareas más relevantes y comúnmente se basa en nubes de puntos obtenidas mediante sensores LiDAR. En ausencia de LiDAR, una alternativa es la detección 3D multi-cámara, que busca predecir cajas delimitadoras 3D en un sistema de coordenadas \aclink{BEV} utilizando únicamente imágenes monoculares. Por otro lado, la segmentación en \aclink{BEV} tiene como objetivo realizar una segmentación semántica del entorno, identificando áreas transitables y delimitaciones de carril en el marco de referencia del vehículo. A diferencia de la detección de objetos, la segmentación en \aclink{BEV} permite una predicción densa de clases estáticas del entorno, lo que resulta clave para la construcción de mapas locales, estimación del comportamiento de agentes y downstream tasks como la planificación del comportamiento del \aclink{ADS}. \hl{Añadir referencias.}
-
-Two of the main perception tasks in \aclink{ADS} are 3D object detection and \aclink{BEV} segmentation. 3D object detection is one of the most crucial tasks and is commonly based on point clouds obtained from \aclink{LiDAR} sensors. In the absence of \aclink{LiDAR}, an alternative is multi-camera 3D detection, which aims to predict 3D bounding boxes in a \aclink{BEV} coordinate system using only monocular images.
+Two of the main perception tasks in \aclink{ADS} are 3D object detection and \aclink{BEV} segmentation. 3D object detection is one of the most crucial tasks and is commonly based on point clouds obtained from \aclink{LiDAR} sensors. In the absence of \aclink{LiDAR}, an alternative is camera-based 3D detection, which aims to predict 3D bounding boxes in a common coordinate system using images. \hl{Add references.}
 
 On the other hand, \aclink{BEV} segmentation focuses on performing semantic segmentation of the environment, identifying drivable areas and lane boundaries in the vehicle's reference frame. Unlike object detection, \aclink{BEV} segmentation enables dense prediction of static environment classes, which is essential for local map construction, agent behavior estimation, and downstream tasks such as behavior planning in \aclink{ADS}. \hl{Add references.}
 
 This thesis is developed within the context of \aclink{BEV} semantic segmentation \hl{...}.
 
-\hl{This SoTA introduction needs a review or rewritting.}
-
 \subsection{Semantic segmentation} \label{sota_semantic_segmentation}
-The goal of semantic segmentation is to assign a semantic category to each pixel in an input image based on a predefined label set. The main difference between image classification and semantic segmentation is that semantic segmentation works in the pixel-level of the image. Instance segmentation is another task where a multiobject detector detects multiple objects and then this objects are segmented to obtain the pixel level boundaries of the detected instances. Then, a fusion between semantic and instance segmentation tasks is made and is named as panoptic segmentation, where the input image gets not only a pixel level semantic label but also differentiates between different instances of the same classes. 
-
-This thesis focuses on the semantic segmentation task, for which there has been a lot of research about.
+There are multiple tasks in computer vision, each addressing different levels of scene understanding. Image classification assigns a single label to an entire image, while semantic segmentation works in the pixel-level of the image assigning a category to each pixel based on a predefined label set. Instance segmentation extends this by detecting multiple objects in an image and segmenting them to delineate their boundaries. The fusion of semantic and instnce segmentation is known as panoptic segmentation, which not only provides pixel-lebel semantic labels but also differentiates between instances of the same class. This thesis focuses on the semantic segmentation task, a well stablished research topic in computer vision.
 
 Early methods relied on hand-crafted features but the introduction of Fully Convolutional Networks (\aclink{FCN}) \cite{FCNs} boosted semantic segmentation as convolutional layers in \aclink{FCN} enables a data-driven feature extraction from images enabling pixel-wise predictions suitable for segmentation tasks. Additionaly, U-Net \cite{u_net} further impoved this by incorporating an encoder-decoder architecture with skip connections to refine segmented object boundaries and preserve spatial information.
 
@@ -68,10 +44,9 @@ Furthermore, the introduction of image classification backbones like VGG \cite{V
 
 From that point, semantic segmentation started to been framed as a structured prediction problem and the development of specific modules and architectures for this task was made. That's the case of dilated convolution \cite{ditaled_conv}, which increase the receptive field by "inflating" the \aclink{CNN} kernels with holes allowing models to capture more spatial context in their prediction.
 
-Also, Transformers have been adapted from NLP to vision tasks, starting with Vision Transformers (ViTs), which model images as patch sequences using self-attention. For semantic segmentation, architectures like SETR replace \aclink{CNN} backbones with transformer for a better global understangin, while hybrid models like Swin Transformer and MaskFormer balance efficiency and context modeling. These advancements improved segmentation performance, particularly in tasks requiring both fine details and long-range dependencies.
+Also, Transformers have been adapted from NLP to vision tasks, starting with Vision Transformers (\aclink{ViT}) \cite{vit}, which model images as patch sequences using self-attention. For semantic segmentation, architectures like SETR \cite{SETR} replace \aclink{CNN} backbones with transformer for a better global understangin, while hybrid models like Swin Transformer \cite{swin} and MaskFormer balance efficiency and context modeling. These advancements improved segmentation performance, particularly in tasks requiring both fine details and long-range dependencies.
 
 \hl{This needs a review. Maybe the ViTs needs a deeper explanation. SegFormer is introduced in methodology.}
-
 
 \subsection{BEV semantic segmentation} \label{sota_BEV_semantic_segmentation}
 Traditional methods \cite{3d_traffic_scene_understanding} estimate local \aclink{BEV} maps using camera inputs under the flat-ground assumption applying \aclink{IPM}. However, these methods require accurate camera parameters which has led to research focusing on camera parameter estimation for \aclink{BEV} transformation \cite{BEV_params_estimation1} \cite{BEV_params_estimation2}. Another key challenge in \aclink{BEV} map generation is handling object occupancy and occlusion. \aclink{ADS} must be aware of objects dimensions and should account for uncertainty in vehicular scenes. However, estimating vehicle occupancy is non-trivial as the necessary perspective views of objects are often unavailable. In this context, there are many reseachs that addresses the local semantic map estimation with different approaches.
