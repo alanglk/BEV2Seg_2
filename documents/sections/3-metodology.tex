@@ -278,22 +278,7 @@ The objective of this module is to compute an intance pcd from the already compu
 
 The input semantic mask is preprocessed with a label merging process for merging into the same class simmilar labels. With this process, some ambiguities and similar label preddictions of the model are mitigated to reduce noise which would affect the following instance estimation processes. The merging policy is default defined as follows and as it can be seen, the target class "vehicle.car" represents all NuScenes vehicles similar to cars.
 
-DEFAULT_MERGE_DICT = {
-    'vehicle.car': [
-        "vehicle.bus.bendy", 
-        "vehicle.bus.rigid", 
-        "vehicle.car", 
-        "vehicle.construction", 
-        "vehicle.emergency.ambulance", 
-        "vehicle.emergency.police", 
-        "vehicle.trailer", 
-        "vehicle.truck"
-    ],
-    "vehicle.motorcycle":[
-        "vehicle.bicycle",
-        "vehicle.motorcycle"
-    ]
-}
+% DEFAULT_MERGE_DICT = { 'vehicle.car': [     "vehicle.bus.bendy",      "vehicle.bus.rigid",      "vehicle.car",      "vehicle.construction",      "vehicle.emergency.ambulance",      "vehicle.emergency.police",      "vehicle.trailer",      "vehicle.truck" ], "vehicle.motorcycle":[     "vehicle.bicycle",     "vehicle.motorcycle" ] }
 
 Once the semantic mask is preprocessed and the computed pointcloud is computed, a pre-filtering process is performed to remove those points out of some bounds (by default $\left[10, 5, 30\right]$ meters in $x$, $y$ and $z$). Then, the semantic mask is projected into the pointcloud to obtain a semantic pointcloud. This is pretty straight forward as each 3D point is accessed with the same indices for its corresponding pixel semantic label. With this process, each semantic label has its corresponding pointcloud associated.
 
@@ -301,7 +286,7 @@ Once the semantic mask is preprocessed and the computed pointcloud is computed, 
 
 Also, each semantic pointcloud is marked with a 'dynamic' flag which relates each semantic class with if the object may move or not. Only semantic pointclouds with this label setted gets pass throught the instance detection process. This is to avoid performing those process on labels like background, road barriers, driveable area...
 
-Finally, a clusterization algorithm is used to extract the different instances of each dynamic semantic pointcloud. The selected algorithm is DBSCAN \footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html#sklearn.cluster.DBSCAN}} which creates good instance clusters and removes part of the trail left by the depht estimation on object edges.
+% Finally, a clusterization algorithm is used to extract the different instances of each dynamic semantic pointcloud. The selected algorithm is DBSCAN \footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html#sklearn.cluster.DBSCAN}} which creates good instance clusters and removes part of the trail left by the depht estimation on object edges.
 
 With this, for each computed instance pointcloud, the minimal containing oriented 3D bounding boxes are calculated using the Jylanki algorithm.
 
