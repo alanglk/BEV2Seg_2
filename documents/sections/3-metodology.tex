@@ -88,7 +88,7 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
 
 \subsubsection{Data augmentations}
 \label{data_augmentations}
-Data augmentations are commonly used in deep learning models to mitigate overfittings during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
+Data augmentations are commonly used in deep learning models to mitigate overfitting during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
 
 Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
 
@@ -152,18 +152,19 @@ In this context, a different approach was also considered: applying geometric tr
         \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rx_0.25_4.png} \\ 
         
         \rotatebox{90}{\textbf{Pitch}} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.25_4.png} \\ 
+
+        \rotatebox{90}{\textbf{Roll}} & 
         \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_-0.25_0.png} & 
         \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_-0.125_1.png} & 
         \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.0_2.png} & 
         \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.125_3.png} & 
         \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/ry_0.25_4.png} \\ 
         
-        \rotatebox{90}{\textbf{Roll}} & 
-        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.25_0.png} & 
-        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_-0.125_1.png} & 
-        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.0_2.png} & 
-        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.125_3.png} & 
-        \includegraphics[width=0.15\textwidth]{images/metodology/data_augmentations/rz_0.25_4.png} \\ 
     \end{tabular}
     
     \caption{Effect of camera transformations on BEV projection. The first row shows variations in the yaw axis, the second in pitch, and the third in roll.}
@@ -195,6 +196,12 @@ The system's output is annotated in the OpenLABEL format and integrated with the
 \end{figure}
 
 \subsubsection{Depth estimation}
+\label{depth_estimation}
+
+
+Traditional depth estimation techniques rely on geometric and photometric marks to in
+
+
 In order to obtain a depth estimation from monocular images, Depth-Pro \cite{depth-pro} has been selected as the estimation model which is " a foundation model for zero-shot metric monocular depth estimation"
 
 
@@ -228,7 +235,71 @@ In order to obtain a depth estimation from monocular images, Depth-Pro \cite{dep
 \end{figure}
 
 \subsubsection{Scene PCD}
-In order to compute the scene pointcloud given an image $I_{h \times w}$ and it's corresponding depth map $D_{h \times w}$ and the intrinsics parameters of the camera $K$ it is prety straight forward. The approach employed for this task is represented in Algorithm \ref{algorithm:scene_pcd_hloop} where the 3D points of the image are calculated for each image column. The resulting dense pointcloud can be seen in Figure \ref{fig:pcd_scene_images}.
+When an image is captured, the 3D geometry of the scene is projected onto a 2D representation, which is then rasterized into the pixel space of the image. This transformation from 3D world coordinates to 2D image coordinates is known as the \emph{camera projection process}. In its simplest form, this is described by the \emph{pinhole camera model}, illustrated in Figure \ref{fig:pinhole_model}. In this setup, $\mathbf{O}_w$ represents the world coordinate frame, $\mathbf{F}_c$ denotes the camera coordinate frame (typically located at the camera's optical center or pinhole), and $\mathbf{F}_i$ defines the 2D image plane.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{images/shared/no_signal.jpg}
+    \caption{Ideal perspective camera model.}
+    \label{fig:pinhole_model}
+\end{figure}
+
+Starting with a 3D point expressed in world coordinates, $\mathbf{P}_w = \left(x_w, y_w, z_w\right)^\top$, the point can be transformed int the camera coordinate frame using a rotation matrix $\mathbf{R}$ and a translation vector $\mathbf{t}$. These are known as camera's extrinsic parameters and are commonly combined into a single homogeneous transformation matrix denoted as $\left[\mathbf{R} \,|\, \mathbf{t}\right]$.
+
+\begin{align}
+    \tilde{\mathbf{P}}_c 
+    &=
+    \begin{pmatrix}
+        x_c \\
+        y_c \\
+        z_c \\
+        1
+    \end{pmatrix}
+    =
+    \begin{pmatrix}
+        r_{11} & r_{12} & r_{13} & t_x \\
+        r_{21} & r_{22} & r_{23} & t_y \\
+        r_{31} & r_{32} & r_{33} & t_z \\
+        0 & 0 & 0 & 1
+    \end{pmatrix}
+    \begin{pmatrix}
+        x_w \\
+        y_w \\
+        z_w \\
+        1
+    \end{pmatrix}
+    =
+    \left[ \mathbf{R} \,|\, \mathbf{t} \right] \tilde{\mathbf{P}}_w 
+\end{align}
+
+Once the point is expressed in the camera coordinate frame $\mathbf{F}_c$, it is projected onto the image plane $\mathbf{F}_i$ using the intrinsic parameters of the camera, which describe how the 3D geometry of the scene is mapped to the 2D image sensor. Under the pinhole camera model, this projection involves a perspective division (to normalize the coordinates) followed by a transformation using the intrinsic matrix $\mathbf{K}$, which encodes the focal lengths and maps the continuous 2D space to the discrete pixel grid of the digital camera, while also considering the sensor's displacement of the principal point $(c_x, c_y)$. The final pixel coordinates can be computed as:
+
+\begin{align}
+    \tilde{\mathbf{p}_i}
+    = \left(u, v, 1\right)^\top
+    = \mathbf{K} \cdot \frac{1}{z_c} \tilde{\mathbf{P}}_c
+\end{align}
+
+where $\mathbf{K}$ is the intrinsic calibration matrix, typically given by:
+
+\begin{align}
+    \mathbf{K} =
+    \begin{pmatrix}
+        f_x & 0 & c_x \\
+        0 & f_y & c_y \\
+        0 & 0 & 1
+    \end{pmatrix}
+\end{align}
+
+Here, $f_x$ and $f_y$ are the focal lengths in pixel units along the $\hat{x}_i$ and $\hat{y}_i$ axes.
+
+However, the images used in this thesis are taken from lens-cameras which introduces inherent tangential and radial distorsions which are taken into consideration by rectifying the camera normalized 3D points before appying the camera's intrinsic matrix $\mathbf{K}$.
+
+Despite all of this, the objective of this module is to make the inverse process of computing the scene pointcloud starting from points in the pixel domain. This is known as reprojection and has the challenging task of infering a third 3D dimension which were lost during the image capturing process. To address this, the depht map $D_{h \times w}$ of the image is estimated \ref{depth_estimation} and the camera parameters are known. 
+
+The approach employed for this task is represented in Algorithm \ref{algorithm:scene_pcd_hloop} where the 3D points of the image are calculated for each image column. The resulting dense pointcloud can be seen in Figure \ref{fig:pcd_scene_images}.
+
+In order to compute the scene pointcloud given an image $I_{h \times w}$ and it's corresponding depth map $D_{h \times w}$ and the intrinsics parameters of the camera $K$ it is prety straight forward. 
 
 \hl{mention that the h-loop strategy was selected as it has greater performance.}
 
