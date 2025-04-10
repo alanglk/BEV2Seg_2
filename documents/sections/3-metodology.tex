@@ -239,7 +239,7 @@ When an image is captured, the 3D geometry of the scene is projected onto a 2D r
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=\linewidth]{images/shared/no_signal.jpg}
+    \includegraphics[width=0.5\linewidth]{images/shared/no_signal.jpg}
     \caption{Ideal perspective camera model.}
     \label{fig:pinhole_model}
 \end{figure}
@@ -293,16 +293,13 @@ where $\mathbf{K}$ is the intrinsic calibration matrix, typically given by:
 
 Here, $f_x$ and $f_y$ are the focal lengths in pixel units along the $\hat{x}_i$ and $\hat{y}_i$ axes.
 
-However, the images used in this thesis are taken from lens-cameras which introduces inherent tangential and radial distorsions which are taken into consideration by rectifying the camera normalized 3D points before appying the camera's intrinsic matrix $\mathbf{K}$.
+However, the images used in this thesis were captured using lens-based cameras, which introduce radial and tangential distortions. These distortions are taken into account by rectifying the normalized 3D coordinates in the camera frame before applying the camera's intrinsic matrix $\mathbf{K}$.
 
-Despite all of this, the objective of this module is to make the inverse process of computing the scene pointcloud starting from points in the pixel domain. This is known as reprojection and has the challenging task of infering a third 3D dimension which were lost during the image capturing process. To address this, the depht map $D_{h \times w}$ of the image is estimated \ref{depth_estimation} and the camera parameters are known. 
+Despite this, the objective of this module is to perform the inverse process: reconstructing the 3D structure of the scene from 2D image pixels. This process is known as \textit{reprojection}, and it has the challenging task of recovering the third spatial dimension, which is inherently lost during the image acquisition process. To address this, a depth map $D_{h \times w}$ is estimated (see Section \ref{depth_estimation}), where $h$ and $w$ correspond to the height and width of the image, respectively. It is also assumed that the camera parameters (intrinsics and extrinsics) are known.
 
-The approach employed for this task is represented in Algorithm \ref{algorithm:scene_pcd_hloop} where the 3D points of the image are calculated for each image column. The resulting dense pointcloud can be seen in Figure \ref{fig:pcd_scene_images}.
+The approach employed for this task is detailed in Algorithm \ref{algorithm:scene_pcd_hloop}. For each pixel column in the vertical range $\left[0, 1, \dots, h{-}1 \right]$, a 3D ray is projected from the camera center and then intersected with the depth value estimated for that pixel. The final result is a dense 3D point cloud which can be seen in Figure \ref{fig:pcd_scene_images}.
 
-In order to compute the scene pointcloud given an image $I_{h \times w}$ and it's corresponding depth map $D_{h \times w}$ and the intrinsics parameters of the camera $K$ it is prety straight forward. 
-
-\hl{mention that the h-loop strategy was selected as it has greater performance.}
-
+\hl{Review this algorithm to match the camera's projection notation.}
 \begin{algorithm}
     \caption{Pointcloud calculation}
     \label{algorithm:scene_pcd_hloop}
@@ -316,7 +313,7 @@ In order to compute the scene pointcloud given an image $I_{h \times w}$ and it'
 
         \For{$i \text{ in } \left[0, 1, \dots, h-1\right]$}
             \State $pix\_coords_{3 \times w} \gets \begin{bmatrix} \text{0:w-1} & \mathbf{i}_w & \mathbf{1}_w \end{bmatrix}$
-            \State $cam\_rays_{3 \times w} \gets K^{-1} \cdot pix\_coords$
+            \State $cam\_rays_{3 \times w} \gets \texttt{UnDistord} \left( \texttt{Normalize} \left( K^{-1} \cdot pix\_coords \right)\right)$
             
             \State $P^{raw}[:, i, :] \gets cam\_rays[2, :] \cdot D[i, :]$  \Comment{Update the $i$-th row of $P$. The ray's z-value is the depht}
         \EndFor
@@ -364,7 +361,7 @@ With this, for each computed instance pointcloud, the minimal containing oriente
 
 Finally, a filtering process is made to ensure there are no noisy instances, redundant instances, or too far away or floating instances.
 
-
+\hl{Complete this algorithm.}
 \begin{algorithm}
     \caption{Instance filtering}
     \label{algorithm:instance_filter}
