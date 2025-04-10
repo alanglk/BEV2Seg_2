@@ -35,7 +35,9 @@ On the other hand, \aclink{BEV} segmentation focuses on performing semantic segm
 
 This thesis is developed within the context of \aclink{BEV} semantic segmentation \hl{...}.
 
-\subsection{Semantic segmentation} \label{sota_semantic_segmentation}
+\subsection{Semantic segmentation} 
+\label{sec:sota_semantic_segmentation}
+
 There are multiple tasks in computer vision, each addressing different levels of scene understanding. Image classification assigns a single label to an entire image, while semantic segmentation works in the pixel-level of the image assigning a category to each pixel based on a predefined label set. Instance segmentation extends this by detecting multiple objects in an image and segmenting them to delineate their boundaries. The fusion of semantic and instnce segmentation is known as panoptic segmentation, which not only provides pixel-lebel semantic labels but also differentiates between instances of the same class. This thesis focuses on the semantic segmentation task, a well stablished research topic in computer vision.
 
 Early methods relied on hand-crafted features but the introduction of Fully Convolutional Networks (\aclink{FCN}) \cite{FCNs} boosted semantic segmentation as convolutional layers in \aclink{FCN} enables a data-driven feature extraction from images enabling pixel-wise predictions suitable for segmentation tasks. Additionaly, U-Net \cite{u_net} further impoved this by incorporating an encoder-decoder architecture with skip connections to refine segmented object boundaries and preserve spatial information.
@@ -48,7 +50,9 @@ Also, Transformers have been adapted from NLP to vision tasks, starting with Vis
 
 \hl{This needs a review. Maybe the ViTs needs a deeper explanation. SegFormer is introduced in methodology.}
 
-\subsection{BEV semantic segmentation} \label{sota_BEV_semantic_segmentation}
+\subsection{BEV semantic segmentation} 
+\label{sec:sota_BEV_semantic_segmentation}
+
 Traditional methods \cite{3d_traffic_scene_understanding} estimate local \aclink{BEV} maps using camera inputs under the flat-ground assumption applying \aclink{IPM}. However, these methods require accurate camera parameters which has led to research focusing on camera parameter estimation for \aclink{BEV} transformation \cite{BEV_params_estimation1} \cite{BEV_params_estimation2}. Another key challenge in \aclink{BEV} map generation is handling object occupancy and occlusion. \aclink{ADS} must be aware of objects dimensions and should account for uncertainty in vehicular scenes. However, estimating vehicle occupancy is non-trivial as the necessary perspective views of objects are often unavailable. In this context, there are many reseachs that addresses the local semantic map estimation with different approaches.
 
 Cam2BEV \cite{Cam2BEV} applies \aclink{IPM} to transform multi-camera segmented input images into the \aclink{BEV} domain which is feeded into the model to refine the \aclink{BEV} representation. To handle occlusions, Cam2BEV introduces an additional semantic class that explicitly marks occluded areas from all vehicle-mounted cameras. As the input of the model are already segmented images, an extra \aclink{CNN} was employed to test the method in real-world data.  
