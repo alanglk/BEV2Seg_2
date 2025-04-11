@@ -85,6 +85,7 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
     \label{fig:bev_dataset}
 \end{figure}
 
+\hl{Include the semantic class distribution of all splits.}
 
 \subsubsection{Data augmentations}
 \label{sec:data_augmentations}
@@ -404,22 +405,20 @@ Once the semantic mask has been preprocessed and the point cloud computed, a pre
     \label{fig:semantic_pointcloud}
 \end{figure}
 
-The instance detection process (Algorithm~\ref{algorithm:instance_pointcloud}) is carried out using a clustering algorithm that extracts the different instances from each dynamic semantic point cloud. The chosen algorithm is DBSCAN\footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html}}, which creates good instance clusters and removes part of the trail left by the depth estimation on object edges.
-
-Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\hat{x}_c$, $\hat{y}_c$, and $\hat{z}_c$. Oriented bounding boxes were not used in this work.
+The instance detection process (Algorithm~\ref{algorithm:instance_pointcloud}) is carried out using a clustering algorithm that extracts the different instances from each dynamic semantic point cloud. The chosen algorithm is DBSCAN\footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html}}, which creates good instance clusters and removes part of the trail left by the depth estimation on object edges. Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\hat{x}_c$, $\hat{y}_c$, and $\hat{z}_c$. Oriented bounding boxes were not used in this work.
 
 Estimating the correct orientation of a bounding box is a challenging task, especially when only a partial view of the object is available (see Figure~\ref{fig:oriented_bounding_box_problems}). Depending on the viewpoint and the amount of visible surface, traditional methods are very likely to produce inaccurate orientation estimates. Modern 3D object detection models typically address this issue by learning the statistical distribution of common object shapes and orientations. Datasets like NuScenes even provide metrics such as Average Scale Error (ASE) and Average Orientation Error (AOE) to evaluate the accuracy of these predictions.
 
-However, the main goal in this thesis is to estimate the physical space occupied by a vehicle in the scene for **pre-annotation purposes**, not precise orientation or object alignment. In this context, using an \aclink{AABB} may slightly overestimate the occupied space when objects are not aligned with the camera's reference frame—for example, during turns or when vehicles are parked at an angle. Nevertheless, this conservative estimation does not pose a significant problem, since these marginally overestimated regions are not of special interest in the annotation process.
+However, the main goal in this thesis is to estimate the physical space occupied by a vehicle in the scene for pre-annotation purposes, not precise orientation or object alignment. In this context, using an \aclink{AABB} may slightly overestimate the occupied space when objects are not aligned with the camera's reference frame, for example during turns or when vehicles are parked at an angle. Nevertheless, this estimation does not pose a significant problem since these overestimated regions are not of special interest in the annotation process.
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=0.5\linewidth]{images/shared/no_signal.jpg}
+    \includegraphics[width=0.5\linewidth]{images/methodology/oriendet_bbox_problem_aux.jpeg}
     \caption{Oriented bounding box problems.}
     \label{fig:oriented_bounding_box_problems}
 \end{figure}
 
-\hl{Complete this algorithm.}
+\hl{Change oriented bounding box problems figure. Complete this algorithm.}
 \begin{algorithm}
     \caption{Instance Pointcloud Computation}
     \label{algorithm:instance_pointcloud}
@@ -465,12 +464,11 @@ The results of this module are shown in Figure~\ref{fig:instance_scene_images}.
 
 
 \subsubsection{Instance BEV mask}
-Once the 3D instance detecction is performed and the panoptic pointcloud is generated the final occupancy and occlusion masks can be estimated with the use of the semantic BEV masks. 
+Once the 3D instance detection is performed and the panoptic point cloud is generated, the final occupancy and occlusion masks can be estimated using the semantic BEV masks.
 
-To do that, the BEV semantic masks are feeded into a conected components labeling algorithm in order to obtain different non connected masks in the semantic mask. Then, the base of the 3D bounding box is taken for each instance in the panoptic pointcloud and an intersection factor is computed for each pair of base bounding boxes and connected masks. Finally, base\_polys and connected masks are associated based on the calculated intersection factor and the final occupancy, marked as the base of the 3D bounding box, and occlusion, marked as the distorded semantic masks of the object in BEV perspective is created.
+To associate the BEV semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is associated with one polygon but a polygon may have multiple masks. This is represented in Algorithm~\ref{algorithm:occ_masks} and results in a final representation of occupancy, defined by the base of the 3D bounding box, and occlusion, which is captured by the distorded shape of the semantic mask from the BEV perspective.
 
-This method estimates the vehicle dimensions dealing with ambiguities at some point: when a vehicle, for example, is perfectly aligned with the camera only the rear width dimension and height are vissible so the depth is ambiguous, but when the vehicle gets some relative rotation respect to the camera, the vehicle dimensions can be more or less estimated with the 3D detection phase making the resulting masks more accurate. 
-
+\hl{Explain why one cuboid base is associated with multiple BEV masks. Complete this algorithm.}
 \begin{algorithm}
     \caption{Occupancy Occlusion masks}
     \label{algorithm:occ_masks}
@@ -483,35 +481,31 @@ This method estimates the vehicle dimensions dealing with ambiguities at some po
     \end{algorithmic}
 \end{algorithm}
 
+This method allows for estimating the vehicle’s extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint improving the accuracy of the resulting BEV masks.
 
-\begin{figure}[h]
+\begin{figure}[h!]
     \centering
-    % Row labels
-    \setlength{\tabcolsep}{1pt}  % Reduce column padding
-    \renewcommand{\arraystretch}{0.5}
-    \begin{tabular}{c c c c c c c c}
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_1.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_2.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_4.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_5.png} &   
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_6.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_7.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_8.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_reproj_cuboids/bev_reproj_cuboid_9.png} \\
-        
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_1.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_2.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_4.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_5.png} &   
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_6.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_7.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_8.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_9.png} \\
-    \end{tabular}
-    \caption{occupancy and occlusion masks in BEV perspective}
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/bev_occupancy_oclusion/bev_cuboid_9.png}
+        \caption{}
+        \label{fig:bev_occupancy_occlusion_a}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/bev_occupancy_oclusion/bev_semantic_color_9.png}
+        \caption{}
+        \label{fig:bev_occupancy_occlusion_b}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/bev_occupancy_oclusion/bev_occ_9.png}
+        \caption{}
+        \label{fig:bev_occupancy_occlusion_c}
+    \end{subfigure}
+
+    \caption{BEV occupancy and occlusion masks. (a) Input 3D detections; (b) input BEV semantic masks and (c) final BEV occupied-occluded mask.}
     \label{fig:bev_occupancy_occlusion}
 \end{figure}
-
 
 
 \subsection{Evaluation methodology}
