@@ -5,14 +5,9 @@
 This section includes all experiments carried out for evaluating the difference between the two approaches considered in the BEV2Seg\_2 pipeline, experiments to study what is the influence of extrinsic parameters modification as data augmentation technique for semantic segmentation of BEV images and the final evaluation of the proposed annotation pipeline of occupancy, occlusion and driveable areas.
 
 \subsection{BEV2Seg\_2}
-Both models, first segmenting-then-IPM and IPM-then-segmenting approaches, has considered the same conditions: no se han congelado las capas del encoder para realizar el fine-tuning en el task de segmentación y el preprocesado de las imágenes se ha realizado con \textit{SegformerImageProcessor} aplicando un cambio de tamaño de la imagen a $512 \times 512$, un re-escalado con un factor de $1/255$ y un normalizado con los valores de media y desviación típica de ImageNet. De esta forma, aseguramos que el preprocesado realizado es el mismo que el esperado por los encoders. 
+Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions: the encoder layers were not frozen during fine-tuning for the segmentation task, allowing the entire model to adapt to the data. Input image preprocessing was performed using the \textit{SegformerImageProcessor}, which includes resizing the images to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing using the mean and standard deviation values from ImageNet~\cite{imagenet}. This ensures the input format is consistent with what the pretrained encoders expect.
 
-Además, a la hora de proporcionar las máscaras semánticas de entrenamiento, el parámetro "reduce\_labels" se ha mantenido en \textit{False}, ya que no contamos con la clase "background". Aquellas zonas que no se quieren inferir, como son el fondo y las áreas no etiquetadas, tienen el label "ignore" así que no se calcula gradiente para ellas.
-
-All the experiments were carried out with the hardware shown in Table \ref{tab:hardware}
-
-
-The notation of models following the first segmenting then IPM for obtaining the BEV semantic masks has been named as "raw2seg\_bev" while the IPM and then segmenting approach has been named as "raw2bev\_seg". Three out of six Segformer's encoder sizes has been selected: MiT-b0, MiT-b2 and MiT-b4.
+Additionally, during training, semantic masks were provided with the \texttt{reduce\_labels} parameter set to \texttt{False}, since our dataset includes the "background" class. This means gradients are computed for all image regions during training. All experiments were carried out using the same hardware configuration described in Table~\ref{tab:hardware}. Among the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4.
 
 \begin{table}[h]
     \centering
@@ -30,15 +25,18 @@ The notation of models following the first segmenting then IPM for obtaining the
     \label{tab:hardware}
 \end{table}
 
-The two approaches were first trained in model size MiT-b0 for $20,7K$ steps without any regularization technique being applyed. The idea of this first experiment was to see if the models suffers from overfitting, so the smallest model size was used as they are fastest to train, it more unlike to has an extreme overfitting as its capacity for "remembering" and adjusting to training data is less than bigger models (although they can suffer from underfitting) and it is a good environment to test hyperparamenters configurations.
+Regarding to the used notation, the models that follow the segment-then-IPM pipeline to obtain BEV semantic masks are referred to as \texttt{raw2seg\_bev}, while those that first apply IPM and then perform segmentation are named \texttt{raw2bev\_seg}.
 
 
-With this configuration the results shown in figure \ref{fig:overfitting_mit-b0} were a clear overfitting of the two approaches can be seen as while the training loss continues decreasing, the evaluation loss starts increasing without showing a clear convergence. Seeing this results with the lightweigtest segformer's model enhances the idea of applying regularization techniques during training. 
+% ==========================================================
+The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for 20.7K steps without applying any regularization techniques. This initial experiment was carried out to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
 
-Thats why, the data augmentation techniques described in \ref{data_augmentations} where employed to train the models with varying data and other regularization techniques such as weight decay, or L2 regularization, were employed. \hl{Explain weight decay briefly}. With the use of this regularization techniques, the overfitting was reduced
+As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting: while the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes.
 
+To address this, data augmentation strategies described in Section~\ref{data_augmentations} were applied to introduce variability in the training data. Additionally, other regularization methods such as weight decay (also known as L2 regularization) were employed. Weight decay penalizes large weights during training, effectively preventing exploding gradients. With these regularization techniques in place, the overfitting behavior was significantly reduced.
 
-Importante destacar que durante las evaluaciones, los conjuntos de evaluacion son distintos: un pipeline evala sobre BEV y otro sobre normal, de ahí la diferencia significativa entre ambos. También, destacar que es posible que haya underfitting ya que el mIoU se mantiene bastante bajo.
+It is important to note that the evaluation datasets differ between the two pipelines—one evaluates performance on BEV projections while the other does so on regular images—hence the significant gap in their results.
+% ==========================================================
 
 
 \hl{I didn't find what is the segformer's loss function.}
