@@ -33,7 +33,7 @@ Two of the main perception tasks in \aclink{ADS} are 3D object detection and \ac
 
 On the other hand, \aclink{BEV} segmentation focuses on performing semantic segmentation of the environment, identifying drivable areas and lane boundaries in the vehicle's reference frame. Unlike object detection, \aclink{BEV} segmentation enables dense prediction of static environment classes, which is essential for local map construction, agent behavior estimation, and downstream tasks such as behavior planning in \aclink{ADS}. \hl{Add references.}
 
-This thesis is developed within the context of \aclink{BEV} semantic segmentation \hl{...}.
+This thesis is developed within the context of \aclink{BEV} semantic segmentation and explores several key aspects and tasks related to perception systems in \aclink{ADS}.
 
 \subsection{Semantic segmentation} 
 \label{sec:sota_semantic_segmentation}
@@ -47,8 +47,6 @@ Furthermore, the introduction of image classification backbones like VGG \cite{V
 From that point, semantic segmentation started to been framed as a structured prediction problem and the development of specific modules and architectures for this task was made. That's the case of dilated convolution \cite{ditaled_conv}, which increase the receptive field by "inflating" the \aclink{CNN} kernels with holes allowing models to capture more spatial context in their prediction.
 
 Also, Transformers have been adapted from NLP to vision tasks, starting with Vision Transformers (\aclink{ViT}) \cite{vit}, which model images as patch sequences using self-attention. For semantic segmentation, architectures like SETR \cite{SETR} replace \aclink{CNN} backbones with transformer for a better global understangin, while hybrid models like Swin Transformer \cite{swin} and MaskFormer balance efficiency and context modeling. These advancements improved segmentation performance, particularly in tasks requiring both fine details and long-range dependencies.
-
-\hl{This needs a review. Maybe the ViTs needs a deeper explanation. SegFormer is introduced in methodology.}
 
 \subsection{BEV semantic segmentation} 
 \label{sec:sota_BEV_semantic_segmentation}

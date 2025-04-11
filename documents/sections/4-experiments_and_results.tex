@@ -9,6 +9,7 @@ Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under
 
 Additionally, during training, semantic masks were provided with the \texttt{reduce\_labels} parameter set to \texttt{False}, since our dataset includes the "background" class. This means gradients are computed for all image regions during training. All experiments were carried out using the same hardware configuration described in Table~\ref{tab:hardware}. Among the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4.
 
+\hl{Complete this table.}
 \begin{table}[h]
     \centering
     \begin{tabular}{c l c}
@@ -27,34 +28,36 @@ Additionally, during training, semantic masks were provided with the \texttt{red
 
 Regarding to the used notation, the models that follow the segment-then-IPM pipeline to obtain BEV semantic masks are referred to as \texttt{raw2seg\_bev}, while those that first apply IPM and then perform segmentation are named \texttt{raw2bev\_seg}.
 
-
-% ==========================================================
-The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for 20.7K steps without applying any regularization techniques. This initial experiment was carried out to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
-
-As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting: while the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes.
-
-To address this, data augmentation strategies described in Section~\ref{data_augmentations} were applied to introduce variability in the training data. Additionally, other regularization methods such as weight decay (also known as L2 regularization) were employed. Weight decay penalizes large weights during training, effectively preventing exploding gradients. With these regularization techniques in place, the overfitting behavior was significantly reduced.
-
-It is important to note that the evaluation datasets differ between the two pipelines—one evaluates performance on BEV projections while the other does so on regular images—hence the significant gap in their results.
-% ==========================================================
-
+The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for $20.7K$ steps without applying any regularization techniques. This initial experiment was carried out to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
 
 \hl{I didn't find what is the segformer's loss function.}
+
+As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting. While the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes. Additionally, no signs of exploding gradients were observed during the training of these models.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/overfitting_bev_nu.png}
+    \caption{Training and evaluation loss of raw2seg\_bev and raw2bev\_seg MiT-b0 models without any regularization technique}
+    \label{fig:overfitting_mit-b0}
+\end{figure}
+
+It is important to note that the evaluation datasets differ between the two pipelines as one evaluates performance on BEV projections while the other does so on regular images motivating the gap in their validation results.
+
+To address the overfitting, data augmentation strategies described in Section~\ref{sec:data_augmentations} were applied to introduce variability in the training data. Additionally, other regularization methods such as weight decay (also known as L2 regularization) were employed. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details. With these regularization techniques in place, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
+
+\hl{Temporal graph!!}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/before_an_after_data_aug.png}
+    \caption{Before and after regularization techniques. Light colors before, darker colors after. BEV segmentation model uses normal data augmentations.}
+    \label{fig:before_after_data_aug}
+\end{figure}
 
 \hl{Comment that with model size MiT-b4 gradient accumulation techniques were used to fit the GPU memory specs.}
 
 \hl{Comment the max epochs set to 200 and the checkpoint strategy used: it is controvesial wheter to use the loss or mIoU. Whe have decided to use the loss.}
 
-
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=\linewidth]{./images/experiments/overfitting_bev_nu.png}
-    \caption{Training and evaluation loss of raw2seg\_bev and raw2bev\_seg MiT-b0 models without any regularization technique}
-    \label{fig:overfitting_mit-b0}
-\end{figure}
-
-
+With all of this in place, the training strategy is designed to support experimentation in order to answer two main research questions: In the case of segmentation in BEV images, \textit{which data augmentation technique is more effective: using the same strategy applied in the other approach, or modifying the extrinsic camera parameters?}; and \textit{which of the two approaches performs better for BEV image segmentation?}
 
 \subsubsection{BEV images data augmentation techniques comparison}
 \hl{Comparison between normal geometric data augmentation techniques and camera's extrinsic parameters modifications.}
