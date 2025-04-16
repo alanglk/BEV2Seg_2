@@ -2,13 +2,23 @@
 
 \begin{titlepage}
     % Logo de la universidad
-    \begin{textblock*}{\textwidth}(10cm,0cm)
-        \includegraphics[width=7.5cm, height=3cm]{images/shared/Logo_EHU.jpg}
+    \begin{textblock*}{\textwidth}(6cm,0.3cm)
+        \begin{center}
+            \begin{minipage}{0.45\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{images/shared/Logo_EHU.jpg}
+            \end{minipage}\hfill
+            \begin{minipage}{0.45\textwidth}
+                \centering
+                \includegraphics[width=0.7\linewidth]{images/shared/Logo_KISA.png} 
+            \end{minipage}
+        \end{center}
     \end{textblock*}
     
-    % Franja azul
+    
+    % Franja de color
     \begin{tikzpicture}[remember picture, overlay]
-        \fill[ehu_blue] (current page.north west) ++ (0,-3.01cm) rectangle (\paperwidth,-3cm);
+        \fill[\covercolor] (current page.north west) ++ (0,-3.01cm) rectangle (\paperwidth,-3cm);
     \end{tikzpicture}
     
     \begin{textblock*}{\paperwidth}(\dimexpr\parindent+\oddsidemargin+3em\relax,3.5cm)

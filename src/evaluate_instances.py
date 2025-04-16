@@ -710,10 +710,16 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
         bbox1 = get_oriented_bbox_from_vals(bbox1)
         bbox2 = get_oriented_bbox_from_vals(bbox2)
 
-        dd  = bbox1.dd(bbox2)        # Difference in Dimensions
+        dd  = bbox1.dd(bbox2)       # Difference in Dimensions
         v2v = bbox1.v2v(bbox2)      # Volume-Volume Distance
         iou = bbox1.IoU_v(bbox2)    # Volumetric IoU
         bbd = bbox1.bbd(bbox2)      # Bounding Box Disparity
+        
+        # ax = plt.figure(figsize=(10, 10)).add_subplot(projection='3d', proj_type = 'ortho', elev=30, azim=-80)
+        # bbd = bbox1.bbd(bbox2, ax=ax)      # Bounding Box Disparity
+        # plt.tight_layout()
+        # plt.legend()
+        # plt.show()
         
         dds.append(dd)
         deds.append(ded)
@@ -733,13 +739,16 @@ def compute_3d_detection_metrics(gt_bboxes:List[dict],
             print(f"[3D-Metrics]    {label} IoU_v   Metric: {iou}")
             print(f"[3D-Metrics]    {label} V2V     Metric: {v2v}")
 
+
     if _debug_plt and len(assignments) > 0:
         if len(assignments) > 1:
-            ax_slider = _plt_axes[4]
-            slider = Slider(ax_slider, "Assignment", 0, len(assignments)-1, valinit=0, valstep=1)
-            slider.on_changed(_debug_update_plt_slider)
+            _debug_update_plt_slider(0)
+            # El slider no funciona
+            # ax_slider = _plt_axes[4]
+            # slider = Slider(ax_slider, "Assignment", 0, len(assignments)-1, valinit=0, valstep=1)
+            # slider.on_changed(_debug_update_plt_slider)
         else:
-            _debug_update_plt_slider
+            _debug_update_plt_slider(0)
 
     return tp, fp, fn, dds, deds, v2vs, vious, bbds
 # ===========================================================================================
@@ -819,7 +828,7 @@ def _debug_show_plt():
     plt.draw()
     plt.pause(0.001)
 
-def _debug_update_plt_slider(val, i, j):
+def _debug_update_plt_slider(val):
     global _plt_init, _plt_figure, _plt_axes 
     global _plt_3d_gt_bboxes, _plt_3d_dt_bboxes, _plt_3d_labels
     if not _plt_init:
@@ -828,7 +837,6 @@ def _debug_update_plt_slider(val, i, j):
 
     if _plt_3d_labels is None or len(_plt_3d_labels) == 0:
         return
-
     idx = int(val)
     bbox1, bbox2 = _plt_3d_gt_bboxes[idx], _plt_3d_dt_bboxes[idx]
     plot_bb(bbox1.getT(),default_colors[2]/255, ax=ax3)
@@ -1489,7 +1497,7 @@ def main(
             if _debug:
                 
                 if _debug_plt:
-                    debug_show_cost_matrix(padded_cost_matrix, assignments, gt_in_uids, dt_in_uids, tp, fk)
+                    # debug_show_cost_matrix(padded_cost_matrix, assignments, gt_in_uids, dt_in_uids, tp, fk)
                     _debug_show_plt()
 
                 # Render 3d scene
@@ -1566,5 +1574,5 @@ if __name__ == "__main__":
          max_association_distance=3.0,
          association_dist_type='v2v',
          save_openlabel_path=SAVE_OPENLABEL_PATH, 
-         debug=False, 
+         debug=True, 
          debug_ego_model_path=DEBUG_EGO_MODEL)
