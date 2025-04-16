@@ -120,6 +120,10 @@ def plot_results(results:dict,
     names, counts, colors = [], [], []
     for i, label_id in enumerate(data['labels'].keys()):
         name = results[data_type]['names'][label_id]
+        
+        if name == 'background':
+            continue
+
         mean_count = data['labels'][label_id] #/ data['total'] # Normalize
 
         color = np.array(results[data_type]['colors'][label_id])
@@ -130,7 +134,7 @@ def plot_results(results:dict,
         colors.append(color)
 
 
-    xs = np.array(list(range(len(data['labels']))))
+    xs = np.array(list(range(len(names))))
     if bar_number == 0:
         xs = xs - bar_width/2
     elif bar_number == 1:
@@ -143,7 +147,7 @@ def plot_results(results:dict,
            edgecolor=bar_edgecolor, 
            label=label_name)
     
-    xs = np.array(list(range(len(data['labels']))))
+    xs = np.array(list(range(len(names))))
     ax.set_xticks(xs, names)
     
     ax.set_title(title)
@@ -176,7 +180,7 @@ def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path
     plot_results(results, data_type='bev', bar_number=0, data_versions=["train", "val", "test"], bar_color="#FF0064", ax=ax)
     plot_results(results, data_type='nu',  bar_number=1, data_versions=["train", "val", "test"], bar_color="#39C39E", ax=ax)
     ax.set_title("Class balance in datasets")
-    ax.legend(loc='upper right', ncols=2)
+    ax.legend(loc='upper left', ncols=2)
     plt.xticks(rotation=90, fontsize=5)
     plt.tight_layout()
     # plt.legend()
