@@ -7,7 +7,7 @@ from matplotlib.pylab import Axes
 import numpy as np
 
 from tqdm import tqdm
-from typing import Literal, List, Tuple
+from typing import Literal, List, Tuple, Union
 
 import argparse
 import json
@@ -85,7 +85,10 @@ def get_dataset_class_balance(dataset_path:str, dataset_type:Literal["bev", "nu"
 def plot_results(results:dict, 
                  data_type:Literal["bev", "nu"], 
                  data_versions:List[Literal['mini', 'train', 'val', 'test']], 
-                 bar_width:float=0.8, 
+                 bar_width:float=0.4, 
+                 bar_number:int=0,
+                 bar_align:str='center',
+                 bar_color:Union[str, Tuple[float]] = None,
                  bar_edgecolor:Tuple[float] = (0.0, 0.0, 0.0), 
                  ax: Axes = None):
     if ax is None:
@@ -93,8 +96,10 @@ def plot_results(results:dict,
     
     if data_type == "bev":
         title = "Class balance in BEV images"
+        label_name = "BEV"
     elif data_type == "nu":
         title = "Class balance in normal images"
+        label_name = "Normal"
     else:
         raise Exception("Invalid dataset type")
     
@@ -112,22 +117,38 @@ def plot_results(results:dict,
                 data['total'] += total_for_label
     
     # Plot 
-    xs = range(len(data['labels']))
-    for x, label_id in zip(xs, data['labels'].keys()):
+    names, counts, colors = [], [], []
+    for i, label_id in enumerate(data['labels'].keys()):
         name = results[data_type]['names'][label_id]
-        color = np.array(results[data_type]['colors'][label_id])
-        color_float = color / 255.0 if np.max(color) > 1.0 else color
-        mean_count = data['labels'][label_id] / data['total'] # Normalize
+        mean_count = data['labels'][label_id] #/ data['total'] # Normalize
 
-        ax.bar(x=name, height=mean_count,
-               width=bar_width, 
-               align='center',
-               color=color_float,
-               edgecolor=bar_edgecolor, 
-               label=name)
+        color = np.array(results[data_type]['colors'][label_id])
+        color = color / 255.0 if np.max(color) > 1.0 else color
+
+        names.append(name)
+        counts.append(mean_count)
+        colors.append(color)
+
+
+    xs = np.array(list(range(len(data['labels']))))
+    if bar_number == 0:
+        xs = xs - bar_width/2
+    elif bar_number == 1:
+        xs = xs + bar_width/2
+
+    ax.bar(x=xs, height=counts,
+           width=bar_width, 
+           align=bar_align,
+           color=bar_color if bar_color is not None else colors,
+           edgecolor=bar_edgecolor, 
+           label=label_name)
+    
+    xs = np.array(list(range(len(data['labels']))))
+    ax.set_xticks(xs, names)
+    
     ax.set_title(title)
     ax.set_xlabel("Label")
-    ax.set_ylabel("Mean count")
+    ax.set_ylabel("Number of pixels")
 
 
 def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path:str="./tmp/NuImagesFormatted", plot_results_flag:bool = True):
@@ -147,11 +168,16 @@ def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path
         print("Finished :D!!")
         return 
 
-    fig, axes = plt.subplots(2, 1, sharex=True, sharey=True)
-    plot_results(results, data_type='bev',  data_versions=["train", "val", "test"], ax=axes[0])
-    plot_results(results, data_type='nu',   data_versions=["train", "val", "test"], ax=axes[1])
-
-    plt.xticks(rotation=90, fontsize=8)
+    # fig, axes = plt.subplots(2, 1, sharex=True, sharey=True)
+    # plot_results(results, data_type='bev',  data_versions=["train", "val", "test"], ax=axes[0])
+    # plot_results(results, data_type='nu',   data_versions=["train", "val", "test"], ax=axes[1])
+    
+    ax = plt.gca()
+    plot_results(results, data_type='bev', bar_number=0, data_versions=["train", "val", "test"], bar_color="#FF0064", ax=ax)
+    plot_results(results, data_type='nu',  bar_number=1, data_versions=["train", "val", "test"], bar_color="#39C39E", ax=ax)
+    ax.set_title("Class balance in datasets")
+    ax.legend(loc='upper right', ncols=2)
+    plt.xticks(rotation=90, fontsize=5)
     plt.tight_layout()
     # plt.legend()
     plt.show()
