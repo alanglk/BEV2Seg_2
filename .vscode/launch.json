@@ -19,7 +19,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}", // Esto ejecuta el archivo que esté abierto
-            "args": ["config/my_scene.toml"],
+            // "args": ["config/my_scene.toml"],
+            "args": ["data/class_balance.json"],
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // Establecer el PYTHONPATH para todo el proyecto
