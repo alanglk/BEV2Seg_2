@@ -85,8 +85,6 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
     \label{fig:bev_dataset}
 \end{figure}
 
-\hl{Include the semantic class distribution of all splits.}
-
 \subsubsection{Data augmentations}
 \label{sec:data_augmentations}
 Data augmentations are commonly used in deep learning models to mitigate overfitting during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
@@ -360,8 +358,19 @@ The approach employed for this task is detailed in Algorithm~\ref{algorithm:scen
 \end{algorithm}
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=0.5\linewidth]{images/methodology/pcd_raw.png}
-    \caption{Reconstructed pointcloud.}
+    \begin{subfigure}[b]{0.45\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/raw_image_0.jpg}
+        \caption{}
+        \label{fig:raw_pointcloud_a}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/pcd_raw.png}
+        \caption{}
+        \label{fig:raw_pointcloud_b}
+    \end{subfigure}
+
+    \caption{Source image (a) and reconstructed pointcloud (b).}
     \label{fig:raw_pointcloud}
 \end{figure}
 
@@ -371,7 +380,7 @@ The objective of this module is to compute instance-level point clouds from the 
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=0.5\linewidth]{images/shared/no_signal.jpg}
+    \includegraphics[width=0.5\linewidth]{images/methodology/instance_scene_flow_diagram.png}
     \caption{Instance scene computation diagram.}
     \label{fig:instance_scene_diagram}
 \end{figure}
@@ -458,7 +467,7 @@ The results of this module are shown in Figure~\ref{fig:instance_scene_images}.
         \label{fig:instance_scene_images_b}
     \end{subfigure}
 
-    \caption{Resulting instances (a) in 3D and (b) projected into the front camera.}
+    \caption{Resulting instances in 3D (a) and projected into the front camera (b).}
     \label{fig:instance_scene_images}
 \end{figure}
 
