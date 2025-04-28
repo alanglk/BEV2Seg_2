@@ -43,7 +43,7 @@ As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs 
 
 It is important to note that the evaluation datasets differ between the two pipelines as one evaluates performance on BEV projections while the other does so on regular images motivating the gap in their validation results.
 
-To address the overfitting, data augmentation strategies described in Section~\ref{sec:data_augmentations} were applied to introduce variability in the training data. Additionally, other regularization methods such as weight decay (also known as L2 regularization) were employed. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details. With these regularization techniques in place, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
+To address the overfitting, data random cropping, flipping and rescaling augmentation strategies described in Section~\ref{sec:data_augmentations} were applied to both normal and \aclink{BEV} images for introducing variability in the training data. Additionally, other regularization methods such as weight decay (also known as L2 regularization) were employed. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details. With these regularization techniques in place, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
 
 \hl{Temporal graph!!}
 \begin{figure}[h!]
@@ -56,11 +56,33 @@ To address the overfitting, data augmentation strategies described in Section~\r
 \hl{Comment that with model size MiT-b4 gradient accumulation techniques were used to fit the GPU memory specs.}
 
 \hl{Comment the max epochs set to 200 and the checkpoint strategy used: it is controvesial wheter to use the loss or mIoU. Whe have decided to use the loss.}
+\hl{Comment the training stopping strategy is based on the eval loss.}
 
-With all of this in place, the training strategy is designed to support experimentation in order to answer two main research questions: In the case of segmentation in BEV images, \textit{which data augmentation technique is more effective: using the same strategy applied in the other approach, or modifying the extrinsic camera parameters?}; and \textit{which of the two approaches performs better for BEV image segmentation?}
+With all of this in place, the training strategy is designed to support experimentation in order to answer two main research questions:
+
+\begin{itemize}
+    \item \textit{Which data augmentation technique is more effective: using the same strategy applied in the other approach, or modifying the extrinsic camera parameters?}
+    \item \textit{Which of the two approaches performs better for BEV image segmentation?}
+\end{itemize}
 
 \subsubsection{BEV images data augmentation techniques comparison}
 \hl{Comparison between normal geometric data augmentation techniques and camera's extrinsic parameters modifications.}
+
+The objective of this section is to show what of the data augmentation techniques is better for \aclink{BEV} semantic segmentation training and how the modification of the camera extrinsic's parameters affects the semantic predictions.
+
+Despite significantly reducing the overfitting, normal data augmentations for \aclink{BEV} images
+
+
+\subsubsection{Pipeline comparison}
+\hl{raw2seg\_bev results compared with raw2bev\_seg results.}
+
+
+
+
+
+\subsection{3D detections evaluations}
+\hl{Explain the selected NuScenes selected vehicle scene, and expose the metrics used (mIoU and v2v distance).}
+
 
 \begin{figure}[h]
     \centering
@@ -81,12 +103,6 @@ With all of this in place, the training strategy is designed to support experime
     \label{fig:bbox_disparity}
 \end{figure}
 
-
-\subsubsection{Pipeline comparison}
-\hl{raw2seg\_bev results compared with raw2bev\_seg results.}
-
-\subsection{3D detections evaluations}
-\hl{Explain the selected NuScenes selected vehicle scene, and expose the metrics used (mIoU and v2v distance).}
 
 \subsection{BEV masks evaluation}
 \hl{Groundtruth BEV masks could be generated from annotations and compute mIoU between the annotated BEV masks and ground truth ones.}
