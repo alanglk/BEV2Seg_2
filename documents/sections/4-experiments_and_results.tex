@@ -62,6 +62,25 @@ With all of this in place, the training strategy is designed to support experime
 \subsubsection{BEV images data augmentation techniques comparison}
 \hl{Comparison between normal geometric data augmentation techniques and camera's extrinsic parameters modifications.}
 
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c}
+        
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_0_3d_scene.png} &
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_2_3d_scene.png} \\
+        
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_0_3d_bb.png} &
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_2_3d_bb.png} \\
+
+    \end{tabular}
+    
+    \caption{Bounding Box Disparity scene calculation. (a) shows an example of intersection, while (b) shows an example of volumetric distance}
+    \label{fig:bbox_disparity}
+\end{figure}
+
 
 \subsubsection{Pipeline comparison}
 \hl{raw2seg\_bev results compared with raw2bev\_seg results.}
