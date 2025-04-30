@@ -5,9 +5,10 @@
 This section includes all experiments carried out for evaluating the difference between the two approaches considered in the BEV2Seg\_2 pipeline, experiments to study what is the influence of extrinsic parameters modification as data augmentation technique for semantic segmentation of BEV images and the final evaluation of the proposed annotation pipeline of occupancy, occlusion and driveable areas.
 
 \subsection{BEV2Seg\_2}
-Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions: the encoder layers were not frozen during fine-tuning for the segmentation task, allowing the entire model to adapt to the data. Input image preprocessing was performed using the \textit{SegformerImageProcessor}, which includes resizing the images to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing using the mean and standard deviation values from ImageNet~\cite{imagenet}. This ensures the input format is consistent with what the pretrained encoders expect.
 
-Additionally, during training, semantic masks were provided with the \texttt{reduce\_labels} parameter set to \texttt{False}, since our dataset includes the "background" class. This means gradients are computed for all image regions during training. All experiments were carried out using the same hardware configuration described in Table~\ref{tab:hardware}. Among the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4.
+Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions. During fine-tuning for the segmentation task, encoder layers were left unfrozen, allowing the entire model to adapt to the training data. Input images were preprocessed using the \textit{SegformerImageProcessor}, which includes resizing to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing with ImageNet mean and standard deviation values~\cite{imagenet}. This preprocessing step ensures the input format is consistent with what the pretrained encoders expect.
+
+Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mean intersection over union is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training and the loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way following the Segformer implementation.
 
 \hl{Complete this table.}
 \begin{table}[h]
@@ -28,11 +29,7 @@ Additionally, during training, semantic masks were provided with the \texttt{red
 
 Regarding to the used notation, the models that follow the segment-then-IPM pipeline to obtain BEV semantic masks are referred to as \texttt{raw2seg\_bev}, while those that first apply IPM and then perform segmentation are named \texttt{raw2bev\_seg}.
 
-The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for $20.7K$ steps without applying any regularization techniques. This initial experiment was carried out to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
-
-\hl{I didn't find what is the segformer's loss function.}
-
-As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting. While the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes. Additionally, no signs of exploding gradients were observed during the training of these models.
+The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for $20.7K$ steps without applying any regularization technique. This initial experiment was performed to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
 
 \begin{figure}[h!]
     \centering
@@ -41,9 +38,104 @@ As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs 
     \label{fig:overfitting_mit-b0}
 \end{figure}
 
-It is important to note that the evaluation datasets differ between the two pipelines as one evaluates performance on BEV projections while the other does so on regular images motivating the gap in their validation results.
+As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting. While the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes. Additionally, no signs of exploding gradients were observed during the training of these models.
 
-To address the overfitting, data random cropping, flipping and rescaling augmentation strategies described in Section~\ref{sec:data_augmentations} were applied to both normal and \aclink{BEV} images for introducing variability in the training data. Additionally, other regularization methods such as weight decay (also known as L2 regularization) were employed. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details. With these regularization techniques in place, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
+Two main approaches were selected to tackle the overfitting problem: weight decay (also known as L2 regularization) and data augmentation. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details; while data augmentation techniques introduces variability in the training dataset enabling the model to adapt better to unseen data. However, the introduction of data augmentation techniques into \aclink{BEV} images domain is not trivial and raises another research question.
+
+With all of this in place, the training strategy is designed to support experimentation in order to answer two main research questions:
+
+\begin{itemize}
+    \item \textit{Which data augmentation technique is more effective for trainig a model directly on \aclink{BEV} images on a semantic segmentation task?}
+    \item \textit{Which of the two approaches performs better for BEV image segmentation?}
+\end{itemize}
+
+\subsubsection{Data augmentation}
+Data augmentations are commonly used in deep learning models to mitigate overfitting during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
+
+Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
+
+Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image may lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure~\ref{fig:bev_cropping}). 
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c c c}
+
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_0_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_1_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_2_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_3_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_4_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_5_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_6_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_7_bev.png} \\ 
+        
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_0_9.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_1_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_2_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_3_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_4_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_5_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_6_1.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_7_2.png} \\ 
+
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_0_9.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_1_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_2_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_3_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_4_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_5_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_6_1.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_7_2.png} \\
+
+    \end{tabular}
+    
+    \caption{Random cropping and horizontal flipping on BEV images. Original BEV images on first row; random flipped and cropped images on second row and corresponding semantic masks on last row.}
+    \label{fig:bev_cropping}
+\end{figure}
+
+In this context, a different approach was also considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique may enable the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure~\ref{fig:bev_data_aug}).
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c}
+        & $-0.25$ rad & $-0.125$ rad & $0.0$ rad & $0.125$ rad & $0.25$ rad \\ 
+        
+        \rotatebox{90}{\textbf{Yaw}} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.25_4.png} \\ 
+        
+        \rotatebox{90}{\textbf{Pitch}} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.25_4.png} \\ 
+
+        \rotatebox{90}{\textbf{Roll}} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.25_4.png} \\ 
+        
+    \end{tabular}
+    
+    \caption{Effect of camera transformations on BEV projection. The first row shows variations in the yaw axes, the second in pitch, and the third in roll.}
+    \label{fig:bev_data_aug}
+\end{figure}
+
+
+With the inclusion of random cropping, flippingf and rescaling augmentation strategies on both normal and \aclink{BEV} images, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
+
 
 \hl{Temporal graph!!}
 \begin{figure}[h!]
@@ -53,19 +145,10 @@ To address the overfitting, data random cropping, flipping and rescaling augment
     \label{fig:before_after_data_aug}
 \end{figure}
 
-\hl{Comment that with model size MiT-b4 gradient accumulation techniques were used to fit the GPU memory specs.}
+It is important to note that the evaluation datasets differ between the two pipelines as one evaluates performance on BEV projections while the other does so on regular images motivating the gap in their validation results.
 
-\hl{Comment the max epochs set to 200 and the checkpoint strategy used: it is controvesial wheter to use the loss or mIoU. Whe have decided to use the loss.}
-\hl{Comment the training stopping strategy is based on the eval loss.}
+\hl{This raises an important question: \textit{Which approach is more effective: traditional geometric data augmentation techniques or the modification of extrinsic parameters?}}
 
-With all of this in place, the training strategy is designed to support experimentation in order to answer two main research questions:
-
-\begin{itemize}
-    \item \textit{Which data augmentation technique is more effective: using the same strategy applied in the other approach, or modifying the extrinsic camera parameters?}
-    \item \textit{Which of the two approaches performs better for BEV image segmentation?}
-\end{itemize}
-
-\subsubsection{BEV images data augmentation techniques comparison}
 \hl{Comparison between normal geometric data augmentation techniques and camera's extrinsic parameters modifications.}
 
 The objective of this section is to show what of the data augmentation techniques is better for \aclink{BEV} semantic segmentation training and how the modification of the camera extrinsic's parameters affects the semantic predictions.
@@ -75,8 +158,6 @@ Despite significantly reducing the overfitting, normal data augmentations for \a
 
 \subsubsection{Pipeline comparison}
 \hl{raw2seg\_bev results compared with raw2bev\_seg results.}
-
-
 
 
 

@@ -2,14 +2,14 @@
 % =                 METHODOLOGY                  =
 % ================================================ 
 
-This section details the experiments and implementations made to address the problems described in Section~\ref{sec:introduction}. On the first hand, the experimental design is introduced, tackling the model and dataset selection, how data augmentations are performed and the training and validation processes. Afterward, the implementation of the occupancy and occlusion masks preannotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
+This section details the experiments and implementations made to address the problems described in Section~\ref{sec:introduction}. On the first hand, the experimental design is introduced, tackling the model and dataset selection and the training and validation processes. Afterward, the implementation of the occupancy and occlusion masks preannotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
 
-Thus, this project can be divided into three main blocks: \aclink{BEV} semantic segmentation experimentation, design and implementation of the preannotation pipeline and a thrid block of how the system is evaluated.
+Thus, this project can be divided into two main blocks: \aclink{BEV} semantic segmentation experimentation and the design and implementation of the preannotation pipeline. Finally, all experiments for evaluating the models and the resulting framework are presented.  
 
 \subsection{Segmentation experiment design: BEV2Seg\_2}
 \label{sec:bev2seg_2}
 
-To address the hypotesis that 'A semantic segmentation model trained with BEV images better segments planar elements' the process represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. It follows two main approaches: first, performing image segmentation on regular RGB images and then reprojecting them to \aclink{BEV}; second, applying \aclink{IPM} to the original images and then segmenting them with the model.
+To address the hypotesis that \textit{A semantic segmentation model trained with BEV images better segments planar elements} the process represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. It follows two main approaches: first, performing image segmentation on regular RGB images and then reprojecting them to \aclink{BEV}; second, applying \aclink{IPM} to the original images and then segmenting them with the model.
 
 \begin{figure}[h!]
     \centering
@@ -85,98 +85,10 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
     \label{fig:bev_dataset}
 \end{figure}
 
-\subsubsection{Data augmentations}
-\label{sec:data_augmentations}
-Data augmentations are commonly used in deep learning models to mitigate overfitting during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
-
-Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
-
-Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image may lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure~\ref{fig:bev_cropping}). 
-
-\begin{figure}[h]
-    \centering
-    % Row labels
-    \setlength{\tabcolsep}{1pt}  % Reduce column padding
-    \renewcommand{\arraystretch}{0.5}
-    \begin{tabular}{c c c c c c c c}
-
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_0_bev.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_1_bev.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_2_bev.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_3_bev.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_4_bev.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_5_bev.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_6_bev.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_7_bev.png} \\ 
-        
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_0_9.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_1_2.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_2_5.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_3_5.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_4_3.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_5_2.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_6_1.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_7_2.png} \\ 
-
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_0_9.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_1_2.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_2_5.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_3_5.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_4_3.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_5_2.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_6_1.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_7_2.png} \\
-
-    \end{tabular}
-    
-    \caption{Random cropping and horizontal flipping on BEV images. Original BEV images on first row; random flipped and cropped images on second row and corresponding semantic masks on last row.}
-    \label{fig:bev_cropping}
-\end{figure}
-
-In this context, a different approach was also considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique may enable the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure~\ref{fig:bev_data_aug}).
-
-\begin{figure}[h]
-    \centering
-    % Row labels
-    \setlength{\tabcolsep}{1pt}  % Reduce column padding
-    \renewcommand{\arraystretch}{0.5}
-    \begin{tabular}{c c c c c c}
-        & $-0.25$ rad & $-0.125$ rad & $0.0$ rad & $0.125$ rad & $0.25$ rad \\ 
-        
-        \rotatebox{90}{\textbf{Yaw}} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_-0.25_0.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_-0.125_1.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.0_2.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.125_3.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.25_4.png} \\ 
-        
-        \rotatebox{90}{\textbf{Pitch}} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_-0.25_0.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_-0.125_1.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.0_2.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.125_3.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.25_4.png} \\ 
-
-        \rotatebox{90}{\textbf{Roll}} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_-0.25_0.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_-0.125_1.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.0_2.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.125_3.png} & 
-        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.25_4.png} \\ 
-        
-    \end{tabular}
-    
-    \caption{Effect of camera transformations on BEV projection. The first row shows variations in the yaw axes, the second in pitch, and the third in roll.}
-    \label{fig:bev_data_aug}
-\end{figure}
-
-\hl{This raises an important question: \textit{Which approach is more effective: traditional geometric data augmentation techniques or the modification of extrinsic parameters?}}
-
-\subsubsection{Validation and comparison: Selection module}
+\subsubsection{Validation and comparison}
 Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.
 
-\hl{Fusion module in the pipeline. Semantic masks are selected from each model depending on its mIoU in the test set?}
-
+\hl{Fusion module in the pipeline. Semantic masks are selected from each model depending on its mIoU in the test set? Meter la chapa de métricas y demás.}
 
 \subsection{Driveable area automatic annotation}
 \label{sec:aplication}
@@ -515,10 +427,4 @@ This method allows for estimating the vehicle’s extent while handling certain 
     \caption{BEV occupancy and occlusion masks. (a) Input 3D detections; (b) input BEV semantic masks and (c) final BEV occupied-occluded mask.}
     \label{fig:bev_occupancy_occlusion}
 \end{figure}
-
-
-\subsection{Evaluation methodology}
-\label{sec:evaluacion}
-
-\hl{Methodology introduction has to be reviewed as this section is being moved to} \ref{sec:experiments_and_results}.
 
