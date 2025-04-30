@@ -237,3 +237,5 @@ class BEV2SEG_2():
     def generate_bev_segmentation(self, image: np.ndarray, openlabel: core.OpenLABEL):
         pass
 
+
+

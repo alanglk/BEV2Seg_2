@@ -21,7 +21,7 @@ To address the hypotesis that \textit{A semantic segmentation model trained with
 Considering this flowchart, three main questions arises: (1) which segmentation model to use, (2) which dataset to train the models with, and (3) how to compare the train models and select the optimal output of the pipeline. 
 
 \subsubsection{Segformer}
-There are multiple techniques and strategies for tackling semantic segmentation in both regular and \aclink{BEV} images \ref{sec:sota}.  
+There are multiple techniques and strategies for tackling semantic segmentation in both regular and \aclink{BEV} images (see Section~\ref{sec:sota}).  
 
 Several models could be chosen to address the proposed hypothesis. The current state of the art includes both \aclink{CNN} and \aclink{ViT}-based models that achieve competitive results. As shown in Figure~\ref{tab:model_comparison}, there is no significant difference in accuracy and inference speed among the top-performing models. Moreover, many of these models have already been applied in the context of \aclink{ADS}. In this work, Segformer~\cite{segformer} has been selected as the semantic segmentation model due to its balance between performance and efficiency. Additionally, it is integrated into the Huggingface~\cite{huggingface} ecosystem, which provides an optimized, parallelized implementation, facilitating distributed training.  
 
@@ -68,7 +68,7 @@ To train the models in the pipeline, a parser has been developed to convert NuIm
 
 The conversion process is performed using a custom parser named 'OLDatasets', which transforms NuImages samples into the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format, where metadata for each frame is stored. In the case of BEVDataset, images are reprojected into the \aclink{BEV} domain using the \aclink{VCD} library \cite{VCD}. This library provides tools to handle OpenLABEL annotations and manage both 2D and 3D data efficiently.
 
-The OLDatasets parser extracts the camera parameters for each sample and computes a \aclink{LUT} to apply \aclink{IPM} reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the \aclink{BEV} space. Since this reprojection involves image warping, the interpolation method must be carefully chosen:
+The OLDatasets parser extracts the camera parameters for each sample and computes a lookup table to apply \aclink{IPM} reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the \aclink{BEV} space. Since this reprojection involves image warping, the interpolation method must be carefully chosen:
 \begin{itemize}
     \item Linear interpolation is applied to images.
     \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
@@ -76,7 +76,7 @@ The OLDatasets parser extracts the camera parameters for each sample and compute
 
 The virtual \aclink{BEV} camera parameters are fixed: \aclink{BEV} reprojection is generated using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the camera and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
 
-Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure~\ref{fig:bev_dataset}.
+Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure~\ref{fig:bev_dataset}. More details about the dataset conversion and especifications can be fount at Appendix~\ref{appendix:OLDatasets}.
 
 \begin{figure}[h!]
     \centering
@@ -87,6 +87,8 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
 
 \subsubsection{Validation and comparison}
 Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.
+
+\hl{See this post: } \url{https://ilmonteux.github.io/2019/05/10/segmentation-metrics.html}
 
 \hl{Fusion module in the pipeline. Semantic masks are selected from each model depending on its mIoU in the test set? Meter la chapa de métricas y demás.}
 
@@ -306,11 +308,23 @@ Firstly, the input semantic mask is preprocessed with a label merging step in wh
         \hline
         \textbf{Merged Class} & \textbf{Original Classes} \\
         \hline
+        \texttt{background} & \texttt{background} \\ 
+        \hline
+        \texttt{animal} & \texttt{animal} \\
+        \hline
+        \texttt{human.pedestrian} &
+        \texttt{human.pedestrian.adult}, \texttt{human.pedestrian.child}, \texttt{human.pedestrian.construction\_worker}, \texttt{human.pedestrian.personal\_mobility}, \texttt{human.pedestrian.police\_officer}, \texttt{human.pedestrian.stroller}, \texttt{human.pedestrian.wheelchair} \\
+        \hline
+        \texttt{movable\_object.barrier} &
+        \texttt{movable\_object.barrier}, \texttt{movable\_object.debris}, \texttt{movable\_object.pushable\_pullable}, \texttt{movable\_object.trafficcone}, \texttt{static\_object.bicycle\_rack} \\
+        \hline
         \texttt{vehicle.car} & 
         \texttt{vehicle.bus.bendy}, \texttt{vehicle.bus.rigid}, \texttt{vehicle.car}, \texttt{vehicle.construction}, \texttt{vehicle.emergency.ambulance}, \texttt{vehicle.emergency.police}, \texttt{vehicle.trailer}, \texttt{vehicle.truck} \\
         \hline
         \texttt{vehicle.motorcycle} & 
         \texttt{vehicle.bicycle}, \texttt{vehicle.motorcycle} \\
+        \hline
+        \texttt{flat.driveable\_surface} & \texttt{flat.driveable\_surface} \\
         \hline
     \end{tabular}
     \caption{Class merge dictionary used for semantic simplification.}
