@@ -5,19 +5,10 @@
 This section includes all experiments carried out for evaluating the difference between the two approaches considered in the BEV2Seg\_2 pipeline, experiments to study what is the influence of extrinsic parameters modification as data augmentation technique for semantic segmentation of BEV images and the final evaluation of the proposed annotation pipeline of occupancy, occlusion and driveable areas.
 
 \subsection{BEV2Seg\_2}
-Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions: the encoder layers were not frozen during fine-tuning for the segmentation task, allowing the entire model to adapt to the data. Input image preprocessing was performed using the \textit{SegformerImageProcessor}, which includes resizing the images to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing using the mean and standard deviation values from ImageNet~\cite{imagenet}. This ensures the input format is consistent with what the pretrained encoders expect.
-
-Additionally, during training, semantic masks were provided with the \texttt{reduce\_labels} parameter set to \texttt{False}, since our dataset includes the "background" class. This means gradients are computed for all image regions during training. All experiments were carried out using the same hardware configuration described in Table~\ref{tab:hardware}. Among the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. And in the case of MiT-b4, due to the model's size, a gradient accumulation technique was employed to ensure the fit to the GPU memmory. The checkpoint strategy is based on the evaluation loss (it is controversial whether to use a loss function or mIoU, but the loss has been selected). And a simple linear learning rate scheduler.
-\hl{I didn't find what is the segformer's loss function. Maybe Categorical Cross-Entropy Loss.} 
 
 Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions. During fine-tuning for the segmentation task, encoder layers were left unfrozen, allowing the entire model to adapt to the training data. Input images were preprocessed using the \textit{SegformerImageProcessor}, which includes resizing to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing with ImageNet mean and standard deviation values~\cite{imagenet}. This preprocessing step ensures the input format is consistent with what the pretrained encoders expect.
 
-Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to the gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory limitations. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mIoU is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training. The loss function employed is BCEWithLogitsLoss for the multilable semantic segmentation task...
-
-% ============================================================================
-Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss—a decision made despite ongoing debate over whether loss or mean Intersection over Union (mIoU) is a more appropriate metric for model selection. A basic linear learning rate scheduler was applied throughout training. The loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way.
-% ============================================================================
-
+Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mean intersection over union is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training and the loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way following the Segformer implementation.
 
 \hl{Complete this table.}
 \begin{table}[h]
@@ -49,16 +40,16 @@ The two approaches were firstly trained using the smallest Segformer model varia
 
 As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting. While the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes. Additionally, no signs of exploding gradients were observed during the training of these models.
 
-Two main approaches were selected to tackle the overfitting problem: weight decay (also known as L2 regularization) and data augmentation. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details; while data augmentation techniques introduces variability in the training dataset enabling the model to adapt better to unseen data. However, the introduction of data augmentation techniques into \aclink{BEV} images domain is not trivial which raises another research question.
+Two main approaches were selected to tackle the overfitting problem: weight decay (also known as L2 regularization) and data augmentation. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details; while data augmentation techniques introduces variability in the training dataset enabling the model to adapt better to unseen data. However, the introduction of data augmentation techniques into \aclink{BEV} images domain is not trivial and raises another research question.
 
 With all of this in place, the training strategy is designed to support experimentation in order to answer two main research questions:
 
 \begin{itemize}
-    \item \textit{Which data augmentation technique is more effective: using the same strategy applied in the other approach, or modifying the extrinsic camera parameters?}
+    \item \textit{Which data augmentation technique is more effective for trainig a model directly on \aclink{BEV} images on a semantic segmentation task?}
     \item \textit{Which of the two approaches performs better for BEV image segmentation?}
 \end{itemize}
 
-\subsubsection{BEV images data augmentation techniques comparison}
+\subsubsection{Data augmentation}
 Data augmentations are commonly used in deep learning models to mitigate overfitting during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
 
 Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
@@ -143,9 +134,7 @@ In this context, a different approach was also considered: applying geometric tr
 \end{figure}
 
 
-
-\hl{Review this!!!}
-Random cropping, flipping and rescaling augmentation strategies were applied to both normal and \aclink{BEV} images for introducing variability in the training data. With these regularization techniques in place, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
+With the inclusion of random cropping, flippingf and rescaling augmentation strategies on both normal and \aclink{BEV} images, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
 
 
 \hl{Temporal graph!!}
