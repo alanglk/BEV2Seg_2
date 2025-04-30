@@ -21,6 +21,9 @@ from oldatasets.BEV import BEVFeatureExtractionDataset
 from oldatasets.NuImages import NuImagesFeatureExtractionDataset
 from oldatasets.NuImages import NuImagesFormattedFeatureExtractionDataset
 
+# For merging labels
+from oldatasets.NuImages.nulabels import DEFAULT_MERGE_DICT, nuid2name, nuname2label, nuid2color, nuid2dynamic, get_merged_nulabels
+
 import argparse
 import toml
 import os
@@ -103,6 +106,7 @@ def main(config: dict):
     lr_scheduler_type       = config['training']['lr_scheduler_type']       if 'lr_scheduler_type' in config['training']        else "linear"
     lr_scheduler_kwargs     = config['training']['lr_scheduler_kwargs']     if 'lr_scheduler_kwargs' in config['training']      else {}
     gradient_accum_steps    = config['training']['gradient_accum_steps']    if 'gradient_accum_steps' in config['training']     else 1
+    merge_semantic_labels   = config['training']['merge_semantic_labels']   if 'merge_semantic_labels' in config['training']    else False
     
 
     
@@ -141,14 +145,22 @@ def main(config: dict):
     # Image Processor
     image_processor = SegformerImageProcessor(reduce_labels=False)
 
+    # Merge Labels
+    global num_labels, id2label
+    id2label = nuid2name
+    id2color = nuid2color
+    merging_lut_ids = None
+    if merge_semantic_labels:
+        id2label,_,id2color,_, merging_lut_ids, _ = get_merged_nulabels(id2label, nuname2label, id2color, nuid2dynamic, DEFAULT_MERGE_DICT)
+
     # Dataset and Dataloader
     if dataset_type == 'BEVDataset':
         if testing:
-            train_dataset   = BEVFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor, transforms=transforms)
-            eval_dataset    = BEVFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor)
+            train_dataset   = BEVFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor, transforms=transforms, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
+            eval_dataset    = BEVFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
         else:
-            train_dataset   = BEVFeatureExtractionDataset(dataroot=dataroot, version='train', image_processor=image_processor, transforms=transforms)
-            eval_dataset    = BEVFeatureExtractionDataset(dataroot=dataroot, version='val',   image_processor=image_processor)
+            train_dataset   = BEVFeatureExtractionDataset(dataroot=dataroot, version='train', image_processor=image_processor, transforms=transforms, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
+            eval_dataset    = BEVFeatureExtractionDataset(dataroot=dataroot, version='val',   image_processor=image_processor, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
 
     elif dataset_type == 'NuImages':
         if testing:
@@ -160,13 +172,11 @@ def main(config: dict):
     
     elif dataset_type == 'NuImagesFormatted':
         if testing:
-            train_dataset   = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor, transforms=transforms)
-            eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor)
+            train_dataset   = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor, transforms=transforms, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
+            eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='mini', image_processor=image_processor, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
         else:
-            train_dataset   = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='train', image_processor=image_processor, transforms=transforms)
-            eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='val',   image_processor=image_processor)
-
-    global num_labels, id2label
+            train_dataset   = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='train', image_processor=image_processor, transforms=transforms, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
+            eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='val',   image_processor=image_processor, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
     id2label = train_dataset.id2label
     num_labels = len(train_dataset.id2label)
 

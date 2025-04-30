@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from oldatasets.common import Dataset2BEV
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFile
 import cv2
 import os
 import time
@@ -259,8 +259,8 @@ class BEVDataset(Dataset):
 class BEVFeatureExtractionDataset(BEVDataset):
     """Image (semantic) segmentation dataset. BGR Format!!!"""
 
-    def __init__(self, dataroot, version, image_processor, image_extension='.png', transforms=None, id2label=nuid2name):
-        super().__init__(dataroot, version, image_extension, transforms, id2label)
+    def __init__(self, dataroot, version, image_processor, image_extension='.png', transforms=None, id2label=nuid2name, id2color=nuid2color, merging_lut_ids:dict = None):
+        super().__init__(dataroot, version, image_extension, transforms, id2label, id2color)
         self.image_processor = image_processor
         # IMPORTANTE:
         #   Se considera que 0 es el background, pero en nuestro caso
@@ -276,7 +276,18 @@ class BEVFeatureExtractionDataset(BEVDataset):
         self.id2label[255] = 'ignore'
         self.label2id['ignore'] = 255
         # self.id2color[255] = (255, 255, 255)
+        self.merging_lut_ids = merging_lut_ids
     
+    def merge_semantic_labels(self, semantic_mask:ImageFile):
+        if isinstance(semantic_mask, ImageFile):
+            semantic_mask = np.array(semantic_mask)
+
+        # Merge labels
+        for src_id, res_id in self.merging_lut_ids:
+            semantic_mask[semantic_mask == src_id] = res_id
+
+        return Image.fromarray( semantic_mask )
+
     def __getitem__(self, index):
         """
         INPUT:
@@ -317,6 +328,10 @@ class BEVFeatureExtractionDataset(BEVDataset):
         # cv2.namedWindow("DEBUG_IMAGE", cv2.WINDOW_NORMAL)
         # cv2.imshow("DEBUG_IMAGE", cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR))
         # cv2.waitKey(0)
+
+        # Merge semantic labels
+        if self.merging_lut_ids is not None:
+            target = self.merge_semantic_labels(target)
 
         # Perform data preparation with image_processor 
         # (it shoul be from transformers:SegformerImageProcessor)

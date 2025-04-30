@@ -1,3 +1,4 @@
+from typing import Tuple
 
 class NuLabel:
     # 'token',        category_token from NuImages Dataset (loaded at parsing)
@@ -49,10 +50,83 @@ nulabels = [
 
 
 # name to label object
-nuname2label      = { label.name    : label for label in nulabels }
-
 # trainId to name and to color
+nuname2label      = { label.name    : label for label in nulabels }
 nuid2name =  { label.trainId : label.name for label in nulabels }
 nuid2color =  { label.trainId : label.color for label in nulabels }
-
 nuid2dynamic = { label.trainId : label.dynamic for label in nulabels }
+
+# Merge labels
+DEFAULT_MERGE_DICT = {
+    "background": [ "background" ],
+    "animal": [ "animal" ],
+    "human.pedestrian": [
+        "human.pedestrian.adult",
+        "human.pedestrian.child",
+        "human.pedestrian.construction_worker",
+        "human.pedestrian.personal_mobility",
+        "human.pedestrian.police_officer",
+        "human.pedestrian.stroller",
+        "human.pedestrian.wheelchair"
+    ],
+    "movable_object.barrier" : [
+        "movable_object.barrier",
+        "movable_object.debris",
+        "movable_object.pushable_pullable",
+        "movable_object.trafficcone",
+        "static_object.bicycle_rack",
+    ],
+    "vehicle.car": [
+        "vehicle.bus.bendy", 
+        "vehicle.bus.rigid", 
+        "vehicle.car", 
+        "vehicle.construction", 
+        "vehicle.emergency.ambulance", 
+        "vehicle.emergency.police", 
+        "vehicle.trailer", 
+        "vehicle.truck"
+    ],
+    "vehicle.motorcycle":[
+        "vehicle.bicycle",
+        "vehicle.motorcycle"
+    ],
+    "flat.driveable_surface":[ "flat.driveable_surface" ]
+}
+
+
+def get_merged_nulabels(nuid2name:dict, nuname2label:dict, nuid2color:dict, nuid2dynamic:dict, merge_dict:dict = DEFAULT_MERGE_DICT) -> Tuple[dict]:
+    """
+    RETURN: ( new_nuid2name,  new_nuname2label, new_nuid2color, new_nuid2dynamic, merging_lut_ids, merging_lut_names )
+    """
+    
+    # Assertion
+    for l_id, l_n in nuid2name.items():
+        considered_label = False
+        for merge_l, labels in merge_dict.items():
+            if l_n in labels:
+                considered_label = True
+                break
+        assert considered_label, f"label {l_n} not pressent in merge_dict"
+
+
+    # Merging LUTs
+    merging_lut_ids     = {}
+    merging_lut_names   = {}
+    for res_label, labels in merge_dict.items():
+        res_label_id = nuname2label[res_label] 
+        for l in labels:
+            merging_lut_names[l] = res_label
+            l_id = nuname2label[l]
+            merging_lut_ids[l_id] = res_label_id
+
+    # New label dicts
+    new_nuid2name = { i:k for i, k in enumerate(merge_dict.keys()) }
+    new_nuname2label = { v:k for k, v in new_nuid2name.items() }
+
+    new_nuid2color      = { i:nuid2color[ nuname2label[meged_l] ] for i, meged_l in new_nuid2name.items()}
+    new_nuid2dynamic    = { i:nuid2dynamic[ nuname2label[meged_l] ] for i, meged_l in new_nuid2name.items()}
+
+    return ( new_nuid2name,  new_nuname2label, new_nuid2color, new_nuid2dynamic, merging_lut_ids, merging_lut_names )
+    
+
+     
