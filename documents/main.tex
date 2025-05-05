@@ -36,8 +36,14 @@
 \usepackage{lipsum} 
 
 \usepackage[backend=biber, sorting=none]{biblatex} % Referencias (bibliografía / webgrafía)
+\usepackage[toc,page]{appendix}         % Apéndice
+
+
 \selectlanguage{english}                % Seleccionar inglés
 \bibliography{references}               % Incluir el archivo de referencias
+
+
+
 
 \setlength{\emergencystretch}{3em}
 
@@ -225,6 +231,8 @@
 \addcontentsline{toc}{section}{References}
 \newpage
 
-\section*{Annexes}
-\input{annexes.tex}
+\begin{appendices}
+  \input{appendix.tex}
+\end{appendices}
+
 \end{document}
