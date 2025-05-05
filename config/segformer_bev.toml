@@ -40,4 +40,4 @@ gradient_accum_steps = 1
 #   "reduce_lr_on_plateau", "cosine_with_min_lr", "warmup_stable_decay" ]
 # See transformers.SchedulerType for more info
 
-merge_semantic_labels = false       # (optional) defaults to False. Whether to merge and reduce the semantic labels or not
+merge_semantic_labels = true        # (optional) defaults to False. Whether to merge and reduce the semantic labels or not

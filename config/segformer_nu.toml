@@ -7,14 +7,14 @@ testing = false     # if set, the 'mini' version of the dataset
 [model]
 output_path = "/models"
 model_name = "segformer_nu_formatted"
-pretrained = "nvidia/mit-b4"
+pretrained = "nvidia/mit-b0"
 
 [training]
-batch_size = 8
+batch_size = 16
 epochs = 200
 learning_rate = 0.00006
-weight_decay = 0.01
-data_augmentations = true           # (optional) defaults to False. 
+weight_decay = 0.0
+data_augmentations = false          # (optional) defaults to False. 
                                     # If set, the dataset_type specific data augmentation functions are applied
 
 # Optimizer
@@ -22,6 +22,11 @@ optim = "adamw_torch"               # (optional) defaults to "adamw_torch"
 # optim_args = {}                   # (optional) defaults to {}
 lr_scheduler_type = "polynomial"    # (optional) defaults to "linear"*
 # lr_scheduler_kwargs = {}          # (optional) defaults to {}. See documentation for each scheduler
+# *Available lr_schedulers: 
+# [ "linear", "cosine", "cosine_with_restarts", "polynomial", 
+#   "constant", "constant_with_warmup", "inverse_sqrt", 
+#   "reduce_lr_on_plateau", "cosine_with_min_lr", "warmup_stable_decay" ]
+# See transformers.SchedulerType for more info
 
 # Other
 val_acc_steps = 32                  # (optional) defaults to None
@@ -31,10 +36,5 @@ resume_from_checkpoint = false      # (optional) defaults to False.
 ls_steps = 200                      # (optional) defaults to 200. 
                                     # Logging/Saving steps. batch_size:32 -> 100; batch_size:16 -> 200
 gradient_accum_steps = 2
-# *Available lr_schedulers: 
-# [ "linear", "cosine", "cosine_with_restarts", "polynomial", 
-#   "constant", "constant_with_warmup", "inverse_sqrt", 
-#   "reduce_lr_on_plateau", "cosine_with_min_lr", "warmup_stable_decay" ]
-# See transformers.SchedulerType for more info
 
-merge_semantic_labels = false       # (optional) defaults to False. Whether to merge and reduce the semantic labels or not
+merge_semantic_labels = true        # (optional) defaults to False. Whether to merge and reduce the semantic labels or not
