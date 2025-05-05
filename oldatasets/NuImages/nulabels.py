@@ -110,22 +110,24 @@ def get_merged_nulabels(nuid2name:dict, nuname2label:dict, nuid2color:dict, nuid
         assert considered_label, f"label {l_n} not pressent in merge_dict"
 
 
-    # Merging LUTs
-    merging_lut_ids     = {}
-    merging_lut_names   = {}
-    for res_label, labels in merge_dict.items():
-        res_label_id = nuname2label[res_label] 
-        for l in labels:
-            merging_lut_names[l] = res_label
-            l_id = nuname2label[l]
-            merging_lut_ids[l_id] = res_label_id
+
 
     # New label dicts
     new_nuid2name = { i:k for i, k in enumerate(merge_dict.keys()) }
     new_nuname2label = { v:k for k, v in new_nuid2name.items() }
-
     new_nuid2color      = { i:nuid2color[ nuname2label[meged_l].trainId ] for i, meged_l in new_nuid2name.items()}
     new_nuid2dynamic    = { i:nuid2dynamic[ nuname2label[meged_l].trainId ] for i, meged_l in new_nuid2name.items()}
+
+    # Merging LUTs
+    merging_lut_ids     = {}
+    merging_lut_names   = {}
+    for res_label, labels in merge_dict.items():
+        res_label_id = new_nuname2label[res_label]
+        for l in labels:
+            merging_lut_names[l] = res_label
+            l_id = nuname2label[l].trainId
+            merging_lut_ids[l_id] = res_label_id
+
 
     return ( new_nuid2name,  new_nuname2label, new_nuid2color, new_nuid2dynamic, merging_lut_ids, merging_lut_names )
     

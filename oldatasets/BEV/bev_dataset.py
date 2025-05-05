@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from oldatasets.common import Dataset2BEV
 
 import numpy as np
-from PIL import Image, ImageFile
+from PIL import Image
 import cv2
 import os
 import time
@@ -278,12 +278,12 @@ class BEVFeatureExtractionDataset(BEVDataset):
         # self.id2color[255] = (255, 255, 255)
         self.merging_lut_ids = merging_lut_ids
     
-    def merge_semantic_labels(self, semantic_mask:ImageFile):
-        if isinstance(semantic_mask, ImageFile):
+    def merge_semantic_labels(self, semantic_mask:Image.Image):
+        if isinstance(semantic_mask, Image.Image):
             semantic_mask = np.array(semantic_mask)
 
         # Merge labels
-        for src_id, res_id in self.merging_lut_ids:
+        for src_id, res_id in self.merging_lut_ids.items():
             semantic_mask[semantic_mask == src_id] = res_id
 
         return Image.fromarray( semantic_mask )

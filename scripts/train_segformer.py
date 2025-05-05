@@ -52,6 +52,7 @@ def preprocess_logits_for_metrics(logits, labels):
     return pred_ids
 
 def compute_metrics(eval_pred):
+  global num_labels
   with torch.no_grad():
     logits, labels = eval_pred
     if isinstance(logits, torch.Tensor):

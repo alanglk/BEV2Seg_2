@@ -25,8 +25,9 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // Establecer el PYTHONPATH para todo el proyecto
-                "REQUESTS_CA_BUNDLE": "/usr/local/share/ca-certificates/fireware-https-proxy-ca.crt",
-                "CUDA_VISIBLE_DEVICES": "1,2"
+                "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
+                "CUDA_VISIBLE_DEVICES": "1,2",
+                //"CUDA_LAUNCH_BLOCKING": "1"
             }
         },
         {

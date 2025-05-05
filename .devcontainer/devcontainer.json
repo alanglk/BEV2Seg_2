@@ -10,11 +10,12 @@
   },
     "runArgs": [
       "--net", "host", 
+      "--ipc", "host",
       "--privileged",
       "-e", "DISPLAY=${env:DISPLAY}",
       "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
       "-e", "REQUESTS_CA_BUNDLE=${env:REQUESTS_CA_BUNDLE}",
-      "-v", "/usr/local/share/ca-certificates/fireware-https-proxy-ca.crt",
+      "-v", "/etc/ssl/certs",
       "--gpus",
       "all",
       "--name", "agarciaj-bev2seg2v03-devcontainer"
