@@ -4,3 +4,6 @@
 [submodule "3D-Metrics"]
 	path = 3D-Metrics
 	url = https://github.com/M-G-A/3D-Metrics.git
+[submodule "mean_iou"]
+	path = mean_iou
+	url = https://huggingface.co/spaces/evaluate-metric/mean_iou

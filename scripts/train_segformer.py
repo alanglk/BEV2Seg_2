@@ -179,7 +179,7 @@ def main(config: dict):
             eval_dataset    = NuImagesFormattedFeatureExtractionDataset(dataroot=dataroot, version='val',   image_processor=image_processor, id2label=id2label, id2color=id2color, merging_lut_ids=merging_lut_ids)
     id2label = train_dataset.id2label
     num_labels = len(train_dataset.id2label)
-
+    
     # Model
     print(f"Loading pretrained model: {pretrained}")
     segformer_config = SegformerConfig.from_pretrained(pretrained)

@@ -60,7 +60,7 @@ nuid2dynamic = { label.trainId : label.dynamic for label in nulabels }
 DEFAULT_MERGE_DICT = {
     "background": [ "background" ],
     "animal": [ "animal" ],
-    "human.pedestrian": [
+    "human.pedestrian.adult": [
         "human.pedestrian.adult",
         "human.pedestrian.child",
         "human.pedestrian.construction_worker",
@@ -86,6 +86,7 @@ DEFAULT_MERGE_DICT = {
         "vehicle.trailer", 
         "vehicle.truck"
     ],
+    "vehicle.ego": [ "vehicle.ego" ],
     "vehicle.motorcycle":[
         "vehicle.bicycle",
         "vehicle.motorcycle"
@@ -123,8 +124,8 @@ def get_merged_nulabels(nuid2name:dict, nuname2label:dict, nuid2color:dict, nuid
     new_nuid2name = { i:k for i, k in enumerate(merge_dict.keys()) }
     new_nuname2label = { v:k for k, v in new_nuid2name.items() }
 
-    new_nuid2color      = { i:nuid2color[ nuname2label[meged_l] ] for i, meged_l in new_nuid2name.items()}
-    new_nuid2dynamic    = { i:nuid2dynamic[ nuname2label[meged_l] ] for i, meged_l in new_nuid2name.items()}
+    new_nuid2color      = { i:nuid2color[ nuname2label[meged_l].trainId ] for i, meged_l in new_nuid2name.items()}
+    new_nuid2dynamic    = { i:nuid2dynamic[ nuname2label[meged_l].trainId ] for i, meged_l in new_nuid2name.items()}
 
     return ( new_nuid2name,  new_nuname2label, new_nuid2color, new_nuid2dynamic, merging_lut_ids, merging_lut_names )
     
