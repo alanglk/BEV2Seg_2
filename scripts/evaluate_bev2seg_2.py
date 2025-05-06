@@ -75,7 +75,7 @@ def get_merging_strategy(model_id2label:dict):
         
         aux = {int(k):v for k,v in model_id2label.items()}
         if 255 in aux:
-            aux.drop(255)
+            aux.pop(255)
         assert id2label == aux
     return merging_lut_ids
 
