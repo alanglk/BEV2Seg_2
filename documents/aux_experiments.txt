@@ -11,3 +11,5 @@ Todos estos factores hacen por un lado que la cantidad total de pixeles sea meno
 Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a cada clase para que a la hora de computar el loss en cada iteración del entrenamiento el efecto de cometer un error en la predicción de una clase minoritaria sea sustancialmente superior al predecir mal una clase mayoritaria. Sin embargo, debido a la naturaleza del proyecto, no es necesario tener una segmentación en clases tan precisas como las que proporciona el dataset, por lo que se ha decidido explorar si al realizar un merge de las clases semánticas se minimiza el efecto del desbalanceo de las clases.
 
 
+Se puede observar que con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma significativa.  
+
