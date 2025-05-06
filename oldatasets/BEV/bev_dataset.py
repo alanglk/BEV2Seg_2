@@ -52,7 +52,7 @@ class BEVDataset(Dataset):
         data_tokens = [os.path.splitext(f)[0] for f in files if f.endswith('.json')]
         return data_tokens
     
-    def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color):
+    def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color, merging_lut_ids:dict = None):
         """
         BGR format!!!
 
@@ -94,6 +94,7 @@ class BEVDataset(Dataset):
         self.id2label = id2label
         self.label2id = { v : k for k, v in self.id2label.items() }
         self.id2color = id2color
+        self.merging_lut_ids = merging_lut_ids
 
         # Load all the tokens from the dataroot folder
         if os.path.isdir(self.dataroot):
@@ -111,7 +112,17 @@ class BEVDataset(Dataset):
         """ 
         #target_1C = target[:, :, 0] # Get just the first channel
         return target2image(target, self.id2color)
+    
+    def merge_semantic_labels(self, semantic_mask:Image.Image):
+        if isinstance(semantic_mask, Image.Image):
+            semantic_mask = np.array(semantic_mask)
 
+        # Merge labels
+        for src_id, res_id in self.merging_lut_ids.items():
+            semantic_mask[semantic_mask == src_id] = res_id
+
+        return Image.fromarray( semantic_mask )
+    
     def _data_augmentation(self, image:Image, target:Image, vcd:core.OpenLABEL, camera_name:str='CAM_FRONT'):
         """
         Codigo guarro de cojones. BEVDataset no estaba pensado para utilizar el openlabel
@@ -252,6 +263,11 @@ class BEVDataset(Dataset):
         # Apply transforms if necessary
         if self.transforms is not None:
             image, target = self.transforms(image, target)
+
+        # Merge semantic labels
+        if self.merging_lut_ids is not None:
+            target = self.merge_semantic_labels(target)
+
         # image   = torch.tensor( np.array( image ) )
         # target  = torch.tensor( np.array( target ) )
         return image, target
@@ -260,7 +276,7 @@ class BEVFeatureExtractionDataset(BEVDataset):
     """Image (semantic) segmentation dataset. BGR Format!!!"""
 
     def __init__(self, dataroot, version, image_processor, image_extension='.png', transforms=None, id2label=nuid2name, id2color=nuid2color, merging_lut_ids:dict = None):
-        super().__init__(dataroot, version, image_extension, transforms, id2label, id2color)
+        super().__init__(dataroot, version, image_extension, transforms, id2label, id2color, merging_lut_ids)
         self.image_processor = image_processor
         # IMPORTANTE:
         #   Se considera que 0 es el background, pero en nuestro caso
@@ -276,18 +292,7 @@ class BEVFeatureExtractionDataset(BEVDataset):
         self.id2label[255] = 'ignore'
         self.label2id['ignore'] = 255
         # self.id2color[255] = (255, 255, 255)
-        self.merging_lut_ids = merging_lut_ids
     
-    def merge_semantic_labels(self, semantic_mask:Image.Image):
-        if isinstance(semantic_mask, Image.Image):
-            semantic_mask = np.array(semantic_mask)
-
-        # Merge labels
-        for src_id, res_id in self.merging_lut_ids.items():
-            semantic_mask[semantic_mask == src_id] = res_id
-
-        return Image.fromarray( semantic_mask )
-
     def __getitem__(self, index):
         """
         INPUT:

@@ -15,6 +15,7 @@ python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/NuImagesFormatted --m
 
 from oldatasets.BEV import BEVDataset
 from oldatasets.NuImages import NuImagesFormattedDataset
+from oldatasets.NuImages.nulabels import nuid2name, get_merged_nulabels
 from src.bev2seg_2 import Raw2Seg_BEV, Raw_BEV2Seg
 
 from vcd import core
@@ -66,6 +67,17 @@ def check_args(args) -> int:
         raise Exception(f"Wrong dataset {dataset_name} for model {model_name}")
 
     return evaluation_type
+
+def get_merging_strategy(model_id2label:dict):
+    merging_lut_ids = None
+    if ( len(model_id2label) -1 ) < len(nuid2name):
+        id2label,_,_,_, merging_lut_ids, _ = get_merged_nulabels()
+        
+        aux = {int(k):v for k,v in model_id2label.items()}
+        if 255 in aux:
+            aux.drop(255)
+        assert id2label == aux
+    return merging_lut_ids
 
 def show_eval_report(data:dict, model_name:str, eval_type:int, label_list:List):
     assert model_name in data
@@ -197,28 +209,33 @@ def main(dataset_path:str,
         2: "[Raw -> Seg] model evaluated with NuImagesFormattedDataset"
     }
 
+    merging_lut_ids = None
     if eval_type == 0:
         print(f"Evaluating model {model_name} on bev images Dataset")
         model   = Raw_BEV2Seg(model_path, None, device=device)
-        dataset = BEVDataset(dataroot=dataset_path, version=dataset_version)
+        merging_lut_ids = get_merging_strategy(model.id2label)
+        dataset = BEVDataset(dataroot=dataset_path, version=dataset_version, id2label=model.id2label, id2color=model.id2color, merging_lut_ids=merging_lut_ids)
     elif eval_type == 1:
         print(f"Evaluating model {model_name} on bev images Dataset")
         model   = Raw2Seg_BEV(model_path, None, device=device)
-        dataset = BEVDataset(dataroot=dataset_path, version=dataset_version)
+        merging_lut_ids = get_merging_strategy(model.id2label)
+        dataset = BEVDataset(dataroot=dataset_path, version=dataset_version, id2label=model.id2label, id2color=model.id2color, merging_lut_ids=merging_lut_ids)
     elif eval_type == 2:
         print(f"Evaluating model {model_name} on raw images Dataset")
         model   = Raw2Seg_BEV(model_path, None, device=device)
-        dataset     = NuImagesFormattedDataset(dataroot=dataset_path, version=dataset_version)
+        merging_lut_ids = get_merging_strategy(model.id2label)
+        dataset     = NuImagesFormattedDataset(dataroot=dataset_path, version=dataset_version, id2label=model.id2label, id2color=model.id2color, merging_lut_ids=merging_lut_ids)
     else:
         raise Exception(f"Unknown evaluation type: {evaluation_type}")
-       
+    
+    if merging_lut_ids is not None:
+        print(f"Using merging strategy for evaluation")
+
     camera_name = 'CAM_FRONT'
     labels_list = list(model.id2label.values())
     num_labels = len(labels_list)
     colors      = list(model.id2color.values())
     colors = [(r / 255, g / 255, b / 255) for r, g, b in colors]
-
-    # Dataloader
 
     # Metric Output
     data = {}

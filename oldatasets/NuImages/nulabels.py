@@ -95,7 +95,7 @@ DEFAULT_MERGE_DICT = {
 }
 
 
-def get_merged_nulabels(nuid2name:dict, nuname2label:dict, nuid2color:dict, nuid2dynamic:dict, merge_dict:dict = DEFAULT_MERGE_DICT) -> Tuple[dict]:
+def get_merged_nulabels(nuid2name:dict=nuid2name, nuname2label:dict=nuname2label, nuid2color:dict=nuid2color, nuid2dynamic:dict=nuid2dynamic, merge_dict:dict=DEFAULT_MERGE_DICT) -> Tuple[dict]:
     """
     RETURN: ( new_nuid2name,  new_nuname2label, new_nuid2color, new_nuid2dynamic, merging_lut_ids, merging_lut_names )
     """
