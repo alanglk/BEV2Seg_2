@@ -37,7 +37,7 @@ class NuImagesFormattedDataset(Dataset):
         data_tokens = [os.path.splitext(f)[0].replace('_raw', '') for f in files if f.endswith('_raw' + file_extension)]
         return data_tokens
 
-    def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color):
+    def __init__(self, dataroot, version, image_extension = '.png', transforms = None, id2label = nuid2name, id2color = nuid2color,  merging_lut_ids:dict = None):
         """
         BGR format!!!
 
@@ -63,6 +63,7 @@ class NuImagesFormattedDataset(Dataset):
         self.id2label = id2label
         self.label2id = { v : k for k, v in self.id2label.items() }
         self.id2color = id2color
+        self.merging_lut_ids = merging_lut_ids
 
         # Load all the tokens from the dataroot folder
         self.data_tokens = NuImagesFormattedDataset.get_data_tokens(self.dataroot, self.image_extension)
@@ -79,7 +80,18 @@ class NuImagesFormattedDataset(Dataset):
         """ 
         #target_1C = target[:, :, 0] # Get just the first channel
         return target2image(target, self.id2color)
+    
+    def merge_semantic_labels(self, semantic_mask:Image.Image):
+        if isinstance(semantic_mask, Image.Image):
+            semantic_mask = np.array(semantic_mask)
+        semantic_mask = semantic_mask.astype(np.uint8)
 
+        # Merge labels
+        for src_id, res_id in self.merging_lut_ids.items():
+            semantic_mask[semantic_mask == src_id] = res_id
+
+        return Image.fromarray( semantic_mask )
+    
     def _get_item_paths(self, index):
         """
         INPUT:
@@ -120,6 +132,10 @@ class NuImagesFormattedDataset(Dataset):
         if self.transforms is not None:
             image, target = self.transforms(image, target)
 
+        # Merge semantic labels
+        if self.merging_lut_ids is not None:
+            target = self.merge_semantic_labels(target)
+        
         # image   = torch.tensor( np.array( image ) )
         # target  = torch.tensor( np.array( target ) )
 
@@ -130,7 +146,7 @@ class NuImagesFormattedFeatureExtractionDataset(NuImagesFormattedDataset):
     """Image (semantic) segmentation dataset. BGR Format!!!"""
 
     def __init__(self, dataroot, version, image_processor, image_extension='.png', transforms=None, id2label=nuid2name, id2color=nuid2color, merging_lut_ids:dict = None):
-        super().__init__(dataroot, version, image_extension, transforms, id2label, id2color)
+        super().__init__(dataroot, version, image_extension, transforms, id2label, id2color, merging_lut_ids)
         self.image_processor = image_processor
         
         if image_processor.do_reduce_labels:
@@ -141,18 +157,7 @@ class NuImagesFormattedFeatureExtractionDataset(NuImagesFormattedDataset):
         self.id2label[255] = 'ignore'
         self.label2id['ignore'] = 255
         # self.id2color[255] = (255, 255, 255)
-        self.merging_lut_ids = merging_lut_ids
-    
-    def merge_semantic_labels(self, semantic_mask:Image.Image):
-        if isinstance(semantic_mask, Image.Image):
-            semantic_mask = np.array(semantic_mask)
-        semantic_mask = semantic_mask.astype(np.uint8)
-
-        # Merge labels
-        for src_id, res_id in self.merging_lut_ids.items():
-            semantic_mask[semantic_mask == src_id] = res_id
-
-        return Image.fromarray( semantic_mask )
+        
     
     def __getitem__(self, index):
         """
