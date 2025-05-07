@@ -7,6 +7,7 @@ from matplotlib.pylab import Axes
 import numpy as np
 
 from tqdm import tqdm
+from tabulate import tabulate
 from typing import Literal, List, Tuple, Union
 
 import argparse
@@ -35,11 +36,6 @@ def get_dataset_class_balance(dataset_path:str, dataset_type:Literal["bev", "nu"
     else:
         raise Exception("Invalid dataset type")
 
-    # Create result data estructure
-    id2count = { k:0.0 for k in aux.id2label.keys() }
-    id2count['total_expected_pixels'] = 0.0
-
-
     # Iterate through selected dataset versions
     results = {}
     for version in dataset_versions:
@@ -52,36 +48,74 @@ def get_dataset_class_balance(dataset_path:str, dataset_type:Literal["bev", "nu"
             raise Exception("Invalid dataset type")
         print(f"{dataset_type} {version} split...")
 
+        num_labels = len(dataset.id2label)
+        label2index = {l:i for i, l in enumerate(dataset.id2label.keys())}
+        count_matrix = np.zeros(num_labels, dtype=np.int256)
+        total_matrix = np.zeros(2, dtype=np.int256) # ['total_expected_pixels', 'actual_total']
+
         # Iterate through all samples 
         for i in tqdm(range(len(dataset))):
             _, target = dataset[i]
             target = np.asarray(target)
 
+            total_matrix[0] += target.shape[0] * target.shape[1]
             labels_in_target = np.unique(target)
             for l in labels_in_target:
-                assert l in id2count
-                id2count[l] += np.count_nonzero(target == l)
-            id2count['total_expected_pixels'] += target.shape[0] * target.shape[1]
+                assert l in label2index
+                index = label2index[l]
+                count_matrix[index] += np.count_nonzero(target == l)
         
         # Compute summ of all labeled pixels
-        actual_total = 0.0
-        for k, v in id2count.items():
-            if k == 'total_expected_pixels':
-                continue
-            actual_total += v
-        id2count['actual_total'] = actual_total
-
+        total_matrix[1] += count_matrix.sum()
+        
         # Save results in final format
         results['names']   = aux.id2label
         results['colors']  = aux.id2color
         results[version] = {}        
-        results[version]['total_count'] = id2count['actual_total']
-        results[version]['expected_total_count'] = id2count['total_expected_pixels']
-        for k, v in id2count.items():
-            if k == 'total_expected_pixels' or k == 'actual_total':
-                continue
-            results[version][k] = v
+        results[version]['total_count'] = total_matrix[1]
+        results[version]['expected_total_count'] = total_matrix[0]
+        for l in range(dataset.id2label.keys()):
+            index = label2index[l]
+            results[version][l] = count_matrix[index]
     return results
+
+def show_class_percentange(results:dict, 
+                           data_type:Literal["bev", "nu"], 
+                           data_versions:List[Literal['mini', 'train', 'val', 'test']]):
+        
+    # Get data from results
+    data = {'expected_total':0.0, 'provided_total':0.0, 'total': 0.0, 'labels': {}}
+    for data_version in results[data_type].keys():
+        if data_version in data_versions:
+            data["provided_total"] = results[data_type][data_version]['total_count']
+            data["expected_total"] = results[data_type][data_version]['expected_total_count']
+            for label, count in results[data_type][data_version].items():
+                if label == 'total_count' or label == 'expected_total_count':
+                    continue
+                if label not in data:
+                    data['labels'][label] = 0.0
+                data['labels'][label] += count
+                data['total'] += count
+
+    print(f"expected_total: {data['expected_total']} | provided_total: {data['provided_total']} | total: {data['total']}")
+
+    # Compute ratio
+    checksum = 0.0
+    for k in list(data['labels'].keys()):
+        l = results[data_type]['names'][k]
+        v = data['labels'].pop(k)
+        ratio = v / data['total']
+        data['labels'][l] = ratio
+        checksum += ratio
+    
+    # Show ratios
+    headers = ["Label", "Ratio (0-1)"]
+    ratios  = [[k, v] for k,v in data['labels'].items()]
+    ratios.append(("total", checksum))
+    inf = tabulate(ratios, headers=headers)
+    print(inf)
+
+
 def plot_results(results:dict, 
                  data_type:Literal["bev", "nu"], 
                  data_versions:List[Literal['mini', 'train', 'val', 'test']], 
@@ -121,8 +155,8 @@ def plot_results(results:dict,
     for i, label_id in enumerate(data['labels'].keys()):
         name = results[data_type]['names'][label_id]
         
-        if name == 'background':
-            continue
+        # if name == 'background':
+        #     continue
 
         mean_count = data['labels'][label_id] #/ data['total'] # Normalize
 
@@ -168,6 +202,12 @@ def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path
         results = {"bevdataset_path":bevdataset_path, "nudataset_path":nudataset_path, "bev":bev_results, "nu":nu_results}
         dump_results(output_path, results)
 
+    print("Class distribution in NuImagesFormatted Dataset")
+    show_class_percentange(results, data_type="nu", data_versions=["train", "val", "test"])
+    print("\nClass distribution in BEVDataset")
+    show_class_percentange(results, data_type="bev", data_versions=["train", "val", "test"])
+    print()
+
     if not plot_results_flag:
         print("Finished :D!!")
         return 
@@ -177,10 +217,10 @@ def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path
     # plot_results(results, data_type='nu',   data_versions=["train", "val", "test"], ax=axes[1])
     
     ax = plt.gca()
-    plot_results(results, data_type='bev', bar_number=0, data_versions=["train", "val", "test"], bar_color="#FF0064", ax=ax)
-    plot_results(results, data_type='nu',  bar_number=1, data_versions=["train", "val", "test"], bar_color="#39C39E", ax=ax)
+    plot_results(results, data_type='nu',  bar_number=0, data_versions=["train", "val", "test"], bar_color="#FF0064", bar_edgecolor=None, ax=ax)
+    plot_results(results, data_type='bev', bar_number=1, data_versions=["train", "val", "test"], bar_color="#39C39E", bar_edgecolor=None, ax=ax)
     ax.set_title("Class balance in datasets")
-    ax.legend(loc='upper left', ncols=2)
+    ax.legend(loc='upper right', ncols=2)
     plt.xticks(rotation=90, fontsize=5)
     plt.tight_layout()
     # plt.legend()
@@ -194,6 +234,8 @@ if __name__ == "__main__":
     parser.add_argument('--plot_results', type=bool, default=True, help="[Optional] Wheter to plot results.")
 
     args = parser.parse_args()
+    
+    
     main(output_path=args.output_path,
          plot_results_flag=args.plot_results,
          bevdataset_path=args.bevdataset_path,
