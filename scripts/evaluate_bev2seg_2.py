@@ -34,6 +34,9 @@ import sys
 import os
 
 
+import evaluate
+metric = evaluate.load("mean_iou")
+
 def check_paths(paths: List[str]):
     for path in paths:
         if not os.path.exists(path):
@@ -133,7 +136,7 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
     return size
 
-def calculate_metrics(annotations, predictions, num_classes):
+def calculate_metrics(annotations:np.ndarray, predictions:np.ndarray, num_classes:int):
     """
     Calcula las métricas de las predicciones y la matriz de confusión.
     
@@ -143,31 +146,31 @@ def calculate_metrics(annotations, predictions, num_classes):
     :return: tensores con precisión, recall, f1-score, IoU y matriz de confusión.
     """
     # Aseguramos que los valores sean enteros
-    annotations = annotations.to(torch.int64)
-    predictions = predictions.to(torch.int64)
+    annotations = annotations.astype(np.int64)
+    predictions = predictions.astype(np.int64)
     
     # Flatten
-    annotations = annotations.view(-1)  # (H, W) → (H*W)
-    predictions = predictions.view(-1)  # (H, W) → (H*W)
+    annotations = annotations.flatten()  # (H, W) → (H*W)
+    predictions = predictions.flatten()  # (H, W) → (H*W)
 
     # Inicializamos las métricas y la matriz de confusión
-    pre_per_class   = torch.zeros(num_classes, device=predictions.device)
-    rec_per_class   = torch.zeros(num_classes, device=predictions.device)
-    acc_per_class   = torch.zeros(num_classes, device=predictions.device)
-    f1_per_class    = torch.zeros(num_classes, device=predictions.device)
-    iou_per_class   = torch.zeros(num_classes, device=predictions.device)
-    conf_matrix     = torch.zeros((num_classes, num_classes), device=predictions.device)
+    pre_per_class   = np.zeros(num_classes)
+    rec_per_class   = np.zeros(num_classes)
+    acc_per_class   = np.zeros(num_classes)
+    f1_per_class    = np.zeros(num_classes)
+    iou_per_class   = np.zeros(num_classes)
+    conf_matrix     = np.zeros((num_classes, num_classes))
 
 
     # Construcción eficiente de la matriz de confusión
     for c_real in range(num_classes):
         for c_pred in range(num_classes):
-            conf_matrix[c_real, c_pred] = torch.sum((annotations == c_real) & (predictions == c_pred))
+            conf_matrix[c_real, c_pred] = np.sum((annotations == c_real) & (predictions == c_pred))
 
     # Calcular TP, FP, FN a partir de la matriz de confusión
-    tp = torch.diag(conf_matrix)  # Elementos de la diagonal
-    fn = conf_matrix.sum(dim=1) - tp  # Fila: Total real menos TP
-    fp = conf_matrix.sum(dim=0) - tp  # Columna: Total predicho menos TP
+    tp = np.diag(conf_matrix)  # Elementos de la diagonal
+    fn = conf_matrix.sum(axis=1) - tp  # Fila: Total real menos TP
+    fp = conf_matrix.sum(axis=0) - tp  # Columna: Total predicho menos TP
     tn = conf_matrix.sum() - (tp + fn + fp)  # Todo lo demás
 
     for c in range(num_classes):
@@ -187,6 +190,16 @@ def calculate_metrics(annotations, predictions, num_classes):
         iou_per_class[c] = tp[c] / (tp[c] + fp[c] + fn[c]) if (tp[c] + fp[c] + fn[c]) > 0 else 0
 
     return pre_per_class, rec_per_class, acc_per_class, f1_per_class, iou_per_class, conf_matrix
+
+def compute_metrics_hf(annotations, predictions, num_classes):
+    metrics = metric._compute(
+        predictions=predictions,
+        references=annotations,
+        num_labels=num_classes,
+        ignore_index=255,
+        reduce_labels=False,
+    )
+    return metrics
 
 ##################################################################################
 #                                      MAIN                                      #
@@ -226,7 +239,7 @@ def main(dataset_path:str,
         merging_lut_ids = get_merging_strategy(model.id2label)
         dataset     = NuImagesFormattedDataset(dataroot=dataset_path, version=dataset_version, id2label=model.id2label, id2color=model.id2color, merging_lut_ids=merging_lut_ids)
     else:
-        raise Exception(f"Unknown evaluation type: {evaluation_type}")
+        raise Exception(f"Unknown evaluation type: {eval_type}")
     
     if merging_lut_ids is not None:
         print(f"Using merging strategy for evaluation")
@@ -245,7 +258,7 @@ def main(dataset_path:str,
         with open(output_path, "rb") as f:
             data = pickle.load(f)
 
-        if model_name in data and evaluation_type in data[model_name]:
+        if model_name in data and eval_type in data[model_name]:
             res = input(f"Model {model_name} is already evaluated with evaluation type '{eval_type}'. Do you want to evaluate it again? [Y/n]")
             if res.lower() != 'y':
                 print("Finish!! :D")
@@ -257,8 +270,8 @@ def main(dataset_path:str,
     data[model_name]['model_size'] = get_size(model)
 
     for m in metric_names:
-        data[model_name][eval_type][m] = torch.zeros(num_labels, device=device)
-    data[model_name][eval_type]['conf_matrix'] = torch.zeros((num_labels, num_labels), device=device)
+        data[model_name][eval_type][m] = np.zeros(num_labels)
+    data[model_name][eval_type]['conf_matrix'] = np.zeros((num_labels, num_labels))
     data[model_name][eval_type]['labels'] = labels_list
     data[model_name][eval_type]['colors'] = colors
     data[model_name][eval_type]['description'] = eval_desc[eval_type]
@@ -267,25 +280,29 @@ def main(dataset_path:str,
     # Run Inference instance by instance and compute metrics
     print(f"Evaluating {model_name} with {type(dataset)} Dataset")
     for i in tqdm(range(len(dataset))):
-        image, target = dataset[i]
-        image_path, target_path = dataset._get_item_paths(i)
-        openlabel_path          = os.path.join(dataset.dataroot, dataset.data_tokens[i] + ".json")
-        check_paths([image_path, target_path, openlabel_path])
 
-        # Load files
+        # Get image and target
+        image, target = dataset.__getitem__(i)
+        image = np.asarray(image.convert("RGB"))
+        target = np.asarray(target)
+
+        # Load OpenLABEL
+        openlabel_path = os.path.join(dataset.dataroot, dataset.data_tokens[i] + ".json")
+        check_paths([openlabel_path])
         vcd = core.VCD()
         vcd.load_from_file(openlabel_path)
         model.set_openlabel(vcd)
-        image       = cv2.imread(image_path)
-        target      = torch.tensor(cv2.imread(target_path)[:, :, 0], device=device)
 
-        # Inference and metric calculations
-        if evaluation_type == 2:
+        # Model inference 
+        pred = None
+        if eval_type == 2:
             pred, _ = model.generate_bev_segmentation(image, camera_name)
         else:
             _, pred = model.generate_bev_segmentation(image, camera_name)
-        pred = torch.tensor(pred, device=device)
+
+        # Metric calculations        
         pre_per_class, rec_per_class, acc_per_class, f1_per_class, iou_per_class, conf_matrix = calculate_metrics(target, pred, num_labels)
+        # metrics_hf = compute_metrics_hf(target, pred, num_labels) # Es lo mismo pero lo mio calcula también la matriz de confusion
 
         data[model_name][eval_type]['mean_precision_per_class']    += pre_per_class
         data[model_name][eval_type]['mean_recall_per_class']       += rec_per_class
@@ -295,9 +312,9 @@ def main(dataset_path:str,
         data[model_name][eval_type]['conf_matrix']                 += conf_matrix
         
     # Compute means
-    data[model_name][eval_type]['conf_matrix'] = data[model_name][eval_type]['conf_matrix'].cpu().detach().numpy() 
+    data[model_name][eval_type]['conf_matrix'] = data[model_name][eval_type]['conf_matrix']
     for m in metric_names:
-        data[model_name][eval_type][m] = data[model_name][eval_type][m].cpu().detach().numpy() 
+        data[model_name][eval_type][m] = data[model_name][eval_type][m] 
         data[model_name][eval_type][m] /= len(dataset)
     
     # Show report
@@ -310,6 +327,7 @@ def main(dataset_path:str,
     print("Finish!! :D")
     
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description="Script for evaluating BEV2Seg models.")
     parser.add_argument('--model_path', type=str, help="Path to the model. It can be a raw2segbev or raw2bevseg model")
     parser.add_argument('--dataset_path', type=str, help="Path to the dataset. NuImagesFormattedDataset or BEVDataset.")
@@ -324,3 +342,4 @@ if __name__ == "__main__":
          output_path=args.output_path,
          eval_type=evaluation_type, 
          dataset_version=args.version)
+    
