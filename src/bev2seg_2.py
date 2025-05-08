@@ -63,7 +63,7 @@ class BEV2SEG_2_Interface(ABC):
         self.bev_parameters = draw.TopView.Params(
             color_map           =   utils.COLORMAP_1, # In the case the OpenLABEL has defined objects
             topview_size        =   (self.BEV_WIDTH, self.BEV_HEIGH),
-            background_color    =   255,
+            background_color    =   0,
             range_x             =   bev_x_range,
             range_y             =   bev_y_range,
             step_x              =   1.0,
