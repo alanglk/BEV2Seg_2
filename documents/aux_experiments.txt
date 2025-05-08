@@ -1,21 +1,33 @@
+
+[4.1 Después de las medidas propuestas para solucionar el overfitting]
+
 Además, es importante destacar la diferencia de métricas entre los dos modelos. A pesar de que el backbone y los hiperparámetros de entrenamiento se hayan mantenido iguales, es notoria la diferencia en los losses y mean intersection over union que presentan ambos modelos. Esto se debe principalmente a que los datasets de evaluación son distintos ya que el approach de segmentar primero una imagen para luego reproyectarla se evalúa con máscaras semánticas en el dominio de la cámara, mientras que el approach de reproyectar imágenees y luego segmentar se evalua directamente con máscaras en BEV.
 
 Este hecho motiva la gráfica de la Figura 16, en la que se ha tomado el modelo 'raw2segbev_mit-b0_v0.3' y se ha evaluado con el conjunto de test primero con máscaras semánticas en el dominio de la cámara y luego con máscaras BEV. En esta Figura se puede apreciar en mayor detalle el valor de mean intersection over union por cada una de las clases semanticas para las que se ha entrenado el modelo y, en general, destacan dos hechos.
 
-En primer lugar, existe un desbalanceo notable entre las métricas de las clases mayoritarias como 'backgroun' o 'flat.driveable_area' y el resto de clases minoritarias y, además, muchas otras clases tienen valores muy cercanos a 0 o nulos. Esto por un lado refleja el desbalanceo inherente al dataset, siendo que hay clases semánticas que no tienen ningún pixel anotado en el mismo (ver Anexo A), y por otro lado muestra como se acentúa este desbalanceo en inferencia al reproyectar las máscaras y evaluar en BEV.
+En primer lugar, existe un desbalanceo notable entre las métricas de las clases mayoritarias como 'backgroun' o 'flat.driveable_area' y el resto de clases minoritarias y, además, muchas otras clases tienen valores muy cercanos a 0 o nulos. Esto refleja en parte el desbalanceo inherente al dataset, siendo que hay clases semánticas que no tienen ningún pixel anotado en el mismo (ver Anexo A).
 
 En segundo lugar, todos los valores de métricas son notablemente superiores en el modelo siendo evaluado con máscaras normales. Al realizar la reproyección de las máscaras a BEV ocurren tres hechos: se añade una zona de 'background'fija siendo el área BEV que está fuera del FOV de la cámara; se acorta la distancia máxima de la escena representada en la imagen BEV haciendo que únicamente los objetos presentes a una distancia menor a $15m$ (ver parámetros de reproyección en la Sección 3) estén presentes en la imagen, lo que acentúa que las clases minoritarias no se encuentren (aparece sobre todo el área conducible y los coches pero los peatones a no ser que se encuentren muy cerca y delante del vehículo no aparecen); y la resolución de la imagen disminuye a $1024x1024$. 
 
-Todos estos factores hacen por un lado que la cantidad total de pixeles sea menor en el conjunto BEV y, por otro, que las clases minoritarias lo sean todavía más provocando que los errores al cometer una mala predicción en un pixel sea notablemente más costoso que al evaluar con el dataset de máscaras normales y por lo tanto haciendo que las métricas medias sean mucho menores.
+Todos estos factores hacen que la cantidad total de píxeles sea menor en el conjunto BEV provocando que los errores al cometer una mala predicción en un pixel sea notablemente más costoso que al evaluar con el dataset de máscaras normales (haciendo a su vez que las métricas medias sean mucho menores). 
 
 Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a cada clase para que a la hora de computar el loss en cada iteración del entrenamiento el efecto de cometer un error en la predicción de una clase minoritaria sea sustancialmente superior al predecir mal una clase mayoritaria. Sin embargo, debido a la naturaleza del proyecto, no es necesario tener una segmentación en clases tan precisas como las que proporciona el dataset, por lo que se ha decidido explorar si al realizar un merge de las clases semánticas se minimiza el efecto del desbalanceo de las clases.
 
 
 
 
+[4.1.1 Sustituye al With the inclusion of...]
+
 Se puede observar que con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma significativa permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados de mIoU de las imágenes BEV son ligeramente inferiores a los obtenidos con el modelo overfiteado. Esto puede deberse a que los conjuntos de validación y de test tienen el mismo tamaño (un 10% del conjunto total cada uno) estando compuestos por muy pocas imágenes (al rededor de 1600 cada uno). Al partir ambos del mismo conjunto inicial y compartir la misma distribución, puede darse el caso de que el overfitting en validación afecte al conjunto de test al no presentar una variabilidad significativa respecto al conjunto de validación. Esto puede explicar el porqué aquellas clases mayoritarias presentan mejores resultados con los modelos overfiteados tanto en imágenes normales como en BEV (ver Figura fusionada de RAW-SEG-BEV y RAW-BEV-SEG para todas las clases).
 
 Sin embargo, si atendemos a las clases minoritarias
+
+
+
+Con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma considerable permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados del mIoU de las imágenes BEV en validacion son inferiores a los obtenidos con el modelo overfiteado.
+
+Esto se debe a que las máscaras semánticas en BEV contienen una mayor proporción de las clases "background"
+
 
 
 
