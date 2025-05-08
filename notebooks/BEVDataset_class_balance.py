@@ -57,14 +57,23 @@ def get_dataset_class_balance(dataset_path:str, dataset_type:Literal["bev", "nu"
             _, target = dataset[i]
             target = np.asarray(target)
 
+            assert len(target.shape) == 2
+
             labels_in_target = np.unique(target)
+            in_target_counted   = 0
+            in_target_expected  = target.shape[0] * target.shape[1]
             for l in labels_in_target:
                 assert l in id2count
-                id2count[l] += np.count_nonzero(target == l)
-            id2count['total_expected_pixels'] += target.shape[0] * target.shape[1]
+                non_zero = np.count_nonzero(target == l)
+                id2count[l]         += non_zero
+                in_target_counted   += non_zero
+            
+            assert in_target_counted == in_target_expected
+
+            id2count['total_expected_pixels'] += in_target_expected
         
         # Compute summ of all labeled pixels
-        actual_total = 0.0
+        actual_total = 0
         for k, v in id2count.items():
             if k == 'total_expected_pixels':
                 continue
@@ -155,19 +164,33 @@ def plot_results(results:dict,
     ax.set_ylabel("Number of pixels")
 
 
-def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path:str="./tmp/NuImagesFormatted", plot_results_flag:bool = True):
+def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path:str="./tmp/NuImagesFormatted", recalc:bool=False, plot_results_flag:bool = True):
     results = None
+
+    already_computed = False
     try:
         check_paths([output_path])
-        print(f"Loading results from file {output_path}")
-        results = read_results(output_path)
+        already_computed = True
     except:
+        print(f"File {output_path} doesn't exist")
+        
+    if already_computed:
+        if recalc:
+            print(f"Recomputing results and dumping into file {output_path}")
+            bev_results = get_dataset_class_balance(bevdataset_path, dataset_type="bev")
+            nu_results  = get_dataset_class_balance(nudataset_path, dataset_type="nu")
+            results = {"bevdataset_path":bevdataset_path, "nudataset_path":nudataset_path, "bev":bev_results, "nu":nu_results}
+            dump_results(output_path, results)
+        else:
+            print(f"Loading results from file {output_path}")
+            results = read_results(output_path)
+    else:
         print(f"Computing results and dumping into file {output_path}")
         bev_results = get_dataset_class_balance(bevdataset_path, dataset_type="bev")
         nu_results  = get_dataset_class_balance(nudataset_path, dataset_type="nu")
         results = {"bevdataset_path":bevdataset_path, "nudataset_path":nudataset_path, "bev":bev_results, "nu":nu_results}
         dump_results(output_path, results)
-
+    
     if not plot_results_flag:
         print("Finished :D!!")
         return 
@@ -187,6 +210,14 @@ def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path
     plt.show()
 
 if __name__ == "__main__":
+    # python3 notebooks/BEVDataset_class_balance.py ./data/class_balance.json --plot_results True
+    main(output_path="./data/class_balance.json",
+         recalc=True,
+         plot_results_flag=True,
+         bevdataset_path="./tmp/BEVDataset",
+         nudataset_path="./tmp/NuImagesFormatted")
+    exit()
+
     parser = argparse.ArgumentParser(description="Get class balance of BEVDataset and NuDataset")
     parser.add_argument('output_path', type=str, help="Output json file")
     parser.add_argument('--bevdataset_path', default="./tmp/BEVDataset", help="[Optional] path of BEVDataset. by default: './tmp/BEVDataset'")
