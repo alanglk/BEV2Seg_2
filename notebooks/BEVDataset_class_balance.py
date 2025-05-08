@@ -60,31 +60,17 @@ def get_dataset_class_balance(dataset_path:str, dataset_type:Literal["bev", "nu"
 
             assert len(target.shape) == 2
 
-            total_matrix[0] += target.shape[0] * target.shape[1]
             labels_in_target = np.unique(target)
             in_target_counted   = 0
             in_target_expected  = target.shape[0] * target.shape[1]
             for l in labels_in_target:
-                assert l in id2count
+                index = label2index[l]
                 non_zero = np.count_nonzero(target == l)
-                id2count[l]         += non_zero
+                count_matrix[index] += non_zero
                 in_target_counted   += non_zero
             
             assert in_target_counted == in_target_expected
-
-            id2count['total_expected_pixels'] += in_target_expected
-                assert l in label2index
-                index = label2index[l]
-                count_matrix[index] += np.count_nonzero(target == l)
-        
-        # Compute summ of all labeled pixels
-        actual_total = 0
-        for k, v in id2count.items():
-            if k == 'total_expected_pixels':
-                continue
-            actual_total += v
-        id2count['actual_total'] = actual_total
-
+            total_matrix[0] += in_target_expected
         total_matrix[1] += count_matrix.sum()
         
         # Save results in final format
