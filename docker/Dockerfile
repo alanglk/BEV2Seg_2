@@ -22,6 +22,9 @@ WORKDIR /
 COPY ./scripts /scripts
 RUN chmod +x /scripts/*.py
 
+# Add src for packages required by scripts
+COPY ./src /scripts/src
+
 # # Create nonroot user
 RUN groupadd -g ${GROUP_ID} user && \
     useradd -m -u ${USER_ID} -g ${GROUP_ID} user && \

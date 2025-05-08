@@ -337,8 +337,18 @@ def main(dataset_path:str,
 if __name__ == "__main__":
     # 
     # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/BEVDataset --model_path ./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5 --output_path ./data/model_evaluations.pkl
-    # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --models_to_evaluate "[('./models/model1','./datasets/dataset1'),('./models/model2','./datasets/dataset2')]" --output_path ./data/model_evaluations.pkl"
+    # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --models_to_evaluate 
     #
+    #
+    # [
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.4', 'BEVDataset'), 
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.4', 'NuImagesFormatted'), 
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5', 'BEVDataset'), 
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5', 'NuImagesFormatted'), 
+    #     ('./models/segformer_bev/raw2bevseg_mit-b0_v0.5', 'BEVDataset'),
+    #     ('./models/segformer_bev/raw2bevseg_mit-b0_v0.6', 'BEVDataset')
+    # ]
+    
     parser = argparse.ArgumentParser(description="Script for evaluating BEV2Seg models.")
     parser.add_argument('--model_path', type=str, help="Path to the model. It can be a raw2segbev or raw2bevseg model")
     parser.add_argument('--dataset_path', type=str, help="Path to the dataset. NuImagesFormattedDataset or BEVDataset.")
@@ -359,6 +369,10 @@ if __name__ == "__main__":
         output_path = args.output_path  # usa el mismo output_path para todos
         check_paths([os.path.dirname(output_path)])
 
+        # Check all paths first
+        for data in models_to_evaluate:
+            check_paths([data[0], data[1]])
+
         for data in models_to_evaluate:
             assert 2 <= len(data) <= 3, f"Cada tupla debe tener 2 o 3 elementos: {data}"
             model_path = data[0]
@@ -366,7 +380,7 @@ if __name__ == "__main__":
             dataset_version = data[2] if len(data) == 3 else 'test'
 
 
-            check_paths([model_path, dataset_path, os.path.dirname(output_path)])
+            check_paths([model_path, dataset_path])
             evaluation_type = get_evaluation_type(model_path, dataset_path)
 
             main(dataset_path=dataset_path,
