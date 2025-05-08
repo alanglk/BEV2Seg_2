@@ -13,7 +13,7 @@ function print_help {
     echo "  -ns                  (Opcional) No usar screen, ejecutar docker run directamente."
     echo
     echo "Ejemplo de uso:"
-    echo "  $0 -o ./data/model_evaluations.pkl -m ./models -a ./tmp/NuImagesFormatted -b ./tmp/BEVDataset -l \"[('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5', 'BEVDataset'), ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5', 'NuImagesFormatted'), ('./models/segformer_bev/raw2bevseg_mit-b0_v0.6', 'BEVDataset')]\""
+    echo "  $0 -o ./data/model_evaluations.pkl -m ./models -a ./tmp/NuImagesFormatted -b ./tmp/BEVDataset -l \"[('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.4'), ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.4'), ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5'), ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5'), ('./models/segformer_bev/raw2bevseg_mit-b0_v0.5'),('./models/segformer_bev/raw2bevseg_mit-b0_v0.6')]\""
     exit 1
 }
 
@@ -88,7 +88,7 @@ ARGS=$(cat <<EOF
     -v ${BEV_DATASET}:/BEVDataset:ro \
     -v ${OUTPUT_DIR}:/output \
     agarciaj/bev2seg_2:v0.5 \
-    bash -c "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python3 /scripts/evaluate_bev2seg_2.py --models_to_evaluate \"$EVALUATION_LIST\" --output_path /output/${OUTPUT_FILE}"
+    bash -c "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python3 /scripts/evaluate_bev2seg_2.py --output_path /output/${OUTPUT_FILE} --nu_dataset_path /NuImagesFormatted --bev_dataset_path /BEVDataset --models_to_evaluate \"$EVALUATION_LIST\""
 EOF
 )
 
