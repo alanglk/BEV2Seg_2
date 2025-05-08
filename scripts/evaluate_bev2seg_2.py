@@ -30,6 +30,7 @@ from typing import List
 from tqdm import tqdm
 import argparse
 import pickle
+import ast
 import sys
 import os
 
@@ -41,19 +42,20 @@ def check_paths(paths: List[str]):
     for path in paths:
         if not os.path.exists(path):
             raise Exception(f"path doesnt exist: {path}")
-
 def check_args(args) -> int:
+    check_paths([args.dataset_path, args.model_path, os.path.dirname(args.output_path)])
+    return get_evaluation_type(args.model_path, args.dataset_path)
+
+def get_evaluation_type(model_path, dataset_path) -> int:
     """
-    INPUT: args
+    INPUT: model_path, dataset_path
     OUTPUT: Evaluation type
         - 0 for raw2bevseg on BEVDataset
         - 1 for raw2segbev on BEVDataset
         - 2 for raw2segbev on NuImagesFormattedDataset
     """
-    check_paths([args.dataset_path, args.model_path, os.path.dirname(args.output_path)])
-
-    model_name = os.path.basename(args.model_path)
-    dataset_name = os.path.basename(args.dataset_path)
+    model_name = os.path.basename(model_path)
+    dataset_name = os.path.basename(dataset_path)
     
     evaluation_type = -1
 
@@ -208,7 +210,8 @@ def main(dataset_path:str,
          model_path:str,
          output_path:str,
          eval_type:int,
-         dataset_version:str = 'test'):
+         dataset_version:str = 'test',
+         reevaluate:bool=False):
     check_paths([dataset_path, model_path])
 
     # Load Models and datasets for inference
@@ -259,10 +262,14 @@ def main(dataset_path:str,
             data = pickle.load(f)
 
         if model_name in data and eval_type in data[model_name]:
-            res = input(f"Model {model_name} is already evaluated with evaluation type '{eval_type}'. Do you want to evaluate it again? [Y/n]")
-            if res.lower() != 'y':
-                print("Finish!! :D")
-                return
+            print(f"Model {model_name} is already evaluated with evaluation type '{eval_type}'")
+            if not reevaluate:
+                res = input(f"Do you want to evaluate it again? [Y/n]")
+                if res.lower() != 'y':
+                    print("Finish!! :D")
+                    return
+            else:
+                print("Evaluating it again...")
     
     data[model_name] = data[model_name] if model_name in data else {} 
     data[model_name][eval_type] = {}
@@ -325,21 +332,57 @@ def main(dataset_path:str,
     with open(output_path, "wb") as f:
         pickle.dump(data, f)
     print("Finish!! :D")
-    
-if __name__ == "__main__":
+      
 
+if __name__ == "__main__":
+    # 
+    # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/BEVDataset --model_path ./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5 --output_path ./data/model_evaluations.pkl
+    # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --models_to_evaluate "[('./models/model1','./datasets/dataset1'),('./models/model2','./datasets/dataset2')]" --output_path ./data/model_evaluations.pkl"
+    #
     parser = argparse.ArgumentParser(description="Script for evaluating BEV2Seg models.")
     parser.add_argument('--model_path', type=str, help="Path to the model. It can be a raw2segbev or raw2bevseg model")
     parser.add_argument('--dataset_path', type=str, help="Path to the dataset. NuImagesFormattedDataset or BEVDataset.")
     parser.add_argument('--output_path', type=str, help="Path of the resulting evaluation data")
-
     parser.add_argument('--version', type=str, default='test', help="Dataset version for evaluation. Default: 'test'")
+    parser.add_argument('--models_to_evaluate', type=str, help="List of tuples (model_path, dataset_path, [dataset_version]) for automatic evaluation")
 
     args = parser.parse_args()
-    evaluation_type = check_args(args)
-    main(dataset_path=args.dataset_path, 
-         model_path=args.model_path, 
-         output_path=args.output_path,
-         eval_type=evaluation_type, 
-         dataset_version=args.version)
-    
+
+    if args.models_to_evaluate:
+        # ✅ MODO AUTOMÁTICO: evaluar lista de modelos
+        try:
+            models_to_evaluate = ast.literal_eval(args.models_to_evaluate)
+            assert isinstance(models_to_evaluate, list), "models_to_evaluate debe ser una lista de tuplas"
+        except Exception as e:
+            raise ValueError(f"Error al parsear models_to_evaluate: {e}")
+        
+        output_path = args.output_path  # usa el mismo output_path para todos
+        check_paths([os.path.dirname(output_path)])
+
+        for data in models_to_evaluate:
+            assert 2 <= len(data) <= 3, f"Cada tupla debe tener 2 o 3 elementos: {data}"
+            model_path = data[0]
+            dataset_path = data[1]
+            dataset_version = data[2] if len(data) == 3 else 'test'
+
+
+            check_paths([model_path, dataset_path, os.path.dirname(output_path)])
+            evaluation_type = get_evaluation_type(model_path, dataset_path)
+
+            main(dataset_path=dataset_path,
+                 model_path=model_path,
+                 output_path=output_path,
+                 eval_type=evaluation_type,
+                 dataset_version=dataset_version,
+                 reevaluate=True)
+
+    elif args.model_path and args.dataset_path and args.output_path:
+        # ✅ MODO MANUAL: evaluar solo un modelo
+        evaluation_type = check_args(args)
+        main(dataset_path=args.dataset_path,
+             model_path=args.model_path,
+             output_path=args.output_path,
+             eval_type=evaluation_type,
+             dataset_version=args.version)
+    else:
+        parser.error("Debes especificar --output_path y --models_to_evaluate para evaluar varios modelos o bien --model_path --dataset_path para evaluar un único modelo.")

@@ -79,42 +79,93 @@ def get_dataset_class_balance(dataset_path:str, dataset_type:Literal["bev", "nu"
             results[version][l] = count_matrix[index]
     return results
 
-def show_class_percentange(results:dict, 
-                           data_type:Literal["bev", "nu"], 
-                           data_versions:List[Literal['mini', 'train', 'val', 'test']]):
+def get_class_ratio(results:dict, 
+                    data_type:Literal["bev", "nu"], 
+                    data_versions:List[Literal['mini', 'train', 'val', 'test']]) -> List[Tuple[str, float]]:
         
     # Get data from results
-    data = {'expected_total':0.0, 'provided_total':0.0, 'total': 0.0, 'labels': {}}
-    for data_version in results[data_type].keys():
-        if data_version in data_versions:
-            data["provided_total"] = results[data_type][data_version]['total_count']
-            data["expected_total"] = results[data_type][data_version]['expected_total_count']
-            for label, count in results[data_type][data_version].items():
-                if label == 'total_count' or label == 'expected_total_count':
-                    continue
-                if label not in data:
-                    data['labels'][label] = 0.0
-                data['labels'][label] += count
-                data['total'] += count
+    assert data_type in results
+    id2label = results[data_type]['names']
+    id2index = {l:i for i, l in enumerate(id2label.keys())}
+    num_labels = len(id2label.keys())
+    count_matrix = np.zeros(num_labels)
+    
+    sum_of_expected_total = 0
+    sum_of_provided_total = 0
 
-    print(f"expected_total: {data['expected_total']} | provided_total: {data['provided_total']} | total: {data['total']}")
+    for data_version in data_versions:
+        assert data_version in results[data_type]
+        
+        sum_of_expected_total += results[data_type][data_version]['expected_total_count']
+        sum_of_provided_total += results[data_type][data_version]['total_count']
+
+        for l in id2label.keys():
+            v = results[data_type][data_version][l]
+            index = id2index[l]
+            count_matrix[index] += v
+    total_count = count_matrix.sum()
+    
+    assert total_count == sum_of_expected_total
+    print(f"expected_total: {sum_of_expected_total} | provided_total: {sum_of_provided_total} | total: {total_count}")
+
 
     # Compute ratio
-    checksum = 0.0
-    for k in list(data['labels'].keys()):
-        l = results[data_type]['names'][k]
-        v = data['labels'].pop(k)
-        ratio = v / data['total']
-        data['labels'][l] = ratio
-        checksum += ratio
+    ratio_matrix = np.zeros(num_labels)
+    for l in id2label.keys():
+        index = id2index[l]
+        ratio_matrix[index] = count_matrix[index] / total_count 
+    # assert ratio_matrix.sum() == 1.0
     
     # Show ratios
     headers = ["Label", "Ratio (0-1)"]
-    ratios  = [[k, v] for k,v in data['labels'].items()]
-    ratios.append(("total", checksum))
-    inf = tabulate(ratios, headers=headers)
+    ratios  = [[v, ratio_matrix[id2index[k]]] for k, v in id2label.items()]
+    inf = tabulate(ratios + [("total", ratio_matrix.sum())], headers=headers)
     print(inf)
+    return ratios
 
+
+def plot_ratios(ratios:List[Tuple[str, float]],
+                data_type:Literal["bev", "nu"], 
+                bar_width:float=0.4, 
+                bar_number:int=0,
+                bar_align:str='center',
+                bar_color:Union[str, Tuple[float]] = None,
+                bar_edgecolor:Tuple[float] = (0.0, 0.0, 0.0), 
+                ax: Axes = None):
+    if ax is None:
+        ax = plt.gca()
+    
+    if data_type == "bev":
+        title = "Class balance in BEV images"
+        label_name = "BEV"
+    elif data_type == "nu":
+        title = "Class balance in normal images"
+        label_name = "Normal"
+    else:
+        raise Exception("Invalid dataset type")
+    
+    # Plot 
+    names, counts = [n for n,_ in ratios], [c for _,c in ratios]
+
+    xs = np.array(list(range(len(names))))
+    if bar_number == 0:
+        xs = xs - bar_width/2
+    elif bar_number == 1:
+        xs = xs + bar_width/2
+
+    ax.bar(x=xs, height=counts,
+           width=bar_width, 
+           align=bar_align,
+           color=bar_color if bar_color is not None else colors,
+           edgecolor=bar_edgecolor, 
+           label=label_name)
+    
+    xs = np.array(list(range(len(names))))
+    ax.set_xticks(xs, names)
+    
+    ax.set_title(title)
+    ax.set_xlabel("Label")
+    ax.set_ylabel("Ratio")
 
 def plot_results(results:dict, 
                  data_type:Literal["bev", "nu"], 
@@ -202,23 +253,24 @@ def main(output_path:str, bevdataset_path:str="./tmp/BEVDataset", nudataset_path
         results = {"bevdataset_path":bevdataset_path, "nudataset_path":nudataset_path, "bev":bev_results, "nu":nu_results}
         dump_results(output_path, results)
 
-    print("Class distribution in NuImagesFormatted Dataset")
-    show_class_percentange(results, data_type="nu", data_versions=["train", "val", "test"])
-    print("\nClass distribution in BEVDataset")
-    show_class_percentange(results, data_type="bev", data_versions=["train", "val", "test"])
-    print()
 
     if not plot_results_flag:
         print("Finished :D!!")
         return 
 
-    # fig, axes = plt.subplots(2, 1, sharex=True, sharey=True)
-    # plot_results(results, data_type='bev',  data_versions=["train", "val", "test"], ax=axes[0])
-    # plot_results(results, data_type='nu',   data_versions=["train", "val", "test"], ax=axes[1])
+    print("Class distribution in NuImagesFormatted Dataset")
+    nu_ratios = get_class_ratio(results, data_type="nu", data_versions=["train", "val", "test"])
+    print("\nClass distribution in BEVDataset")
+    bev_ratios = get_class_ratio(results, data_type="bev", data_versions=["train", "val", "test"])
+    print()
     
+
+
     ax = plt.gca()
     plot_results(results, data_type='nu',  bar_number=0, data_versions=["train", "val", "test"], bar_color="#FF0064", bar_edgecolor=None, ax=ax)
     plot_results(results, data_type='bev', bar_number=1, data_versions=["train", "val", "test"], bar_color="#39C39E", bar_edgecolor=None, ax=ax)
+    # plot_ratios(nu_ratios, data_type='nu',  bar_number=0, bar_color="#FF0064", bar_edgecolor=None, ax=ax)
+    # plot_ratios(bev_ratios, data_type='bev',  bar_number=1, bar_color="#39C39E", bar_edgecolor=None, ax=ax)
     ax.set_title("Class balance in datasets")
     ax.legend(loc='upper right', ncols=2)
     plt.xticks(rotation=90, fontsize=5)
