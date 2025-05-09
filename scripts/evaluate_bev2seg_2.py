@@ -379,16 +379,27 @@ if __name__ == "__main__":
     # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --dataset_path ./tmp/BEVDataset --model_path ./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5 --output_path ./data/model_evaluations.pkl
     # CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_bev2seg_2.py --models_to_evaluate 
     #
-    #
     # [
-    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.4'), 
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2'), 
     #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.4'), 
     #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5'), 
-    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.5'), 
+    #     ('./models/segformer_bev/raw2bevseg_mit-b0_v0.3'),
     #     ('./models/segformer_bev/raw2bevseg_mit-b0_v0.5'),
     #     ('./models/segformer_bev/raw2bevseg_mit-b0_v0.6')
     # ]
+    #
+    # [
+    #      
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b0_v0.3'), 
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b2_v0.4'), 
+    #     ('./models/segformer_nu_formatted/raw2segbev_mit-b4_v0.1'), 
+    #     ('./models/segformer_bev/raw2bevseg_mit-b2_v0.3'),
+    #     ('./models/segformer_bev/raw2bevseg_mit-b2_v0.4'),
+    #     ('./models/segformer_bev/raw2bevseg_mit-b4_v0.1'),
+    #     ('./models/segformer_bev/raw2bevseg_mit-b4_v0.2'),
+    # ]
     
+
     parser = argparse.ArgumentParser(description="Script for evaluating BEV2Seg models.")
     parser.add_argument('--model_path', type=str, help="Path to the model. It can be a raw2segbev or raw2bevseg model")
     parser.add_argument('--nu_dataset_path', type=str, help="Path to the NuImagesFormattedDataset.")
@@ -397,6 +408,7 @@ if __name__ == "__main__":
     parser.add_argument('--version', type=str, default='test', help="Dataset version for evaluation. Default: 'test'")
     parser.add_argument('--models_to_evaluate', type=str, help="List of tuples (model_path, dataset_path, [dataset_version]) for automatic evaluation")
     parser.add_argument('--testing', action='store_true', help="Wheter to be a simple experiment or a full evaluation. If set, semantic mask are saved.")
+    parser.add_argument('--revaluate', action='store_true', help="Wheter to revaluate already evaluated models.")
     
     args = parser.parse_args()
     assert args.nu_dataset_path and args.bev_dataset_path and args.output_path
@@ -440,13 +452,13 @@ if __name__ == "__main__":
                      output_path=output_path,
                      eval_type=evaluation_type,
                      dataset_version=dataset_version,
-                     reevaluate=True,
+                     reevaluate=args.revaluate,
                      testing=args.testing)
 
     elif args.model_path:
         # ✅ MODO MANUAL: evaluar solo un modelo
         check_args(args)
-
+        
         for evaluation_type in get_evaluation_types(args.model_path):
             main(nu_dataset_path=args.nu_dataset_path,
                 bev_dataset_path=args.bev_dataset_path,
@@ -454,6 +466,7 @@ if __name__ == "__main__":
                 output_path=args.output_path,
                 eval_type=evaluation_type,
                 dataset_version=args.version,
+                reevaluate=args.revaluate,
                 testing=args.testing)
     else:
         parser.error("Debes especificar --output_path y --models_to_evaluate para evaluar varios modelos o bien --model_path --dataset_path para evaluar un único modelo.")
