@@ -1,3 +1,22 @@
+¿Se ha explicado qué es una máscara semántica?
+
+[3.1.3 Validation and comparison]
+
+A la hora de validar y comparar distintos modelos de segmentación es fundamental utilizar una base de datos común y emplear métricas adecuadas que permitan evaluar el rendimiento de forma cuantitativa y objetiva. El primer requisito se garantiza mediante el uso del conjunto de test del dataset, el cual no ha sido previamente expuesto a los modelos a comparar, asegurando así una evaluación imparcial y representativa de su capacidad de generalización.
+
+En cuanto a las métricas de evaluación, si observamos la Figura X, donde se muestra una máscara semántica inferida por un modelo de segmentación junto con la correspondiente máscara anotada (ground truth), podemos intuir que una predicción acertada será aquella que maximice la superposición entre la máscara predicha y la máscara real, evitando al mismo tiempo una sobreextensión excesiva más allá de los límites de las regiones de interés del ground truth.
+
+Con este objetivo se emplean dos métricas distintas pero estrechamente relacionadas: los índices de Dice (también conocido como F1-score) y de Jaccard (también conocido como Intersection over Union, IoU), cuyas expresiones formales se presentan en la Fórmula X. Ambas métricas están acotadas en el rango [0, 1], donde un valor de 0 indica ausencia total de solapamiento entre predicción y ground truth, y un valor de 1 indica coincidencia perfecta entre ambas máscaras.
+
+Supongamos que partimos de una imagen de resolución H×W y queremos predecir N clases distintas. La salida del modelo será un tensor de dimensiones HxWxN, es decir, N máscaras de tamaño HxW en las que cada elemento representa un valor de pertenencia a una clase determinada. Sin embargo, en la segmentación semántica se considera únicamente la mejor predicción para cada píxel, generando así N máscaras binarias que representan las clasificaciones semánticas finales de la imagen original. En este contexto, las métricas descritas se calculan de manera independiente para cada una de las N clases.
+
+Para un ground truth fijo, ambas métricas están positivamente correlacionadas: si un clasificador A supera a un clasificador B según una de las métricas, también lo superará según la otra. Este hecho podría llevar a pensar que la elección entre una u otra métrica es arbitraria; sin embargo, las diferencias se hacen evidentes al calcular la media de las métricas sobre un conjunto de inferencias. En este punto, aunque ambas métricas coincidan en que el modelo A tiene mejor rendimiento que el modelo B, difieren en la magnitud de dicha diferencia.
+
+En términos generales, la métrica IoU tiende a penalizar con mayor severidad las instancias mal clasificadas en comparación con el F1-score (o Dice score), proporcionando una medida más cercana al rendimiento en el peor de los casos. Por su parte, el F1-score tiende a reflejar un rendimiento más cercano al promedio. Esta diferencia implica que, al calcular promedios sobre múltiples inferencias, el IoU será más sensible a errores puntuales significativos, mientras que el F1-score será más tolerante ante estos casos aislados.
+
+
+
+
 
 [4.1 Después de las medidas propuestas para solucionar el overfitting]
 
