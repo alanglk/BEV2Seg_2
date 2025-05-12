@@ -60,10 +60,76 @@ Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages for
     \label{fig:dataset_class_balance_ratio}
 \end{figure}
 
+% ==========================================================
 \section{Rotation matrix to euler angles}
 Here \cite{euler_from_matrix} is the pseudocode.
 
+% ==========================================================
+\section{F1-Score in terms of Intersection Over Union} \label{appendix:f1_iou}
+\begin{equation}
+    \begin{aligned}
+    \text{F1} &= \frac{2TP}{2TP + FP + FN} \\
+    \text{IoU} &= \frac{TP}{TP + FP + FN}
+    \end{aligned}
+    \label{eq:system}
+    \end{equation}
+    
+    % Step 1: Solve F1 in terms of IoU
+    \noindent
+    We know that:
+    \[
+    \text{IoU} = \frac{TP}{TP + FP + FN} \Rightarrow TP + FP + FN = \frac{TP}{\text{IoU}}
+    \]
+    
+    Now substitute into the expression for F1:
+    \[
+    \text{F1} = \frac{2TP}{2TP + FP + FN} = \frac{2TP}{TP + (TP + FP + FN)} = \frac{2TP}{TP + \frac{TP}{\text{IoU}}}
+    \]
+    
+    Factor \(TP\) out of the denominator:
+    \[
+    \text{F1} = \frac{2TP}{TP \left(1 + \frac{1}{\text{IoU}}\right)} = \frac{2}{1 + \frac{1}{\text{IoU}}}
+    \]
+    
+    Now simplify:
+    \[
+    \text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}}
+    \]
+    
+    % Step 2: Solve IoU in terms of F1
+    \noindent
+    Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
+    \[
+    \text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}}
+    \]
+    
+    Multiply both sides by \(1 + \text{IoU}\):
+    \[
+    \text{F1}(1 + \text{IoU}) = 2\text{IoU}
+    \Rightarrow \text{F1} + \text{F1} \cdot \text{IoU} = 2 \cdot \text{IoU}
+    \]
+    
+    Bring all terms to one side:
+    \[
+    \text{F1} = 2\text{IoU} - \text{F1} \cdot \text{IoU}
+    \Rightarrow \text{F1} = \text{IoU}(2 - \text{F1})
+    \]
+    
+    Now isolate \(\text{IoU}\):
+    \[
+    \text{IoU} = \frac{\text{F1}}{2 - \text{F1}}
+    \]
+    
+    \begin{equation}
+    \boxed{
+    \text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}} \qquad
+    \text{IoU} = \frac{\text{F1}}{2 - \text{F1}}
+    }
+    \label{eq:conversion}
+\end{equation}
 
+
+% ==========================================================
 \section{Color palette}
 \begin{table}[h]
     \centering
