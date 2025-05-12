@@ -48,14 +48,14 @@ This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_e
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=0.8\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.3_test_evaluation.png}
+    \includegraphics[width=0.8\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.2_test_evaluation.png}
     \caption{Model evaluated with normal and BEV images}
     \label{fig:normal_vs_bev_evaluation}
 \end{figure}
 
 First, there's a clear imbalance in performance between dominant classes such as \texttt{background} and \texttt{flat.driveable\_area}, and the remaining, less frequent classes. Many of the minority classes show extremely low or even zero IoU scores. This is partly due to the inherent class imbalance in the dataset: some semantic classes have no annotated pixels at all (see Appendix~\ref{appendix:OLDatasets} for more details).
 
-Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to 15 meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects—minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
+Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to 15 meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
 
 All these factors lead to a lower total number of pixels in the BEV dataset. As a result, each misclassified pixel has a greater impact on the overall evaluation, making errors more costly and consequently lowering the average performance metrics.
 
@@ -69,8 +69,11 @@ With all of this in place, the training strategy is designed to support experime
     \item \textit{Which of the two approaches performs better for BEV driveable area segmentation?}
 \end{itemize}
 
+\hl{Mention the used hyperparameters for training the models.}
 
 \subsubsection{Merging labels}
+
+
 
 
 \subsubsection{Data augmentation}

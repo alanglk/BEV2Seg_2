@@ -33,9 +33,12 @@ Todos estos factores hacen que la cantidad total de píxeles sea menor en el con
 Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a cada clase para que a la hora de computar el loss en cada iteración del entrenamiento el efecto de cometer un error en la predicción de una clase minoritaria sea sustancialmente superior al predecir mal una clase mayoritaria. Sin embargo, debido a la naturaleza del proyecto, no es necesario tener una segmentación en clases tan precisas como las que proporciona el dataset, por lo que se ha decidido explorar si al realizar un merge de las clases semánticas se minimiza el efecto del desbalanceo de las clases.
 
 
+[4.1.1 Merging labels]
+Como se ha comentado, con el fin de mejorar el rendimiento de los modelos en las clases minoritarias del dataset se ha decidido hacer un merge de las clases semánticas en clases más representativas. Esta estrategia es la mima en la empleada en el pipeline de anotación implementado, por lo que se ha decidido implementarlo en tiempo de entrenamiento utilizando el mismo conjunto look up table de reglas de merging semánticos de labels que el descrito el la tabla 3 adaptando los scripts de entrenamiento y evaluación para considerar el merging look up table.
 
 
-[4.1.1 Sustituye al With the inclusion of...]
+
+[4.1.2 Sustituye al With the inclusion of...]
 
 Se puede observar que con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma significativa permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados de mIoU de las imágenes BEV son ligeramente inferiores a los obtenidos con el modelo overfiteado. Esto puede deberse a que los conjuntos de validación y de test tienen el mismo tamaño (un 10% del conjunto total cada uno) estando compuestos por muy pocas imágenes (al rededor de 1600 cada uno). Al partir ambos del mismo conjunto inicial y compartir la misma distribución, puede darse el caso de que el overfitting en validación afecte al conjunto de test al no presentar una variabilidad significativa respecto al conjunto de validación. Esto puede explicar el porqué aquellas clases mayoritarias presentan mejores resultados con los modelos overfiteados tanto en imágenes normales como en BEV (ver Figura fusionada de RAW-SEG-BEV y RAW-BEV-SEG para todas las clases).
 
