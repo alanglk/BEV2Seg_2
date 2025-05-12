@@ -86,11 +86,53 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
 \end{figure}
 
 \subsubsection{Validation and comparison}
-Mean intersection over union (mIoU) or Jaccard index is used as the metric for evaluation and comparison between the two approaches.
+When validating and comparing different segmentation models, it is essential to use a common dataset and apply appropriate metrics that allow for a quantitative and objective evaluation of model performance. The first requirement is met by using the test set of the dataset, which has not been previously exposed to the models being compared. Regarding evaluation metrics, as shown in Figure~\ref{fig:semantic_masks}, where a semantic mask predicted by a segmentation model is displayed alongside the corresponding annotated ground truth mask, it is intuitive to assume that an accurate prediction is one that maximizes the overlap between the predicted mask and the ground truth while also avoiding excessive overflow beyond the boundaries of the ground truth regions.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/raw/original_image_2.png} 
+        \caption{}
+        \label{fig:semantic_masks_a}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/semantic_colored/2_target_color.png}
+        \caption{}
+        \label{fig:semantic_masks_b}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/semantic_colored/2_inference_color.png}
+        \caption{}
+        \label{fig:semantic_masks_c}
+    \end{subfigure}
+
+    \caption{Semantic masks example: (a) original image, (b) colored semantic ground truth, (c) colored inferenced semantic mask.}
+    \label{fig:semantic_masks}
+\end{figure}
+
+To quantify this, two distinct but related metrics are commonly used: the Dice coefficient (also known as the F1-score) and the Jaccard index (also known as Intersection over Union, IoU), whose formal definitions are presented in Formula~\ref{eq:metrics}. Both metrics are bounded within the range [0, 1], where 0 indicates no overlap between prediction and ground truth, and 1 indicates a perfect match between the two masks.
+
+\begin{equation}
+    \begin{aligned}
+    \text{Dice}(A, B) &= \frac{2\,|A \cap B|}{|A| + |B|} = \frac{2\,TP}{2\,TP + FP + FN} \\
+    \text{Jaccard}(A, B)  &= \frac{|A \cap B|}{|A \cup B|} = \frac{TP}{TP + FP + FN}
+    \end{aligned}
+    \label{eq:metrics}
+\end{equation}
+
+Suppose we start from an image with resolution $H \times W$ and aim to predict $N$ different classes. The model output will be a tensor of dimensions $H \times W \times N$, representing $N$ masks of size $H \times W$, where each element encodes a class-specific confidence value. However, in semantic segmentation, only the best prediction per pixel is retained, resulting in $N$ binary masks that represent the final semantic classifications of the original image. In this context, the described metrics are computed independently for each of the $N$ classes.
+
+For a fixed ground truth, both metrics are positively correlated: if classifier A outperforms classifier B according to one metric, it will also outperform it according to the other (see Appendix~\ref{appendix:f1_iou}). This might suggest that the choice between the two metrics is arbitrary; however, differences become apparent when averaging scores over a set of predictions. At this stage, although both metrics may agree that model A performs better than model B, they differ in how much better one model is compared to the other.
+
+In general, the IoU metric tends to penalize poorly classified instances more severely than the F1-score, thereby offering a performance measure that reflects worst-case behavior. In contrast, the F1-score is more representative of average-case performance. As a result, when computing averages across multiple predictions, IoU is more sensitive to significant outliers, while F1-score tends to be more forgiving in such cases.
+
+Taking all this into account, mean Intersection over Union (mIoU) has been chosen as the primary metric for evaluating and comparing models in this work.
 
 \hl{See this post: } \url{https://ilmonteux.github.io/2019/05/10/segmentation-metrics.html}
 
-\hl{Fusion module in the pipeline. Semantic masks are selected from each model depending on its mIoU in the test set? Meter la chapa de métricas y demás.}
+\hl{Fusion module in the pipeline has to be "comparison".}
 
 \subsection{Driveable area automatic annotation}
 \label{sec:aplication}
@@ -161,14 +203,14 @@ This is where Depth-Pro \cite{depth-pro} comes into as it is 'a foundation model
     \setlength{\tabcolsep}{1pt}  % Reduce column padding
     \renewcommand{\arraystretch}{0.5}
     \begin{tabular}{c c c c c c c c}
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_0.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_1.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_2.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_3.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_4.png} &   
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_5.png} & 
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_6.png} &
-        \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/original_image_7.png} \\
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_0.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_1.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_3.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_4.png} &   
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_6.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/raw/original_image_7.png} \\
 
         \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/colored_depth_map_0.png} & 
         \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/colored_depth_map_1.png} & 
@@ -316,10 +358,12 @@ Firstly, the input semantic mask is preprocessed with a label merging step in wh
         \texttt{human.pedestrian.adult}, \texttt{human.pedestrian.child}, \texttt{human.pedestrian.construction\_worker}, \texttt{human.pedestrian.personal\_mobility}, \texttt{human.pedestrian.police\_officer}, \texttt{human.pedestrian.stroller}, \texttt{human.pedestrian.wheelchair} \\
         \hline
         \texttt{movable\_object.barrier} &
-        \texttt{movable\_object.barrier}, \texttt{movable\_object.debris}, \texttt{movable\_object.pushable\_pullable}, \texttt{movable\_object.trafficcone}, \texttt{static\_object.bicycle\_rack} \\
+        \texttt{movable\_object.barrier}, \texttt{movable\_object.debris}, \texttt{movable\_object.pushable\_pullable}, \texttt{movable\_object.trafficcone}, \texttt{static\_object.bicycle\_rack}, \\
         \hline
         \texttt{vehicle.car} & 
         \texttt{vehicle.bus.bendy}, \texttt{vehicle.bus.rigid}, \texttt{vehicle.car}, \texttt{vehicle.construction}, \texttt{vehicle.emergency.ambulance}, \texttt{vehicle.emergency.police}, \texttt{vehicle.trailer}, \texttt{vehicle.truck} \\
+        \hline
+        \texttt{vehicle.ego} & \texttt{vehicle.ego} \\
         \hline
         \texttt{vehicle.motorcycle} & 
         \texttt{vehicle.bicycle}, \texttt{vehicle.motorcycle} \\
