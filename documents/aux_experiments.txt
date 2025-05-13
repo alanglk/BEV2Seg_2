@@ -36,19 +36,33 @@ Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a
 [4.1.1 Merging labels]
 Como se ha comentado, con el fin de mejorar el rendimiento de los modelos en las clases minoritarias del dataset se ha decidido hacer un merge de las clases semánticas en clases más representativas. Esta estrategia es la mima en la empleada en el pipeline de anotación implementado, por lo que se ha decidido implementarlo en tiempo de entrenamiento utilizando el mismo conjunto look up table de reglas de merging semánticos de labels que el descrito el la tabla 3 adaptando los scripts de entrenamiento y evaluación para considerar el merging look up table.
 
-En la Figura X se muestran las gráficas de los resultados de dos modelos evaluados con imágenes BEV en la que se aplica o no la estrategia de merging labels. 
+En la Figura X se presentan los resultados comparativos de dos modelos evaluados sobre el mismo conjunto de test con máscaras en vista BEV. El Modelo A ha sido entrenado con todas las clases semánticas originales, mientras que el Modelo B utiliza la estrategia de merging, reduciendo así el número total de clases consideradas. Los resultados muestran que, en algunas clases específicas, el Modelo A logra un mayor valor de Intersection over Union (IoU); sin embargo, en esos mismos casos, el F1-score (o Dice coefficient) del Modelo B suele mantenerse similar o incluso mejorar ligeramente.
+
+La diferencia más significativa entre las métricas de las clases corresponde al label "vehicle.car", demostrando que esta estrategia mejora de forma significativa el rendimiento del modelo en esta clase. Sin embargo, por lo general, ambos modelos demuestran un rendimiento similar. El hecho de que el modelo con merging obtenga valores de mF1 iguales o superiores, incluso cuando su mIoU es menor, sugiere que la simplificación del espacio semántico no deteriora la capacidad del modelo de capturar correctamente las instancias relevantes, sino que más bien reduce la penalización asociada a clases minoritarias con poca representatividad. Asimismo, al reducir el número total de clases consideradas, el promedio global de las métricas mejora, ya que se evita que clases irrelevantes o mal representadas distorsionen el cálculo final. Esto refuerza la utilidad práctica del merging en contextos donde no se requiere una segmentación tan granular, priorizando la estabilidad y representatividad de las métricas globales del modelo.
+
+
 
 [4.1.2 Sustituye al With the inclusion of...]
 
 Se puede observar que con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma significativa permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados de mIoU de las imágenes BEV son ligeramente inferiores a los obtenidos con el modelo overfiteado. Esto puede deberse a que los conjuntos de validación y de test tienen el mismo tamaño (un 10% del conjunto total cada uno) estando compuestos por muy pocas imágenes (al rededor de 1600 cada uno). Al partir ambos del mismo conjunto inicial y compartir la misma distribución, puede darse el caso de que el overfitting en validación afecte al conjunto de test al no presentar una variabilidad significativa respecto al conjunto de validación. Esto puede explicar el porqué aquellas clases mayoritarias presentan mejores resultados con los modelos overfiteados tanto en imágenes normales como en BEV (ver Figura fusionada de RAW-SEG-BEV y RAW-BEV-SEG para todas las clases).
 
-Sin embargo, si atendemos a las clases minoritarias
+WARNING!!!!!!!!!!!!!!!!!!!!!!!
+NECESITO LOS LOGS DE raw2bevseg_mit-b0_v0.5 y reentrenar raw2bevseg_mit-b0_v0.4 tanto para los logs como para los resultados. No me terminan de cuadrar las gráficas con el razonamiento y necesito que los modelos estén entrenados con los mismos hiperparámetros y el checkpoint strategy.
 
 
 
-Con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma considerable permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados del mIoU de las imágenes BEV en validacion son inferiores a los obtenidos con el modelo overfiteado.
+[4.2 3D detections evaluation]
+El objetivo del pipeline es el de llevar a cabo una preanotación de máscaras de ocupación/oclusión y área conducible para escenas vehiculares para lo que se realizan detecciones 3D de objetos a partir de imágenes monoculares. 
 
-Esto se debe a que las máscaras semánticas en BEV contienen una mayor proporción de las clases "background"
+Con el fin de evaluar las detecciones que se realizan en el pipeline implementado, se ha seleccionado una escena de NuScenes anotada con groundtruth de los objetos 3D, odometría del vehículo....
+
+Tengo que refrescar todo esto :(
+
+
+
+
+
+
 
 
 

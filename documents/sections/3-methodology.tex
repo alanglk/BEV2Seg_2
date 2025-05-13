@@ -112,7 +112,7 @@ When validating and comparing different segmentation models, it is essential to 
     \label{fig:semantic_masks}
 \end{figure}
 
-To quantify this, two distinct but related metrics are commonly used: the Dice coefficient (also known as the F1-score) and the Jaccard index (also known as Intersection over Union, IoU), whose formal definitions are presented in Formula~\ref{eq:metrics}. Both metrics are bounded within the range [0, 1], where 0 indicates no overlap between prediction and ground truth, and 1 indicates a perfect match between the two masks.
+To quantify this, two distinct but related metrics are commonly used: the Dice coefficient (also known as the F1-score) and the Jaccard index, also known as \aclink{IoU}, whose formal definitions are presented in Formula~\ref{eq:metrics}. Both metrics are bounded within the range [0, 1], where 0 indicates no overlap between prediction and ground truth, and 1 indicates a perfect match between the two masks.
 
 \begin{equation}
     \begin{aligned}
@@ -126,9 +126,9 @@ Suppose we start from an image with resolution $H \times W$ and aim to predict $
 
 For a fixed ground truth, both metrics are positively correlated: if classifier A outperforms classifier B according to one metric, it will also outperform it according to the other (see Appendix~\ref{appendix:f1_iou}). This might suggest that the choice between the two metrics is arbitrary; however, differences become apparent when averaging scores over a set of predictions. At this stage, although both metrics may agree that model A performs better than model B, they differ in how much better one model is compared to the other.
 
-In general, the IoU metric tends to penalize poorly classified instances more severely than the F1-score, thereby offering a performance measure that reflects worst-case behavior. In contrast, the F1-score is more representative of average-case performance. As a result, when computing averages across multiple predictions, IoU is more sensitive to significant outliers, while F1-score tends to be more forgiving in such cases.
+In general, the \aclink{IoU} metric tends to penalize poorly classified instances more severely than the F1-score, thereby offering a performance measure that reflects worst-case behavior. In contrast, the F1-score is more representative of average-case performance. As a result, when computing averages across multiple predictions, \aclink{IoU} is more sensitive to significant outliers, while F1-score tends to be more forgiving in such cases.
 
-Taking all this into account, mean Intersection over Union (mIoU) has been chosen as the primary metric for evaluating and comparing models in this work.
+Taking all this into account, \aclink{mIoU} has been chosen as the primary metric for evaluating and comparing models in this work.
 
 \subsection{Driveable area automatic annotation}
 \label{sec:aplication}
@@ -414,10 +414,7 @@ However, the main goal in this thesis is to estimate the physical space occupied
     \end{algorithmic}
 \end{algorithm}
 
-Finally, a filtering process is performed to ensure there are no noisy, redundant, too far away or floating instances.
-\hl{Explain the filtering process: AABB intersection factor.}
-
-The results of this module are shown in Figure~\ref{fig:instance_scene_images}.
+Finally, a filtering process is performed to ensure there are no noisy, redundant, too far away or floating instances. Also, it ensures there are no overlapping bounding boxes by checking each new instance's 3D bounding box against those already accepted. If an overlap is detected, the function compares their sizes: the larger box is kept, and the smaller one is removed or ignored. This helps avoid redundant or conflicting instances that may represent the same object or spatial region, improving the clarity and consistency of the data. The final results of this module are shown in Figure~\ref{fig:instance_scene_images}.
 
 \begin{figure}[h!]
     \centering
@@ -443,7 +440,9 @@ Once the 3D instance detection is performed and the panoptic point cloud is gene
 
 To associate the BEV semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is associated with one polygon but a polygon may have multiple masks. This is represented in Algorithm~\ref{algorithm:occ_masks} and results in a final representation of occupancy, defined by the base of the 3D bounding box, and occlusion, which is captured by the distorded shape of the semantic mask from the BEV perspective.
 
-\hl{Explain why one cuboid base is associated with multiple BEV masks. Complete this algorithm.}
+A single cuboid base can be associated with multiple BEV masks because a 3D instance may appear fragmented in the BEV semantic view. When connected components labeling is applied to these masks, each fragment is identified as a separate region. However, since all fragments originate from the same 3D object, they are associated with the same cuboid base.
+
+\hl{Complete this algorithm.}
 \begin{algorithm}
     \caption{Occupancy Occlusion masks}
     \label{algorithm:occ_masks}
