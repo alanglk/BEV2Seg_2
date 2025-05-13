@@ -36,7 +36,7 @@ Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a
 [4.1.1 Merging labels]
 Como se ha comentado, con el fin de mejorar el rendimiento de los modelos en las clases minoritarias del dataset se ha decidido hacer un merge de las clases semánticas en clases más representativas. Esta estrategia es la mima en la empleada en el pipeline de anotación implementado, por lo que se ha decidido implementarlo en tiempo de entrenamiento utilizando el mismo conjunto look up table de reglas de merging semánticos de labels que el descrito el la tabla 3 adaptando los scripts de entrenamiento y evaluación para considerar el merging look up table.
 
-
+En la Figura X se muestran las gráficas de los resultados de dos modelos evaluados con imágenes BEV en la que se aplica o no la estrategia de merging labels. 
 
 [4.1.2 Sustituye al With the inclusion of...]
 

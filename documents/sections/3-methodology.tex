@@ -130,10 +130,6 @@ In general, the IoU metric tends to penalize poorly classified instances more se
 
 Taking all this into account, mean Intersection over Union (mIoU) has been chosen as the primary metric for evaluating and comparing models in this work.
 
-\hl{See this post: } \url{https://ilmonteux.github.io/2019/05/10/segmentation-metrics.html}
-
-\hl{Fusion module in the pipeline has to be "comparison".}
-
 \subsection{Driveable area automatic annotation}
 \label{sec:aplication}
 
@@ -384,7 +380,7 @@ Once the semantic mask has been preprocessed and the point cloud computed, a pre
     \label{fig:semantic_pointcloud}
 \end{figure}
 
-The instance detection process (Algorithm~\ref{algorithm:instance_pointcloud}) is carried out using a clustering algorithm that extracts the different instances from each dynamic semantic point cloud. The chosen algorithm is DBSCAN\footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html}}, which creates good instance clusters and removes part of the trail left by the depth estimation on object edges. Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\hat{x}_c$, $\hat{y}_c$, and $\hat{z}_c$. Oriented bounding boxes were not used in this work.
+The instance detection process (Algorithm~\ref{algorithm:instance_pointcloud}) is carried out using a clustering algorithm that extracts the different instances from each dynamic semantic point cloud. The chosen algorithm is DBSCAN, which creates good instance clusters and removes part of the trail left by the depth estimation on object edges. Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\hat{x}_c$, $\hat{y}_c$, and $\hat{z}_c$. Oriented bounding boxes were not used in this work.
 
 Estimating the correct orientation of a bounding box is a challenging task, especially when only a partial view of the object is available (see Figure~\ref{fig:oriented_bounding_box_problems}). Depending on the viewpoint and the amount of visible surface, traditional methods are very likely to produce inaccurate orientation estimates. Modern 3D object detection models typically address this issue by learning the statistical distribution of common object shapes and orientations. Datasets like NuScenes even provide metrics such as Average Scale Error (ASE) and Average Orientation Error (AOE) to evaluate the accuracy of these predictions.
 
