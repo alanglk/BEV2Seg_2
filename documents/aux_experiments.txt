@@ -52,18 +52,31 @@ NECESITO LOS LOGS DE raw2bevseg_mit-b0_v0.5 y reentrenar raw2bevseg_mit-b0_v0.4 
 
 
 [4.2 3D detections evaluation]
-El objetivo del pipeline es el de llevar a cabo una preanotación de máscaras de ocupación/oclusión y área conducible para escenas vehiculares para lo que se realizan detecciones 3D de objetos a partir de imágenes monoculares. 
 
-Con el fin de evaluar las detecciones que se realizan en el pipeline implementado, se ha seleccionado una escena de NuScenes anotada con groundtruth de los objetos 3D, odometría del vehículo....
+Como se ha comentado anteriormente, el objetivo final del pipeline de anotación es el de generar máscaras de ocupación, oclusión y área conducible. Para realizar esto se toman máscaras semánticas del entorno tanto en el dominio de la cámara como en vista BEV y se realiza un proceso intermedio de detección 3D de objetos a partir de imágenes monoculares en el dominio de la cámara con el fin de estimar las dimensiones de los obstáculos. Esta detección 3D se realiza con algoritmos de clustering de nubes de puntos y resulta de especial interés el medir cómo de precisas son estas detecciones.
 
-Tengo que refrescar todo esto :(
+De hecho, el dataset de NuScenes fue desarrollado con el fin de entrenar y evaluar este tipo de estrategias entre otros, y cuenta con diversas métricas y métodos de evaluación para este propósito. Entre otras métricas, las que más destacan son las siguientes:
+	- Mean Average Precision (mAP):
+
+True positive metrics:
+	- Average Translation Error (ATE):
+	- Average Scale Error (ASE):
+	- Average Orientation Error (AOE):
+	- Average Velocity Error (AVE):
+	- Average Attribute Error (AAE):
+Estas métricas basadas en true positive detections se calculan empleando un threshold de 2m de distancia desde el centro y están diseñadas para ser escalares positivos (>= 0). Además, estas métricas están definidas por cada una de las clases semánticas del dataset, por lo que los resultados finales se toman con las medias de las métricas: mATE, mASE, mAOE, mAVE, y mAAE.
+
+Custom metrics:
+	- NuScenes detection score (NDS): 
+
+<Explicar las métricas en detalle>
+
+<Explicar el caso de uso: vista desde la cámara, no importa la orientación pero sí que hay que medir cuánto se equivoca en estimar las dimensiones y la posición de los cuboides. A la hora de estimar las posiciones, más que la distancia entre centroides interesa que la distancia volumétrica sea lo menor posible. Además, IoU por sí solo no tiene demasiado sentido, ya que dos predicciones se considerarán igual de malas si tienen IoU = 0 a pesar de que una esté más cerca del ground truth que la otra. En cuanto al error en la estimación de las posiciones, interesa el error en cada uno de los ejes para medir cómo se comporta el sistema en los giros. Con todo ello, se ha decidido utilizar la métrica que combina el IoU y la distancia volumétrica para medir el error en la traslación y la diferencia absoluta de las dimensiones por cada eje después de alinear la rotación de los cuboides para medir el error de las dimensiones>
+
+Sin embargo, se ha decidido emplear unas métricas adaptadas para el caso de uso que se presenta en este trabajo...
 
 
 
-
-
-
-
-
+El proceso de evaluación comienza definiendo... 
 
 
