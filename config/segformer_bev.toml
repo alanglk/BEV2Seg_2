@@ -13,10 +13,10 @@ pretrained = "nvidia/mit-b0"
 batch_size = 16
 epochs = 200
 learning_rate = 0.00006
-weight_decay = 0.01
+weight_decay = 0.0
 
 # Data augmentation
-data_augmentation = true                            # (optional) defaults to False. 
+data_augmentation = false                           # (optional) defaults to False. 
                                                     # If set, the dataset_type specific data augmentation functions are applied
 data_augmentation_type = "use_custom_bev_transforms"     # (optional) defaults to "use_torch_transforms". ["use_torch_transforms", "use_custom_bev_transforms"]. 
 
