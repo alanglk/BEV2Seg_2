@@ -481,3 +481,106 @@ This method allows for estimating the vehicle’s extent while handling certain 
     \label{fig:bev_occupancy_occlusion}
 \end{figure}
 
+
+\subsubsection{Evaluation strategy}
+As early mentioned, the final objective of the annotation pipeline is to provide occupancy, occlusion and driveable area masks. To achieve this, the process starts from semantic masks of the environment, both in the camera and \aclink{BEV} domains. A crucial intermediate step in this pipeline is the 3D object detection from monocular images in the camera view to estimate the dimensions and positions of obstacles. As this detection is performed using pointcloud clustering algorithms it is particularly important to assess its performance using appropriate evaluation metrics.
+
+Another key aspect of the evaluation involves assessing the quality of the generated BEV masks. Therefore, the evaluation methodology must address two distinct components: the accuracy of the monocular 3D object detection, and the fidelity of the resulting BEV masks when compared to a defined ground truth.
+
+\subsubsubsection{3D detections evaluation}
+The nuScenes metrics~\cite{nuscenes} were considered as a starting point as this dataset was specifically developed to facilitate the training and evaluation of 3D perception strategies. The nuScenes benchmark includes a set of standardized metrics aimed at assessing the quality of 3D object detections. Among these, one of the most important is the \aclink{mAP}, a widely adopted metric for evaluating object detection models. The \aclink{mAP} is defined as the area under the precision-recall curve and reflects the trade-off between precision, the proportion of true positives among all predicted positives, and recall, the proportion of true positives among all actual relevant instances in the dataset.
+
+To compute the \aclink{mAP}, it is first necessary to establish a matching criterion between predictions and ground truth instances. In the case of the nuScenes benchmark, this association is determined using the 2D distance between the centers of the predicted and ground truth boxes projected onto the ground plane. A prediction is considered a true positive if the centroid distance is below a predefined threshold; otherwise, it is treated as a false positive. Ground truth instances with no associated predictions are counted as false negatives. The \aclink{AP} is computed for a set of predefined distance thresholds ($\{0.5, 1, 2, 4\}$ meters), and the final \aclink{mAP} score is obtained by averaging the \aclink{AP} values across all object classes.
+
+In addition to the mAP, the nuScenes benchmark introduces a set of complementary metrics designed to evaluate specific aspects of correctly classified detections (true positives). These metrics quantify errors in several key attributes of the detected objects, using a fixed association threshold of $2$ meters between predicted and ground truth box centers.
+
+The main metrics in this category are as follows:
+\begin{itemize}
+    \item \textbf{Average Translation Error (ATE)}: Measures the translation error as the Euclidean distance between the centers of the predicted and ground truth bounding boxes, projected onto the ground plane.
+    
+    \item \textbf{Average Scale Error (ASE)}: Calculates the scale error as $1 - \text{IoU}$, after aligning both the orientation and position of the boxes. This metric reflects how well the predicted box matches the ground truth in size.
+    
+    \item \textbf{Average Orientation Error (AOE)}: Measures the orientation error as the smallest angular difference in yaw between the predicted and ground truth boxes.
+    
+    \item \textbf{Average Velocity Error (AVE)}: Represents the absolute error in velocity estimation, measured in meters per second.
+    
+    \item \textbf{Average Attribute Error (AAE)}: Evaluates errors in dynamic attribute classification (e.g., whether a car is parked, moving, or stationary) as $1 - \text{acc}$, where $\text{acc}$ denotes the accuracy of attribute prediction.
+\end{itemize}
+
+To summarize overall performance, nuScenes defines the \textit{nuScenes Detection Score} (NDS), a global metric that combines all of the above measures in a weighted average. The NDS provides a comprehensive assessment of the system's detection performance, balancing accuracy, localization, orientation, speed, scale, and attribute prediction.
+
+
+% ==============================================================================
+
+% Además del mAP, nuScenes propone un conjunto de métricas adicionales que permiten evaluar de forma más específica distintos aspectos de las detecciones correctamente clasificadas (true positives). Estas métricas cuantifican errores en distintos atributos clave del objeto detectado, utilizando un umbral fijo de 2 metros para establecer la asociación entre predicción y ground truth. Las principales métricas de este tipo son:
+
+%\begin{itemize}
+%    \item Average Translation Error (ATE): mide el error de traslación como la distancia euclídea entre los centros de las cajas predichas y las reales, proyectados en el plano del suelo.
+%    \item Average Scale Error (ASE): calcula el error de escala como $1 - IoU$, una vez alineadas la orientación y la posición de las cajas.
+%    \item Average Orientation Error (AOE): mide el error de orientación como la menor diferencia angular en el eje de guiñada (yaw) entre predicción y realidad.
+%    \item Average Velocity Error (AVE): representa el error absoluto en la estimación de la velocidad del objeto, medido en metros por segundo.
+%    \item Average Attribute Error (AAE): evalúa el error en la predicción de atributos dinámicos (por ejemplo, si un coche está aparcado, en movimiento o detenido) como $1 - acc$, siendo $acc$ el accuracy o la proporción de aciertos en la clasificación del atributo.
+%\end{itemize}
+
+%Como métrica global, NuScenes propone el NuScenes Detection Score (NDS), que sintetiza la calidad general de las detecciones mediante una combinación ponderada de todas las métricas anteriores. Esta métrica permite obtener una visión de conjunto del rendimiento del sistema, equilibrando precisión, localización, orientación, velocidad, escala y atributos.
+
+%El caso de uso abordado en este trabajo presenta particularidades que lo diferencian del escenario estándar planteado en el dataset NuScenes. En concreto, las detecciones 3D se obtienen a partir de imágenes monoculares mediante algoritmos de clustering, por lo que los cuboides 3D generados únicamente representan la parte visible del objeto desde la cámara en un instante determinado. Además, estos cuboides están siempre alineados con la orientación de la cámara, lo que hace que el cálculo del error de orientación carezca de utilidad práctica en este contexto, ya que se sabe de antemano que este error será elevado. No obstante, resulta de gran interés evaluar la precisión en la estimación de las posiciones y dimensiones de los cuboides generados, ya que ello permite valorar si el pipeline es capaz de realizar detecciones razonablemente precisas con la información disponible.
+
+%En este escenario, emplear la distancia entre centroides como criterio de asociación entre predicciones y ground truth resulta problemático. Mientras que los cuboides del ground truth engloban la totalidad del objeto en 3D, los cuboides predichos solo contienen los puntos visibles desde la cámara, lo que genera desplazamientos sistemáticos en las posiciones relativas de los centros. Por ello, se ha optado por utilizar una métrica más adecuada: la distancia entre volúmenes (volume-to-volume distance, o v2v), definida como la distancia mínima entre las envolventes convexas de los volúmenes considerados.
+
+%Sin embargo, la métrica v2v presenta una limitación importante: toma un valor de cero siempre que exista intersección entre los volúmenes, independientemente del grado de solapamiento. Para superar esta limitación se recurre a la métrica Bounding Box Disparity (BBD) [referencia], que combina IoU y v2v en una única métrica continua y no negativa. Esta métrica permite cuantificar la disimilitud entre dos cuboides, tanto si se solapan como si no. Como se indica en la definición original, mientras que el IoU únicamente puede comparar cuboides con intersección, el BBD proporciona una medida de disparidad también en ausencia de solapamiento. Su interpretación es la siguiente:
+
+%\begin{itemize}
+%    \item Si $BBD = 0$, los cuboides son idénticos (intersección total).
+%    \item Si $0 < BBD < 1$, existe solapamiento pero también disparidad.
+%    \item Si $BBD \geq 1$, los cuboides no se solapan.
+%\end{itemize}
+
+%Estos distintos casos se ilustran en la Figura X.
+
+%Por otra parte, para evaluar el error en la estimación de las dimensiones de los objetos detectados, se ha decidido calcular la diferencia absoluta entre las dimensiones de los cuboides predichos y del ground truth en cada uno de los ejes (longitud, anchura y altura). Esto permite analizar en qué dimensión se concentra mayor error y bajo qué condiciones.
+
+%El proceso de evaluación comienza delimitando el área en la que se considerarán las detecciones generadas por el pipeline. Dado que el sistema produce predicciones a distancias mayores que las empleadas posteriormente para generar las máscaras BEV de ocupación y oclusión, se ha decidido restringir el rango de evaluación a la misma región que se usa para la generación de dichas máscaras. Concretamente, se define el polígono de visión de la cámara proyectado sobre el plano horizontal y se limita la distancia máxima de detección a 15 metros. De este modo, solo se consideran para la evaluación aquellas detecciones y elementos del ground truth que se encuentren dentro de este polígono en el instante correspondiente.
+
+%Una vez filtradas las detecciones, se procede a la asociación entre predicciones y ground truth mediante la resolución del Linear Sum Assignment Problem (LSAP) utilizando el algoritmo húngaro. Esto permite encontrar las correspondencias óptimas entre objetos predichos y reales, sobre las cuales se calculan las siguientes métricas:
+
+%\begin{itemize}
+%    \item True Positives (TP), False Positives (FP) y False Negatives (FN): determinados en función de las asociaciones establecidas.
+%    \item DD (Difference in Dimensions): diferencia de volumen entre cuboides asociados.
+%    \item DED (Difference in Each Dimension): diferencia absoluta por eje (longitud, anchura, altura).
+%    \item v2v: distancia entre volúmenes.
+%    \item IoU: intersección sobre unión en 3D.
+%    \item BBD (Bounding Box Disparity): métrica continua de disimilitud explicada anteriormente.
+%\end{itemize}
+
+%Estas métricas permiten evaluar de manera más precisa y adaptada la calidad de las detecciones 3D en el contexto particular del pipeline propuesto, considerando las limitaciones y características propias del proceso de detección monocular.
+% ==============================================================================
+
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c}
+        
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_0_3d_scene.png} &
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_2_3d_scene.png} \\
+        
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_0_3d_bb.png} &
+        \includegraphics[width=0.45\textwidth]{images/experiments/frame_2_3d_bb.png} \\
+
+    \end{tabular}
+    
+    \caption{Bounding Box Disparity scene calculation. (a) shows an example of intersection, while (b) shows an example of volumetric distance}
+    \label{fig:bbox_disparity}
+\end{figure}
+
+
+
+
+
+
+\subsubsubsection{BEV masks evaluation}
+\hl{Groundtruth BEV masks could be generated from annotations and compute mIoU between the annotated BEV masks and ground truth ones.}
+
