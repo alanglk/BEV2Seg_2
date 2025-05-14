@@ -12,7 +12,7 @@
 \usepackage{nameref}                    % Para poder referenciar por nombre
 \usepackage{acronym}                    % Para incluir las listas de abreviaturas
 \usepackage{multicol}                   % Permite crear espacios con columnas verticales
-\usepackage{booktabs} % Para mejores líneas horizontales en tablas
+\usepackage{booktabs}                   % Para mejores líneas horizontales en tablas
 \usepackage{parskip}                    % Eliminar sangrado y añadir espacio entre párrafos
 \usepackage{titlesec}                   % Crear subsubsub secciones
 \usepackage{amsmath}                    % Funciones para ecuaciones
@@ -23,6 +23,7 @@
 
 \usepackage{array}                      % Para personalizar columnas de tabla
 \usepackage{tabularx}                   % Para tablas de ancho variable
+\usepackage{multirow}
 
 \usepackage{graphicx}                   % Para incluir imágenes
 \usepackage{subcaption}                 % Subfiguras
@@ -196,7 +197,7 @@
 
 % Abreviaturas
 \section*{Acronyms}
-\markboth{Acronyms}{Acronyms}
+\markboth{ACRONYMS}{ACRONYMS}
 \addcontentsline{toc}{section}{Acronyms}
 \input{acronyms.tex}
 
@@ -221,7 +222,9 @@
 \newpage
 
 \newpage
-\section*{acknowledgements}
+\section*{Acknowledgements}
+\markboth{ACKNOWLEDGEMENTS}{ACKNOWLEDGEMENTS}
+\addcontentsline{toc}{section}{Acknowledgements}
 \label{acknowledgements}
 \input{acknowledgements.tex}
 \newpage

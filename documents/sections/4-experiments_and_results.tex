@@ -42,9 +42,9 @@ As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs 
 
 Two main approaches were selected to tackle the overfitting problem: weight decay (also known as L2 regularization) and data augmentation. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details; while data augmentation techniques introduces variability in the training dataset enabling the model to adapt better to unseen data. However, the introduction of data augmentation techniques into \aclink{BEV} images domain is not trivial and raises another research question.
 
-It is also important to highlight the difference in metrics between the two models. Even though the backbone and training hyperparameters remain the same, there is a noticeable difference in both the loss values and the mean Intersection over Union (mIoU) between the models. This difference is primarily due to the fact that the evaluation datasets differ. Specifically, the approach that segments the image first and then reprojects it is evaluated using semantic masks in the camera view, while the approach that first reprojects images into \aclink{BEV} and then performs segmentation is evaluated using masks directly in the \aclink{BEV} domain.
+It is also important to highlight the difference in metrics between the two models. Even though the backbone and training hyperparameters remain the same, there is a noticeable difference in both the loss values and the \aclink{mIoU} between the models. This difference is primarily due to the fact that the evaluation datasets differ. Specifically, the approach that segments the image first and then reprojects it is evaluated using semantic masks in the camera view, while the approach that first reprojects images into \aclink{BEV} and then performs segmentation is evaluated using masks directly in the \aclink{BEV} domain.
 
-This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_evaluation}, where the model \texttt{raw2segbev\_mit-b0\_v0.3} is evaluated on the test set twice: once using semantic masks in the camera domain and once using \aclink{BEV} masks. The figure displays the per-class mIoU for all the semantic categories the model was trained on, and two main observations emerge.
+This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_evaluation}, where the model \texttt{raw2segbev\_mit-b0\_v0.3} is evaluated on the test set twice: once using semantic masks in the camera domain and once using \aclink{BEV} masks. The figure displays the per-class \aclink{mIoU} for all the semantic categories the model was trained on, and two main observations emerge.
 
 \begin{figure}[h!]
     \centering
@@ -53,7 +53,7 @@ This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_e
     \label{fig:normal_vs_bev_evaluation}
 \end{figure}
 
-First, there's a clear imbalance in performance between dominant classes such as \texttt{background} and \texttt{flat.driveable\_area}, and the remaining, less frequent classes. Many of the minority classes show extremely low or even zero IoU scores. This is partly due to the inherent class imbalance in the dataset: some semantic classes have no annotated pixels at all (see Appendix~\ref{appendix:OLDatasets} for more details).
+First, there's a clear imbalance in performance between dominant classes such as \texttt{background} and \texttt{flat.driveable\_area}, and the remaining, less frequent classes. Many of the minority classes show extremely low or even zero \aclink{IoU} scores. This is partly due to the inherent class imbalance in the dataset: some semantic classes have no annotated pixels at all (see Appendix~\ref{appendix:OLDatasets} for more details).
 
 Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to 15 meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
 
@@ -72,7 +72,62 @@ With all of this in place, the training strategy is designed to support experime
 \hl{Mention the used hyperparameters for training the models.}
 
 \subsubsection{Merging labels}
+As previously discussed, to improve model performance on the dataset’s minority classes, a semantic label merging strategy was applied. This approach combines less represented semantic classes into more general, representative categories. Notably, this same merging strategy was already used in the annotation pipeline, so it was incorporated during training using the same look-up table of merging rules described in Table 3. The training and evaluation scripts were adapted accordingly to apply the merging rules consistently.
 
+Table~\ref{tab:merging_comparison_bev} shows the results of two models evaluated on the same test set using \aclink{BEV} masks. Model A was trained using the full set of original semantic classes, while Model B was trained using the merged classes, thereby reducing the total number of labels. 
+
+Despite this, in general the results indicate that in some specific classes, Model A achieves a higher \aclink{IoU}; however, in those same cases, Model B tends to maintain a similar or slightly better F1-score. The most notable improvement is observed in the \texttt{vehicle.car} class, where the merging strategy significantly boosts model performance. Nevertheless, the overall results reveal that while Model A achieves higher \aclink{IoU} scores in certain individual classes, Model B often maintains comparable or even slightly superior F1-scores in those same cases.
+
+The fact that the model with merged labels achieves equal or better mean F1-scores (mF1), even when its mean \aclink{IoU} is lower, suggests that simplifying the semantic space does not decrease the model’s ability to identify important instances. Instead, it reduces the penalty from underrepresented classes. Additionally, by reducing the number of classes, the overall average of the metrics improves, as it avoids dilution from irrelevant or sparsely populated classes. This makes label merging especially useful in cases where fine-grained segmentation isn’t necessary, and consistency across the whole model is more important.
+
+\begin{table}[h!]
+    \centering
+    \tiny
+    \begin{tabular}{llcccc}
+    \toprule
+    \textbf{Merged Class} & \textbf{Original Label} & \textbf{mIoU A} & \textbf{mIoU B} & \textbf{mF1 A} & \textbf{mF1 B} \\
+    \midrule
+    background & background & 0.98 & 0.97 & 0.99 & 0.99 \\
+    \midrule
+    animal & animal & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \midrule
+    human.pedestrian.adult & human.pedestrian.adult & 0.09 & 0.08 & 0.11 & 0.11 \\
+     & human.pedestrian.child & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.construction\_worker & 0.01 & - & 0.01 & - \\
+     & human.pedestrian.personal\_mobility & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.police\_officer & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.stroller & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.wheelchair & 0.00 & - & 0.00 & - \\
+    \midrule
+    movable\_object.barrier & movable\_object.barrier & 0.09 & 0.14 & 0.10 & 0.17 \\
+     & movable\_object.debris & 0.00 & - & 0.00 & - \\
+     & movable\_object.pushable\_pullable & 0.00 & - & 0.00 & - \\
+     & movable\_object.trafficcone & 0.10 & - & 0.12 & - \\
+     & static\_object.bicycle\_rack & 0.00 & - & 0.00 & - \\
+    \midrule
+    vehicle.car & vehicle.bus.bendy & 0.00 & - & 0.00 & - \\
+     & vehicle.bus.rigid & 0.02 & - & 0.03 & - \\
+     & vehicle.car & 0.31 & 0.38 & 0.34 & 0.42 \\
+     & vehicle.construction & 0.01 & - & 0.01 & - \\
+     & vehicle.emergency.ambulance & 0.00 & - & 0.00 & - \\
+     & vehicle.emergency.police & 0.00 & - & 0.00 & - \\
+     & vehicle.trailer & 0.00 & - & 0.00 & - \\
+     & vehicle.truck & 0.09 & - & 0.10 & - \\
+    \midrule
+    vehicle.ego & vehicle.ego & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \midrule
+    vehicle.motorcycle & vehicle.bicycle & 0.02 & - & 0.03 & - \\
+     & vehicle.motorcycle & 0.05 & 0.06 & 0.06 & 0.07 \\
+    \midrule
+    flat.driveable\_surface & flat.driveable\_surface & 0.95 & 0.94 & 0.97 & 0.97 \\
+    \midrule
+     & & 0.10 & 0.32 & 0.11 & 0.34 \\
+    \bottomrule
+    \end{tabular}
+
+    \caption{Per-class metric comparison between Model A and merged Model B evaluated in BEV images}
+    \label{tab:merging_comparison_bev}
+\end{table}
 
 
 

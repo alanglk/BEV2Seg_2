@@ -129,6 +129,57 @@ Here \cite{euler_from_matrix} is the pseudocode.
 \end{equation}
 
 
+\section{Merging comparison}
+\begin{table}[h]
+    \centering
+    \tiny
+    \begin{tabular}{llcccc}
+    \toprule
+    \textbf{Merged Class} & \textbf{Original Label} & \textbf{IoU A} & \textbf{IoU B} & \textbf{F1 A} & \textbf{F1 B} \\
+    \midrule
+    background & background & 0.98 & 0.98 & 0.99 & 0.99 \\
+    \midrule
+    animal & animal & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \midrule
+    human.pedestrian.adult & human.pedestrian.adult & 0.16 & 0.14 & 0.21 & 0.19 \\
+     & human.pedestrian.child & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.construction\_worker & 0.01 & - & 0.02 & - \\
+     & human.pedestrian.personal\_mobility & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.police\_officer & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.stroller & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.wheelchair & 0.00 & - & 0.00 & - \\
+    \midrule
+    movable\_object.barrier & movable\_object.barrier & 0.12 & 0.17 & 0.14 & 0.21 \\
+     & movable\_object.debris & 0.00 & - & 0.01 & - \\
+     & movable\_object.pushable\_pullable & 0.00 & - & 0.00 & - \\
+     & movable\_object.trafficcone & 0.11 & - & 0.15 & - \\
+     & static\_object.bicycle\_rack & 0.01 & - & 0.01 & - \\
+    \midrule
+    vehicle.car & vehicle.bus.bendy & 0.00 & - & 0.00 & - \\
+     & vehicle.bus.rigid & 0.06 & - & 0.07 & - \\
+     & vehicle.car & 0.51 & 0.58 & 0.59 & 0.66 \\
+     & vehicle.construction & 0.03 & - & 0.03 & - \\
+     & vehicle.emergency.ambulance & 0.00 & - & 0.00 & - \\
+     & vehicle.emergency.police & 0.00 & - & 0.00 & - \\
+     & vehicle.trailer & 0.00 & - & 0.00 & - \\
+     & vehicle.truck & 0.16 & - & 0.20 & - \\
+    \midrule
+    vehicle.ego & vehicle.ego & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \midrule
+    vehicle.motorcycle & vehicle.bicycle & 0.03 & - & 0.04 & - \\
+     & vehicle.motorcycle & 0.08 & 0.07 & 0.09 & 0.09 \\
+    \midrule
+    flat.driveable\_surface & flat.driveable\_surface & 0.98 & 0.97 & 0.99 & 0.99 \\
+    \bottomrule
+     & & 0.12 & 0.36 & 0.14 & 0.39 \\
+    \bottomrule
+    \end{tabular}
+    \caption{Per-class metric comparison between Model A and merged Model B evaluated with normal images}
+    \label{tab:merging_comparison_normal}
+\end{table}
+    
+
+
 % ==========================================================
 \section{Color palette}
 \begin{table}[h]

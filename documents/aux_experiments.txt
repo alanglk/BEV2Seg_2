@@ -36,19 +36,122 @@ Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a
 [4.1.1 Merging labels]
 Como se ha comentado, con el fin de mejorar el rendimiento de los modelos en las clases minoritarias del dataset se ha decidido hacer un merge de las clases semánticas en clases más representativas. Esta estrategia es la mima en la empleada en el pipeline de anotación implementado, por lo que se ha decidido implementarlo en tiempo de entrenamiento utilizando el mismo conjunto look up table de reglas de merging semánticos de labels que el descrito el la tabla 3 adaptando los scripts de entrenamiento y evaluación para considerar el merging look up table.
 
-En la Figura X se muestran las gráficas de los resultados de dos modelos evaluados con imágenes BEV en la que se aplica o no la estrategia de merging labels. 
+En la Figura X se presentan los resultados comparativos de dos modelos evaluados sobre el mismo conjunto de test con máscaras en vista BEV. El Modelo A ha sido entrenado con todas las clases semánticas originales, mientras que el Modelo B utiliza la estrategia de merging, reduciendo así el número total de clases consideradas. Los resultados muestran que, en algunas clases específicas, el Modelo A logra un mayor valor de Intersection over Union (IoU); sin embargo, en esos mismos casos, el F1-score (o Dice coefficient) del Modelo B suele mantenerse similar o incluso mejorar ligeramente.
+
+La diferencia más significativa entre las métricas de las clases corresponde al label "vehicle.car", demostrando que esta estrategia mejora de forma significativa el rendimiento del modelo en esta clase. Sin embargo, por lo general, ambos modelos demuestran un rendimiento similar. El hecho de que el modelo con merging obtenga valores de mF1 iguales o superiores, incluso cuando su mIoU es menor, sugiere que la simplificación del espacio semántico no deteriora la capacidad del modelo de capturar correctamente las instancias relevantes, sino que más bien reduce la penalización asociada a clases minoritarias con poca representatividad. Asimismo, al reducir el número total de clases consideradas, el promedio global de las métricas mejora, ya que se evita que clases irrelevantes o mal representadas distorsionen el cálculo final. Esto refuerza la utilidad práctica del merging en contextos donde no se requiere una segmentación tan granular, priorizando la estabilidad y representatividad de las métricas globales del modelo.
+
+
 
 [4.1.2 Sustituye al With the inclusion of...]
 
 Se puede observar que con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma significativa permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados de mIoU de las imágenes BEV son ligeramente inferiores a los obtenidos con el modelo overfiteado. Esto puede deberse a que los conjuntos de validación y de test tienen el mismo tamaño (un 10% del conjunto total cada uno) estando compuestos por muy pocas imágenes (al rededor de 1600 cada uno). Al partir ambos del mismo conjunto inicial y compartir la misma distribución, puede darse el caso de que el overfitting en validación afecte al conjunto de test al no presentar una variabilidad significativa respecto al conjunto de validación. Esto puede explicar el porqué aquellas clases mayoritarias presentan mejores resultados con los modelos overfiteados tanto en imágenes normales como en BEV (ver Figura fusionada de RAW-SEG-BEV y RAW-BEV-SEG para todas las clases).
 
-Sin embargo, si atendemos a las clases minoritarias
+WARNING!!!!!!!!!!!!!!!!!!!!!!!
+NECESITO LOS LOGS DE raw2bevseg_mit-b0_v0.5 y reentrenar raw2bevseg_mit-b0_v0.4 tanto para los logs como para los resultados. No me terminan de cuadrar las gráficas con el razonamiento y necesito que los modelos estén entrenados con los mismos hiperparámetros y el checkpoint strategy.
 
 
 
-Con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma considerable permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados del mIoU de las imágenes BEV en validacion son inferiores a los obtenidos con el modelo overfiteado.
+[4.2 3D detections evaluation]
 
-Esto se debe a que las máscaras semánticas en BEV contienen una mayor proporción de las clases "background"
+Como se ha comentado anteriormente, el objetivo final del pipeline de anotación es el de generar máscaras de ocupación, oclusión y área conducible. Para realizar esto se toman máscaras semánticas del entorno tanto en el dominio de la cámara como en vista BEV y se realiza un proceso intermedio de detección 3D de objetos a partir de imágenes monoculares en el dominio de la cámara con el fin de estimar las dimensiones de los obstáculos. Esta detección 3D se realiza con algoritmos de clustering de nubes de puntos y resulta de especial interés el medir cómo de precisas son estas detecciones.
+
+De hecho, el dataset de NuScenes fue desarrollado con el fin de entrenar y evaluar este tipo de estrategias entre otros, y cuenta con diversas métricas y métodos de evaluación para este propósito. Entre otras métricas, las que más destacan son las siguientes:
+	- Mean Average Precision (mAP): mAP es una métrica entre 0 y 1 que se utiliza ampliamente para evaluar el rendimiento de modelos de predicción. Esta métrica se suele definir como el area de la curva de precisión-recall, es decir, es la media de la integración de los valores precision-recal para cualquier valor de confianza de todas las clases disponibles. (explicar esto mejor). Las curvas de precision-recall se suelen obtener calculando las matrices de confusión para cada uno de los valores de confianza. A su vez, es muy común que estas matrices de confusión se calculen en base a la métrica de IoU entre la predicción y el ground truth de forma que si el valor de IoU supera un cierto treshold de confianza, se considera un true positive; si este valor es inferior se considera un false positive y si se tiene una predicción que no se puede asociar a ningún ground truth tendríamos un false negative. Es importante recalcar el proceso de asociación que tiene lugar antes de calcular las métricas: cada predicción se tiene que asociar con un groundtruth para calcular las métricas y, en el caso de las métricas de nuScenes, esta asociación se realiza considerando una cierta distancia entre centros de predicciones. En el caso de nuScenes, el mAP se calcula definiendo un match o asociación considerando únicamente la distancia 2D entre centros en el plano del suelo en lugar de considerar similitudes basadas en IoU. Este match entre predicciones y groundtruth se realiza para un cierto treshold de distancia entre centroides y para cada uno de ellos se calcula el average precision (AP) integrando la curva de precision-recall y finalmente se calcula el average sobre los thresholds [0.5, 1, 2, 4] metros para cada una de las clases y finalmente se calcula la media entre las clases.
+
+Además del mAP, nuScenes también cuenta con métricas que miden los errores de traslación, escala, orientación, velocidad y el atributo predecido para el objeto (el atributo se define como una propiedad de una instancia que puede cambiar mientras que la categoría de esa instancia se mantiene igual, por ejemplo un coche puede estar aparcado, en movimiento o parado pero sigue siendo un coche). Estas métricas basadas en true positive detections se calculan empleando un threshold de 2m de distancia desde el centro y están diseñadas para ser escalares positivos (>= 0). Además, estas métricas están definidas por cada una de las clases semánticas del dataset, por lo que los resultados finales se toman con las medias de las métricas: mATE, mASE, mAOE, mAVE, y mAAE.
+True positive metrics:
+	- Average Translation Error (ATE): mide el error como la distancia euclidea entre los centroides en el plano del suelo.
+	- Average Scale Error (ASE): se calcula como 1 - IoU después de alinear los centroides y las orientaciones.
+	- Average Orientation Error (AOE): es la menor de las diferencias del yaw angle entre las instancias asociadas entre las predicciones y el ground truth.
+	- Average Velocity Error (AVE): error absoluto de la velocidad en m/s.
+	- Average Attribute Error (AAE): se calcula como 1 - acc donde acc es el accuracy en la clasificación del atributo.
+
+Custom metrics:
+	- NuScenes detection score (NDS): Además de todas estas métricas, nuScenes propone una métrica propia que se consolida como una suma ponderada de todas las anteriores.
+
+
+Sin embargo, el caso de uso expuesto en este trabajo es ligeramente diferente. Al realizar detecciones 3D de objetos empleando imágenes monoculares y algoritmos de clústering, los cuboides 3D resultantes recogen unicamente los puntos visibles desde la cámara. Además, todos los cuboides 3D están alineados con la cámara por lo que calcular el error de orientación tampoco es de especial interés, ya sabemos que va a ser alto. Sin embargo, sí que interesa calcular el error al estimar las dimensiones y posiciones de los cuboides para saber si, con los datos disponibles, el pipeline implementado hace unas buenas detecciones.
+
+De esta manera, en este caso de uso la distancia entre centroides de predicciones y ground truth no tiene mucho sentido ya que los cuboides del ground truth engloban a todo el objeto 3D, mientras que los cuboides de las predicciones solo recogen los puntos 3D visibles desde la cámara en cada frame. Por ello, en lugar de emplear la distancia entre centroides se ha decidido utilizar la distancia entre volúmenes o "volume to volume distance" (v2v). The metric v2v is defined as the shortest distance between the hull of one volume to the hull of another volume. Sin embargo, esta distancia es 0 cuando existe intersección entre ambos volúmenes, por lo que hay que considerar este caso y calcular otra métrica cuando se produzcan intersecciones. En este contexto nos encontramos con la métrica "Bounding Box Disparity" (BBD) [referencia], que combina IoU y v2v en una única métrica positiva contínua. Gracias a esta métrica se puede formalizar la dis-similaridad entre dos bounding boxes exista o no intersección: Since the Intersection over Union can only rank the similarity of two bounding boxes when they are overlapping, a distinction between two bounding boxes closer or farther away without an overlap cannot be made. De esta manera, si BBD = 0 no existe disparidad entre los bounding boxes (intersección total); si 0 < BBD < 1, hay disparidad pero tienen intersección; y si BBD >= 1, hay disparidad y no tienen intersección. Los casos en los que hay overlap o no se pueden visualizar en la Figura X.
+
+Por otro lado, para calcular el error en la estimación de las dimensiones de los objetos 3D se ha decidido realizar la diferencia absoluta en dimensiones por cada eje. De esta manera se podrá evaluar los errores en cada uno de los ejes y visualizar en cuál de ellos se comete más error y en qué situaciones.
+
+
+
+El proceso de evaluación comienza definiendo el área en el que se van a considerar las detecciones 3D resultado del pipeline. El pipeline devuelve detecciones en una distancia superior a la que luego es realmente considerada a la hora de generar las máscaras BEV de ocupación oclusión, por lo que se ha decidido acotar el rango de evaluación de la misma manera. Así, se calcula el polígono de visión de la cámara en el eje x de la cámara y se limita la distancia máxima a la que se van a considerar las detecciones a 15m. De esta manera, únicamente se van a tener en cuenta para la evaluación aquellas detecciones y ground truth que entren dentro de este polígono en un momento determinado. Con este primer filtrado se calculan las asociaciones entre predicciones y ground truth utilizando el algoritmo húngaro para resolver el problema Linear Sum Assignment Problem (LSAP). Con ello se obtienen las mejores asociaciones posibles entre instancias predecidas y ground truth, para las cuales se calculan cada una de las siguientes métricas:
+
+tp, fp, fn, dds, deds, v2vs, vious, bbds
+
+	- Confusion Matrix: se calculan los elementos de la matriz de confusión (true positives, como las detecciones que han sido asociadas; false positives, como las detecciones que no han sido asociadas; y false negatives, como aquellos elementos del ground truth que no han sido asociados).
+	- Difference in dimensions (DD): es la diferencia entre volúmenes.
+	- Difference in each dimension (DED): es la diferencia absoluta en cada uno de los ejes de los bounding boxes.
+	- Volume to volume distance (v2v): distancia entre volúmenes.
+	- Intersection Over Union (IoU): volumentric IoU.
+	- Bounding Box Disparity (BBD): explicada anteriormente.
+
+
+================================================================================================================
+Como se ha comentado anteriormente, el objetivo final del pipeline de anotación es generar máscaras de ocupación, oclusión y área conducible. Para lograrlo, se parte de máscaras semánticas del entorno tanto en el dominio de la cámara como en vista cenital (BEV, Bird’s Eye View). Un paso intermedio crucial en este proceso es la detección 3D de objetos a partir de imágenes monoculares en el dominio de la cámara, con el fin de estimar las dimensiones y posiciones de los obstáculos. Esta detección se lleva a cabo mediante algoritmos de clustering de nubes de puntos y, dado su papel central, es especialmente relevante evaluar su precisión mediante métricas adecuadas.
+
+El dataset nuScenes fue desarrollado, entre otros fines, para facilitar el entrenamiento y la evaluación de este tipo de estrategias de percepción 3D. Este conjunto de datos incluye diversas métricas estandarizadas para medir la calidad de las detecciones. Entre ellas, destaca en primer lugar la Mean Average Precision (mAP), una métrica ampliamente utilizada para evaluar modelos de detección. El mAP se define como el área bajo la curva de precision-recall, y refleja el equilibrio entre la precisión (proporción de verdaderos positivos respecto a todas las predicciones positivas) y el recall (proporción de verdaderos positivos respecto a todos los elementos relevantes del conjunto de datos).
+
+Para calcular el mAP, es necesario establecer previamente un criterio de correspondencia entre las predicciones y el ground truth. En muchos casos este proceso se realiza mediante la métrica de Intersection over Union (IoU), que evalúa la superposición espacial entre predicción y realidad. Si el IoU supera un determinado umbral, se considera un true positive; si no, un false positive. Las instancias del ground truth sin predicciones asociadas se consideran false negatives. En el caso de NuScenes, sin embargo, la correspondencia no se basa en el IoU, sino en la distancia 2D entre los centros de las cajas en el plano del suelo. Así, para diferentes umbrales de distancia (0.5, 1, 2 y 4 metros), se calcula la Average Precision (AP) correspondiente, y el mAP final se obtiene como la media de las APs para todas las clases y umbrales considerados.
+
+Además del mAP, nuScenes propone un conjunto de métricas adicionales que permiten evaluar de forma más específica distintos aspectos de las detecciones correctamente clasificadas (true positives). Estas métricas cuantifican errores en distintos atributos clave del objeto detectado, utilizando un umbral fijo de 2 metros para establecer la asociación entre predicción y ground truth. Las principales métricas de este tipo son:
+
+    Average Translation Error (ATE): mide el error de traslación como la distancia euclídea entre los centros de las cajas predichas y las reales, proyectados en el plano del suelo.
+
+    Average Scale Error (ASE): calcula el error de escala como 1−IoU, una vez alineadas la orientación y la posición de las cajas.
+
+    Average Orientation Error (AOE): mide el error de orientación como la menor diferencia angular en el eje de guiñada (yaw) entre predicción y realidad.
+
+    Average Velocity Error (AVE): representa el error absoluto en la estimación de la velocidad del objeto, medido en metros por segundo.
+
+    Average Attribute Error (AAE): evalúa el error en la predicción de atributos dinámicos (por ejemplo, si un coche está aparcado, en movimiento o detenido) como 1−accuracy, siendo la accuracy la proporción de aciertos en la clasificación del atributo.
+
+Como métrica global, NuScenes propone el NuScenes Detection Score (NDS), que sintetiza la calidad general de las detecciones mediante una combinación ponderada de todas las métricas anteriores. Esta métrica permite obtener una visión de conjunto del rendimiento del sistema, equilibrando precisión, localización, orientación, velocidad, escala y atributos.
+
+El caso de uso abordado en este trabajo presenta particularidades que lo diferencian del escenario estándar planteado en el dataset NuScenes. En concreto, las detecciones 3D se obtienen a partir de imágenes monoculares mediante algoritmos de clustering, por lo que los cuboides 3D generados únicamente representan la parte visible del objeto desde la cámara en un instante determinado. Además, estos cuboides están siempre alineados con la orientación de la cámara, lo que hace que el cálculo del error de orientación carezca de utilidad práctica en este contexto, ya que se sabe de antemano que este error será elevado. No obstante, resulta de gran interés evaluar la precisión en la estimación de las posiciones y dimensiones de los cuboides generados, ya que ello permite valorar si el pipeline es capaz de realizar detecciones razonablemente precisas con la información disponible.
+
+En este escenario, emplear la distancia entre centroides como criterio de asociación entre predicciones y ground truth resulta problemático. Mientras que los cuboides del ground truth engloban la totalidad del objeto en 3D, los cuboides predichos solo contienen los puntos visibles desde la cámara, lo que genera desplazamientos sistemáticos en las posiciones relativas de los centros. Por ello, se ha optado por utilizar una métrica más adecuada: la distancia entre volúmenes (volume-to-volume distance, o v2v), definida como la distancia mínima entre las envolventes convexas de los volúmenes considerados.
+
+Sin embargo, la métrica v2v presenta una limitación importante: toma un valor de cero siempre que exista intersección entre los volúmenes, independientemente del grado de solapamiento. Para superar esta limitación se recurre a la métrica Bounding Box Disparity (BBD) [referencia], que combina IoU y v2v en una única métrica continua y no negativa. Esta métrica permite cuantificar la disimilitud entre dos cuboides, tanto si se solapan como si no. Como se indica en la definición original, mientras que el IoU únicamente puede comparar cuboides con intersección, el BBD proporciona una medida de disparidad también en ausencia de solapamiento. Su interpretación es la siguiente:
+
+    Si BBD = 0, los cuboides son idénticos (intersección total).
+
+    Si 0 < BBD < 1, existe solapamiento pero también disparidad.
+
+    Si BBD ≥ 1, los cuboides no se solapan.
+
+Estos distintos casos se ilustran en la Figura X.
+
+Por otra parte, para evaluar el error en la estimación de las dimensiones de los objetos detectados, se ha decidido calcular la diferencia absoluta entre las dimensiones de los cuboides predichos y del ground truth en cada uno de los ejes (longitud, anchura y altura). Esto permite analizar en qué dimensión se concentra mayor error y bajo qué condiciones.
+
+El proceso de evaluación comienza delimitando el área en la que se considerarán las detecciones generadas por el pipeline. Dado que el sistema produce predicciones a distancias mayores que las empleadas posteriormente para generar las máscaras BEV de ocupación y oclusión, se ha decidido restringir el rango de evaluación a la misma región que se usa para la generación de dichas máscaras. Concretamente, se define el polígono de visión de la cámara proyectado sobre el plano horizontal y se limita la distancia máxima de detección a 15 metros. De este modo, solo se consideran para la evaluación aquellas detecciones y elementos del ground truth que se encuentren dentro de este polígono en el instante correspondiente.
+
+Una vez filtradas las detecciones, se procede a la asociación entre predicciones y ground truth mediante la resolución del Linear Sum Assignment Problem (LSAP) utilizando el algoritmo húngaro. Esto permite encontrar las correspondencias óptimas entre objetos predichos y reales, sobre las cuales se calculan las siguientes métricas:
+
+    True Positives (TP), False Positives (FP) y False Negatives (FN): determinados en función de las asociaciones establecidas.
+
+    DD (Difference in Dimensions): diferencia de volumen entre cuboides asociados.
+
+    DED (Difference in Each Dimension): diferencia absoluta por eje (longitud, anchura, altura).
+
+    v2v: distancia entre volúmenes.
+
+    IoU: intersección sobre unión en 3D.
+
+    BBD (Bounding Box Disparity): métrica continua de disimilitud explicada anteriormente.
+
+Estas métricas permiten evaluar de manera más precisa y adaptada la calidad de las detecciones 3D en el contexto particular del pipeline propuesto, considerando las limitaciones y características propias del proceso de detección monocular.
+================================================================================================================
+
+
+
+
+
+
+
 
 
 
