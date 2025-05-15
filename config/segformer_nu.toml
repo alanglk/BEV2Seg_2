@@ -13,8 +13,8 @@ pretrained = "nvidia/mit-b0"
 batch_size = 16
 epochs = 200
 learning_rate = 0.00006
-weight_decay = 0.001
-data_augmentations = true          # (optional) defaults to False. 
+weight_decay = 0.0
+data_augmentations = false          # (optional) defaults to False. 
                                     # If set, the dataset_type specific data augmentation functions are applied
 
 # Optimizer
@@ -37,4 +37,4 @@ ls_steps = 200                      # (optional) defaults to 200.
                                     # Logging/Saving steps. batch_size:32 -> 100; batch_size:16 -> 200
 gradient_accum_steps = 1
 
-merge_semantic_labels = true        # (optional) defaults to False. Whether to merge and reduce the semantic labels or not
+merge_semantic_labels = false        # (optional) defaults to False. Whether to merge and reduce the semantic labels or not
