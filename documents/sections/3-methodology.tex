@@ -488,7 +488,6 @@ As early mentioned, the final objective of the annotation pipeline is to provide
 Another key aspect of the evaluation involves assessing the quality of the generated BEV masks. Therefore, the evaluation methodology must address two distinct components: the accuracy of the monocular 3D object detection, and the fidelity of the resulting BEV masks when compared to a defined ground truth.
 
 \subsubsubsection{3D detections evaluation}
-
 The nuScenes metrics~\cite{nuscenes} were considered as a starting point as this dataset was specifically developed to facilitate the training and evaluation of 3D perception strategies. A central component of its evaluation policy is the matching between predictions and ground truth, which is performed using the 2D distance between the centers of the predicted and ground truth bounding boxes projected onto the ground plane. A prediction is considered a true positive if this distance falls below a predefined threshold. Then, \aclink{AP} is computed across several distance thresholds ($\{0.5, 1, 2, 4\}$ meters), and the final \aclink{mAP} score is obtained by averaging \aclink{AP} values over all object classes.
 
 Beyond the \aclink{mAP}, nuScenes includes additional metrics to evaluate key attributes of correctly detected objects, using a fixed association threshold of $2$ meters. These include translation, scale, orientation, velocity, and attribute classification errors. Each of these metrics targets a specific aspect of detection performance, such as localization accuracy or motion estimation. To provide a unified performance score, the nuScenes Detection Score (NDS) aggregates all these metrics into a single weighted average, offering a comprehensive view of system performance.
@@ -563,31 +562,6 @@ Finally, the following metrics are calculated:
     \item \textbf{IoU}: 3D intersection-over-union.
     \item \textbf{BBD}: Dissimilarity metric for overlapping/non-overlapping boxes.
 \end{itemize}
-
-
-% ==============================================================================
-%El proceso de evaluación comienza delimitando el área en la que se considerarán las detecciones generadas por el pipeline. Dado que el sistema produce predicciones a distancias mayores que las empleadas posteriormente para generar las máscaras BEV de ocupación y oclusión, se ha decidido restringir el rango de evaluación a la misma región que se usa para la generación de dichas máscaras. Concretamente, se define el polígono de visión de la cámara proyectado sobre el plano horizontal y se limita la distancia máxima de detección a 15 metros. De este modo, solo se consideran para la evaluación aquellas detecciones y elementos del ground truth que se encuentren dentro de este polígono en el instante correspondiente.
-
-%Una vez filtradas las detecciones, se procede a la asociación entre predicciones y ground truth mediante la resolución del Linear Sum Assignment Problem (LSAP) utilizando el algoritmo húngaro. Esto permite encontrar las correspondencias óptimas entre objetos predichos y reales, sobre las cuales se calculan las siguientes métricas:
-
-%\begin{itemize}
-%    \item True Positives (TP), False Positives (FP) y False Negatives (FN): determinados en función de las asociaciones establecidas.
-%    \item DD (Difference in Dimensions): diferencia de volumen entre cuboides asociados.
-%    \item DED (Difference in Each Dimension): diferencia absoluta por eje (longitud, anchura, altura).
-%    \item v2v: distancia entre volúmenes.
-%    \item IoU: intersección sobre unión en 3D.
-%    \item BBD (Bounding Box Disparity): métrica continua de disimilitud explicada anteriormente.
-%\end{itemize}
-
-%Estas métricas permiten evaluar de manera más precisa y adaptada la calidad de las detecciones 3D en el contexto particular del pipeline propuesto, considerando las limitaciones y características propias del proceso de detección monocular.
-% ==============================================================================
-
-
-
-
-
-
-
 
 
 \subsubsubsection{BEV masks evaluation}
