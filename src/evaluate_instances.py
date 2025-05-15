@@ -121,6 +121,7 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
         return obj_dict
 
     if filter_out:
+        gt_lanes           = filter_out(gt_objs['objects'], ['lane']) if 'lane' in gt_objs['objects'] else None 
         gt_objs['objects'] = filter_out(gt_objs['objects'], selected_types)     if selected_types is not None else gt_objs['objects']
         dt_objs['objects'] = filter_out(dt_objs['objects'], selected_types)     if selected_types is not None else dt_objs['objects']
         gt_objs['objects'] = ignore_names(gt_objs['objects'], ignoring_names)   if ignoring_names is not None else gt_objs['objects']
@@ -185,7 +186,7 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
         print(f"[GT]    Frames with no entries: {gt_frames_with_no_objs}")
     if len(dt_frames_with_no_objs):
         print(f"[DT]   Frames with no entries: {dt_frames_with_no_objs}")
-    return gt_objs, dt_objs
+    return gt_objs, dt_objs, gt_lanes
 
 def merge_semantic_labels(objs_inf:AnnotationInfo, merge_dict:dict = DEFAULT_MERGE_DICT):
     """Return AnnotationInfo with merged semantic types
@@ -378,7 +379,7 @@ def plot_ray_polys(multipolygon:MultiPolygon, color:str, label:str = "", ax:Axes
         fx, fy = poly.exterior.xy
         plt.plot(fx, fy, color=color)
         plt.fill(fx, fy, color=color, alpha=0.3, label=label)
-def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num) -> List[np.ndarray]:
+def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num:int, h:float=0.01) -> List[np.ndarray]:
     """Get the occlusion of 3d objects by projecting rays in the top-view
     """
     camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
@@ -391,7 +392,7 @@ def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coor
     
     # Launch rays
     num_rays    = 100
-    h           = 0.01    # Longitud de paso
+    #h           = 0.01    # Longitud de paso
     steps       = int(d / h)
     
     rays_orig   = np.array([[0], [0], [0]]).reshape(3, 1, 1)        # Shape (3, 1, 1)
@@ -448,8 +449,9 @@ def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coor
     plt.close(figure)
     # plt.show()
 
-    return rays_points, intersections
+    # TODO: Add lane polys and rasterize on the BEV common space
 
+    return rays_points, intersections
 
 def rotate_3d(points, angles):
     """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
@@ -1441,7 +1443,7 @@ def main(
 
     # Get the selected ground_truth and annotated objects 
     all_objs_inf = vcd.get_objects()
-    gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=selected_types, ignoring_names=ignoring_names, filter_out=True)
+    gt_objs_inf, dt_objs_inf, gt_lanes = get_gt_dt_inf(all_objs_inf, selected_types=selected_types, ignoring_names=ignoring_names, filter_out=True)
     
     # If merge labels was applied to the object detection, it has to be considered
     # for the groundtruth
@@ -1487,6 +1489,7 @@ def main(
             dt_in_objs_data = [dt_objs_data[i] for i in dt_in_indices]
 
             gt_in_cc_polys = get_occlusion_polys(gt_in_objs_data, scene, camera_depth, camera_name, fk)
+
 
             cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)

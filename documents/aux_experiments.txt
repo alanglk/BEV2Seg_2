@@ -51,7 +51,7 @@ NECESITO LOS LOGS DE raw2bevseg_mit-b0_v0.5 y reentrenar raw2bevseg_mit-b0_v0.4 
 
 
 
-[4.2 3D detections evaluation]
+[3.2.5.1 3D detections evaluation]
 
 Como se ha comentado anteriormente, el objetivo final del pipeline de anotación es el de generar máscaras de ocupación, oclusión y área conducible. Para realizar esto se toman máscaras semánticas del entorno tanto en el dominio de la cámara como en vista BEV y se realiza un proceso intermedio de detección 3D de objetos a partir de imágenes monoculares en el dominio de la cámara con el fin de estimar las dimensiones de los obstáculos. Esta detección 3D se realiza con algoritmos de clustering de nubes de puntos y resulta de especial interés el medir cómo de precisas son estas detecciones.
 
@@ -148,6 +148,9 @@ Estas métricas permiten evaluar de manera más precisa y adaptada la calidad de
 
 
 
+[3.2.5.2 BEV masks evaluation]
+
+Para evaluar las máscaras de ocupación, oclusión y área conducible es necesario generar un ground truth con el que comparar la salida del pipeline de anotación. Para ello
 
 
 

@@ -488,6 +488,7 @@ As early mentioned, the final objective of the annotation pipeline is to provide
 Another key aspect of the evaluation involves assessing the quality of the generated BEV masks. Therefore, the evaluation methodology must address two distinct components: the accuracy of the monocular 3D object detection, and the fidelity of the resulting BEV masks when compared to a defined ground truth.
 
 \subsubsubsection{3D detections evaluation}
+
 The nuScenes metrics~\cite{nuscenes} were considered as a starting point as this dataset was specifically developed to facilitate the training and evaluation of 3D perception strategies. A central component of its evaluation policy is the matching between predictions and ground truth, which is performed using the 2D distance between the centers of the predicted and ground truth bounding boxes projected onto the ground plane. A prediction is considered a true positive if this distance falls below a predefined threshold. Then, \aclink{AP} is computed across several distance thresholds ($\{0.5, 1, 2, 4\}$ meters), and the final \aclink{mAP} score is obtained by averaging \aclink{AP} values over all object classes.
 
 Beyond the \aclink{mAP}, nuScenes includes additional metrics to evaluate key attributes of correctly detected objects, using a fixed association threshold of $2$ meters. These include translation, scale, orientation, velocity, and attribute classification errors. Each of these metrics targets a specific aspect of detection performance, such as localization accuracy or motion estimation. To provide a unified performance score, the nuScenes Detection Score (NDS) aggregates all these metrics into a single weighted average, offering a comprehensive view of system performance.
@@ -516,9 +517,9 @@ In this scenario, employing centroid distance as the criterion for evaluating po
 However, the v2v metric has a notable limitation: it yields a value of zero whenever there is any intersection between the volumes, regardless of the degree of overlap. To overcome this, we utilize the Bounding Box Disparity (BBD) metric \cite{bounding_box_disparity}, which combines IoU and v2v into a single, continuous, and non-negative measure. This metric allows for the quantification of dissimilarity between two cuboids, whether they overlap or not. As stated in its original definition, while IoU can only compare intersecting cuboids, BBD provides a disparity measure even in the absence of overlap. Its interpretation is as follows:
 
 \begin{equation}
-    \begin{align}
+    \begin{aligned}
     \text{BBD} = 1 - \text{IoU} + v2v
-    \end{align}
+    \end{aligned}
     \label{eq:3d_metrics}
 \end{equation}
 
@@ -548,7 +549,9 @@ These distinct cases are illustrated in Figure~\ref{fig:bbox_disparity}.
 
 On the other hand, to evaluate the error in the estimation of the detected object's dimensions, the absolute difference between the dimensions of the predicted and ground truth cuboids along each axis (length, width, and height) has been considered. This allows for the analysis of which dimension exhibits the greatest error and under what conditions.
 
-The evaluation process begins by defining the spatial region in which the detections produced by the pipeline will be considered. Since the system is capable of generating predictions at distances greater than those actually used for producing the BEV occupancy and occlusion masks, the evaluation range is restricted to the same area used for generating those masks. Specifically, this involves projecting the camera’s field of view onto the ground plane and limiting the maximum detection distance to 15 meters. As a result, only the predictions and ground truth elements that fall within this projected polygon at a given time frame are included in the evaluation.
+The evaluation process begins by defining the spatial region in which the detections produced by the pipeline will be considered. Since the system is capable of generating predictions at distances greater than those actually used for producing the BEV occupancy and occlusion masks, the evaluation range is restricted to the same area used for generating those masks. Specifically, this involves projecting the camera's field of view onto the ground plane and limiting the maximum detection distance to 15 meters. As a result, only the predictions and ground truth elements that fall within this projected polygon at a given time frame are included in the evaluation.
+
+\hl{Explain how the camera FOV is obtained from camera's intrinsics and how its converted to a polygon.}
 
 Then, the matching between predictions and ground truth is performed, formalized as a Linear Sum Assignment Problem (LSAP) and solved using the Hungarian algorithm. Because of this, the cost matrix is initially calculated as the v2v distance between all ground truth and prediction instances.  However, unlike a standard LSAP, this implementation incorporates a maximum distance threshold for valid assignments. Detections with no sufficiently close ground truth counterparts are removed before solving the LSAP, and the cost matrix is padded to a square shape. Finally, assignments exceeding the distance threshold are discarded after the LSAP solution, ensuring only meaningful matches are retained. 
 \hl{Maybe it is interesting to add an Appendix about this}
