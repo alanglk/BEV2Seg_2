@@ -57,7 +57,7 @@ The Segformer model consists on an hierarchical Transformer  encoder, which extr
 The training strategy involves using pretrained encoders from ImageNet-1K, attaching an untrained segmentation head decoder, and fine-tuning the entire model for semantic segmentation of vehicular scenes. Since the objective is to train the models directly on \aclink{BEV} images, which differ significantly from standard perspective images, the encoder layers will remain trainable rather than being frozen.
 
 
-\subsubsection{BEVDataset}
+\subsubsection{BEVDataset} \label{sec:BEVDataset}
 In order to train the model on the segmentation task, a valid dataset must be selected. There are several semantic segmentation datasets for the \aclink{ADS} context such as Cityscapes \cite{Cityscapes}, that defines $30$ semantic classes and provides $5.000$ frames with pixel-level high-quality annotations and $20.000$ weakly annotated images; KITTI \cite{KITTI}, which provices $400$ annotated images with a $0.5$ split for training and validation following the Cityscapes annotation format; ApolloScape \cite{ApolloScape}, that provides $146.997$ frames with corresponding pixel-level annonations and pose information for $25$ labels; or NuImages, a subset of NuScenes \cite{nuscenes}, that contains annotated images on $26$ different labels. For all of them, the ego pose and camera parameters metadata are provided. 
 
 There are other benchmarks \cite{WildDash} \cite{CamVid} but in orther to train the models a rich dataset is needed. Despite Cityscapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it provides very accurate ego poses and camera parameters, it has 3D annotations and it has a very good documentation.
@@ -74,7 +74,7 @@ The OLDatasets parser extracts the camera parameters for each sample and compute
     \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
 \end{itemize}
 
-The virtual \aclink{BEV} camera parameters are fixed: \aclink{BEV} reprojection is generated using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the camera and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
+The virtual \aclink{BEV} camera parameters are fixed: \aclink{BEV} reprojection is generated at the 'vehicle-iso8855' coordinate frame using a regular grid with a cell spacing of 1 meter, covering a total distance of 30 meters in front of the vehicle and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
 
 Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure~\ref{fig:bev_dataset}. More details about the dataset conversion and especifications can be fount at Appendix~\ref{appendix:OLDatasets}.
 
@@ -455,7 +455,7 @@ A single cuboid base can be associated with multiple BEV masks because a 3D inst
     \end{algorithmic}
 \end{algorithm}
 
-This method allows for estimating the vehicle’s extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint improving the accuracy of the resulting BEV masks.
+This method allows for estimating the vehicle’s extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
 
 \begin{figure}[h!]
     \centering
@@ -481,13 +481,30 @@ This method allows for estimating the vehicle’s extent while handling certain 
     \label{fig:bev_occupancy_occlusion}
 \end{figure}
 
+\hl{The final BEV masks have to be generated using the labels of this table. This is not done yet.}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l c c c c}
+        \toprule
+        \textbf{Name} & \textbf{ID} & \textbf{Color (RGB)} \\
+        \midrule
+        background  & 0 & (0, 0, 0)         \\
+        occuped     & 1 & (0, 74, 179)      \\
+        occluded    & 2 & (101, 164, 255)   \\
+        driveable   & 3 & (255, 192, 101)   \\
+
+        \bottomrule
+    \end{tabular}
+    \caption{Semantic labels defined for resulting masks}
+    \label{tab:occ2_labels}
+\end{table}
 
 \subsubsection{Evaluation strategy}
 As early mentioned, the final objective of the annotation pipeline is to provide occupancy, occlusion and driveable area masks. To achieve this, the process starts from semantic masks of the environment, both in the camera and \aclink{BEV} domains. A crucial intermediate step in this pipeline is the 3D object detection from monocular images in the camera view to estimate the dimensions and positions of obstacles. As this detection is performed using pointcloud clustering algorithms it is particularly important to assess its performance using appropriate evaluation metrics.
 
-Another key aspect of the evaluation involves assessing the quality of the generated BEV masks. Therefore, the evaluation methodology must address two distinct components: the accuracy of the monocular 3D object detection, and the fidelity of the resulting BEV masks when compared to a defined ground truth.
+Another key aspect of the evaluation involves assessing the quality of the generated BEV masks. Therefore, the evaluation methodology must address two distinct components: the accuracy of the monocular 3D object detection, and the fidelity of the resulting BEV masks when compared to a defined ground truth. This evaluation uses the pipeline's output OpenLabel file for a vehicular scene, alongside the corresponding ground truth OpenLabel file which contains annotated elements. A 'vehicular scene' is defined here as a sequence of frames with annotations that include not only the environment, but also vehicle position and odometry.
 
-\subsubsubsection{3D detections evaluation}
+\subsubsubsection{3D detections evaluation} \label{sec:3d_det_evaluation}
 
 The nuScenes metrics~\cite{nuscenes} were considered as a starting point as this dataset was specifically developed to facilitate the training and evaluation of 3D perception strategies. A central component of its evaluation policy is the matching between predictions and ground truth, which is performed using the 2D distance between the centers of the predicted and ground truth bounding boxes projected onto the ground plane. A prediction is considered a true positive if this distance falls below a predefined threshold. Then, \aclink{AP} is computed across several distance thresholds ($\{0.5, 1, 2, 4\}$ meters), and the final \aclink{mAP} score is obtained by averaging \aclink{AP} values over all object classes.
 
@@ -568,5 +585,35 @@ Finally, the following metrics are calculated:
 
 
 \subsubsubsection{BEV masks evaluation}
-\hl{Groundtruth BEV masks could be generated from annotations and compute mIoU between the annotated BEV masks and ground truth ones.}
+To evaluate the occupancy, occlusion, and drivable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
 
+This algorithm calculates camera viewing angles along the $\hat{x}_c$ axis to define $N$ rays. A step length $h$ is also defined, which determines the intervals at which each ray will sample points to classify them as visible, occluded, or belonging to an occupied area. All rays originate from the camera coordinate frame and are subsequently transformed to the vehicle coordinate frame (\textit{vehicle-iso8855}) as it is the coordinate system in which the BEV masks are generated (see Section\ref{sec:BEVDataset}).
+
+Once these rays and their corresponding check points are established in the BEV mask coordinate frame, the point classification process begins. An iteration process goes through camera-visible objects (also transformed to the vehicle coordinate frame) and check if the base of the object's bounding box contains each ray's point. Here, three outcomes are possible: no intersection, indicating a visible point; intersection, classifying the point as occupied; or no current intersection but a previous intersection along the same ray, resulting in occlusion classification.
+
+
+Following ray point evaluation, closed polygon sets are constructed to represent all points within each of the three classes. A clustering algorithm groups points of the same class to distinguish connected areas and generate individual sub-polygons. These sub-polygons are formed using only the edge points of each cluster and finally, the ground truth drivable area, which is directly annotated as polygons, undergoes a simpler process of identifying camera-visible polygons. All polygon sets are then rasterized into semantic masks, adhering to the used BEV parameters and considering the semantic classes described in Table~\ref{tab:occ2_labels}. This whole process is represented in Figure~\ref{fig:gt_occ2_masks}.  
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/shared/no_signal.jpg} 
+        \caption{}
+        \label{fig:gt_occ2_masks_a}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/gt_occ2_maks/gt_vec_mask_8.png}
+        \caption{}
+        \label{fig:gt_occ2_masks_b}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{images/methodology/gt_occ2_maks/gt_ras_mask_colored_8.png}
+        \caption{}
+        \label{fig:gt_occ2_masks_c}
+    \end{subfigure}
+
+    \caption{BEV ground truth masks: (a) WebLABEL visualization, (b) resulting polygons, (c) rasterized and colored BEV mask.}
+    \label{fig:gt_occ2_masks}
+\end{figure}
