@@ -11,17 +11,22 @@ import threading
 import time
 
 from my_utils import get_pallete, DEFAULT_MERGE_DICT, parse_mtl, parse_obj_with_materials
+from oldatasets.Occ2.occ2labels import occ2name2id, occ2id2color
+from oldatasets.common.utils import target2image
 
 # import open3d.visualization.gui as gui
 # import open3d.visualization.rendering as rendering
 from three_d_metrics.open3d_addon import * # 3d metrics
+from src.bev2seg_2 import BEV2SEG_2_Interface
 
+import cv2
 
 from shapely.geometry import MultiPolygon, Polygon, MultiPoint, Point
 from sklearn.cluster import DBSCAN
 from scipy.spatial.distance import pdist, squareform
 from scipy.spatial import Delaunay
-import networkx as nx
+import rasterio
+from rasterio import features
 
 import copy
 
@@ -32,7 +37,6 @@ import pickle
 import json
 import sys
 import os
-
 
 def check_paths(paths: List[str]):
     for path in paths:
@@ -120,6 +124,7 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
             obj_dict[tp].pop(uid)
         return obj_dict
 
+    gt_lanes = gt_objs['objects']['lane'].copy() if 'lane' in gt_objs['objects'] else None 
     if filter_out:
         gt_objs['objects'] = filter_out(gt_objs['objects'], selected_types)     if selected_types is not None else gt_objs['objects']
         dt_objs['objects'] = filter_out(dt_objs['objects'], selected_types)     if selected_types is not None else dt_objs['objects']
@@ -185,7 +190,7 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
         print(f"[GT]    Frames with no entries: {gt_frames_with_no_objs}")
     if len(dt_frames_with_no_objs):
         print(f"[DT]   Frames with no entries: {dt_frames_with_no_objs}")
-    return gt_objs, dt_objs
+    return gt_objs, dt_objs, gt_lanes
 
 def merge_semantic_labels(objs_inf:AnnotationInfo, merge_dict:dict = DEFAULT_MERGE_DICT):
     """Return AnnotationInfo with merged semantic types
@@ -245,6 +250,8 @@ def get_types_in_obj_inf(objs_inf:AnnotationInfo) -> list:
 def get_camera_fov_polygon(scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num) -> np.ndarray:
     """Get the FOV area of a camera
     """
+    # TODO: Documentar esto!!
+    # Aquí cambiaste alguna mierda en el get_camera
     camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
 
     h, w = camera.height, camera.width
@@ -280,7 +287,7 @@ def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, 
         if len(ks) > 0 and len(intersections[j, ks[-1]:]) > 1: 
             intersections[j, ks[-1]:] = 2.0 # Occlusion
     
-    # # Debug plotting
+    # Debug plotting
     # plt.tight_layout()
     # fx, fy = bbox_footprint.exterior.xy
     # plt.plot(fx, fy, color="orange")
@@ -327,6 +334,9 @@ def find_border_indices(js_cluster:np.ndarray, ks_cluster:np.ndarray) -> Tuple[L
 def create_multipolygon(rays_points:np.ndarray, js, ks, label="") -> MultiPolygon:
     # rays_points[(x, y, z), num_ray, num_step]
     xy_points = rays_points[:2, js, ks].T 
+
+    if len(xy_points) == 0:
+        return MultiPolygon()
 
     cluster_path = os.path.join("trash", f"{label}.pkl")
     if os.path.exists(cluster_path):
@@ -378,21 +388,51 @@ def plot_ray_polys(multipolygon:MultiPolygon, color:str, label:str = "", ax:Axes
         fx, fy = poly.exterior.xy
         plt.plot(fx, fy, color=color)
         plt.fill(fx, fy, color=color, alpha=0.3, label=label)
-def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coord_sys:str, frame_num) -> List[np.ndarray]:
+
+def rasterize_shapely(geometry:int, width:int, height:int, x_range:Tuple[float], y_range:Tuple[float]):
+    """
+    Rasteriza una geometría de Shapely (Polygon o MultiPolygon) en un array numpy.
+    Args:
+        geometry (Polygon or MultiPolygon): La geometría a rasterizar.
+        width (int): El ancho del ráster de salida.
+        height (int): La altura del ráster de salida.
+        x_range (tuple): El rango (min_x, max_x) de las coordenadas x.
+        y_range (tuple): El rango (min_y, max_y) de las coordenadas y.
+
+    Returns:
+        numpy.ndarray: bool np.uint8 array
+    """
+    min_x, max_x = x_range
+    min_y, max_y = y_range
+
+    # Crear una transformación afín para mapear las coordenadas del ráster al espacio real
+    transform = rasterio.transform.from_bounds(min_x, min_y, max_x, max_y, width, height)
+
+    # Rasterizar la geometría
+    raster = features.rasterize(
+        [(geometry, 1)],  # Lista de tuplas (geometría, valor a asignar)
+        out_shape=(height, width),
+        transform=transform,
+        fill=0,  # Valor para los píxeles fuera de la geometría
+        dtype=rasterio.uint8  # Tipo de datos para el ráster
+    )
+
+    return raster.astype(bool)  # Convertir a booleano (True si hay geometría)
+def get_occlusion_polys(objs_data:dict, lane_data:dict, scene:scl.Scene, fov_coord_sys:str, frame_num:int, ray_max_distance:float = 50.0, bev_coord_sys:str='vehicle-iso8855', h_sp:float=0.01) -> List[np.ndarray]:
     """Get the occlusion of 3d objects by projecting rays in the top-view
     """
     camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
 
     h, w = camera.height, camera.width
-    d = 30.0 # camera_depth
+    d = ray_max_distance
     K_3x3 = camera.K_3x3
     fx = K_3x3[0, 0]
     alpha = np.arctan((w/2)/fx)
     
     # Launch rays
     num_rays    = 100
-    h           = 0.01    # Longitud de paso
-    steps       = int(d / h)
+    #h_sp       = 0.01    # Longitud de paso
+    steps       = int(d / h_sp)
     
     rays_orig   = np.array([[0], [0], [0]]).reshape(3, 1, 1)        # Shape (3, 1, 1)
     rays_angles = np.linspace(-alpha, alpha, num_rays)              # Shape (num_rays,)
@@ -407,7 +447,7 @@ def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coor
     
     # Transform rays points to odom frame 
     rays_4xN        = utils.add_homogeneous_row(rays_3xN)
-    transform_4x4   = scene.get_transform(fov_coord_sys, 'odom', frame_num)[0]
+    transform_4x4   = scene.get_transform(fov_coord_sys, bev_coord_sys, frame_num)[0]
     rays_trans_4xN  = transform_4x4 @ rays_4xN
     rays_trans_3xN  = rays_trans_4xN[:3]
     rays_points     = rays_trans_3xN.flatten().reshape((3, num_rays, steps)) # ((x,y,z), ray index, step index)
@@ -416,8 +456,8 @@ def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coor
     # Point intersection?
     for i in range(len(objs_data)):
         bbox = objs_data[i]['val']
-        if objs_data[i]['coordinate_system'] != 'odom':
-            bbox = scene.transform_cuboid(bbox, cs_src=objs_data[i]['coordinate_system'], cs_dst='odom', frame_num=frame_num)
+        if objs_data[i]['coordinate_system'] != bev_coord_sys:
+            bbox = scene.transform_cuboid(bbox, cs_src=objs_data[i]['coordinate_system'], cs_dst=bev_coord_sys, frame_num=frame_num)
         intersections = bbox_intersects_with_rays(rays_points, intersections, bbox)
     
     # Build a Graph -> Identify connected components -> Create Multipolygons
@@ -433,23 +473,73 @@ def get_occlusion_polys(objs_data, scene:scl.Scene, camera_depth:float, fov_coor
     occluded_points = rays_points[:, js, ks]
     occluded_polys  = create_multipolygon(rays_points, js, ks, label=f"occluded_{frame_num}")
     
-    # Debug plotting
+    # TODO: Add lane polys and rasterize on the BEV common space
+    bev_height, bev_width = BEV2SEG_2_Interface.BEV_HEIGH, BEV2SEG_2_Interface.BEV_WIDTH 
+    bev_aspect_ratio = bev_width / bev_height
+    bev_x_range = (-1.0, BEV2SEG_2_Interface.BEV_MAX_DISTANCE)
+    bev_y_range = (-((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2,
+                    ((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2)
+    bev_mask = np.zeros((bev_height, bev_width))
+
+    # Rasterize driveable area
+    lane_T_4x4, _ = scene.get_transform(cs_src='odom', cs_dst=bev_coord_sys, frame_num=frame_num)
+    lane_multipoly = []
+    for k in lane_data.keys():
+        if not 'object_data' in lane_data[k]:
+            continue # Basura que se ha colado supongo
+        # Solo hay un poly3d y es cerrado
+        assert len(lane_data[k]['object_data']['poly3d']) == 1 
+        poly3d_data = lane_data[k]['object_data']['poly3d'][0]
+        assert 'closed' in poly3d_data and 'val' in poly3d_data and 'name' in poly3d_data
+        assert poly3d_data['name'] == 'polygon' and poly3d_data['closed'] == True  
+        
+        poly3d_vals = np.array(poly3d_data['val'])
+        N = poly3d_vals.size // 3 # 3 axis as it is a 3D poly
+        poly3d_vals_3xN = poly3d_vals.reshape((N, 3)).T
+        poly3d_vals_4xN = utils.add_homogeneous_row(poly3d_vals_3xN)
+        assert np.sum(poly3d_vals_4xN[2, :]) == 0.0,  "All lane poly Zs are 0"
+        
+        poly3d_vals_4xN = lane_T_4x4 @ poly3d_vals_4xN # Transform to the bev coor sys
+        poly3d_vals     = poly3d_vals_4xN[:2, :].T # Just debugging
+        lane_poly       = Polygon(poly3d_vals)
+        lane_multipoly.append(lane_poly)
+        if visible_polys.intersects(lane_poly):
+            mask = rasterize_shapely(lane_poly, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
+            bev_mask[mask == True] = occ2name2id['driveable']
+
+    # Rasterize other polys
+    mask = rasterize_shapely(occluded_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
+    bev_mask[mask == True] = occ2name2id['occluded']
+    mask = rasterize_shapely(occuped_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
+    bev_mask[mask == True] = occ2name2id['occuped']
+    bev_mask_colored = target2image(bev_mask, colormap=occ2id2color)
+
+    # For saving masks
+    gt_vec_mask_path = os.path.join("trash", f"gt_vec_mask_{frame_num}.png")
+    gt_ras_mask_path = os.path.join("trash", f"gt_ras_mask_{frame_num}.png")
+    gt_ras_mask_colored_path = os.path.join("trash", f"gt_ras_mask_colored_{frame_num}.png")
+    
+    # Debug vec
     plt.ioff()
     figure = plt.figure()
     plt.tight_layout()
     plt.scatter(visible_points[0],  visible_points[1],  s=0.5, color="blue", label="visible")
     plt.scatter(occuped_points[0],  occuped_points[1],  s=0.5, color="red", label="intersection")
     plt.scatter(occluded_points[0], occluded_points[1], s=0.5, color="black", label="occlusion")
+    plot_ray_polys(MultiPolygon(lane_multipoly), "#ffc065", label="driveable")
     plot_ray_polys(visible_polys, "blue", label = "visible poly")
     plot_ray_polys(occuped_polys, "red")
     plot_ray_polys(occluded_polys, "black")
     plt.legend()
-    plt.savefig(f"trash/gt_mask_{frame_num}.png")
+    plt.savefig(gt_vec_mask_path)
     plt.close(figure)
     # plt.show()
 
-    return rays_points, intersections
-
+    # Debug mask
+    cv2.imwrite(gt_ras_mask_path, bev_mask)
+    cv2.imwrite(gt_ras_mask_colored_path, bev_mask_colored)
+    
+    return bev_mask, bev_mask_colored
 
 def rotate_3d(points, angles):
     """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
@@ -1441,7 +1531,7 @@ def main(
 
     # Get the selected ground_truth and annotated objects 
     all_objs_inf = vcd.get_objects()
-    gt_objs_inf, dt_objs_inf = get_gt_dt_inf(all_objs_inf, selected_types=selected_types, ignoring_names=ignoring_names, filter_out=True)
+    gt_objs_inf, dt_objs_inf, gt_lanes = get_gt_dt_inf(all_objs_inf, selected_types=selected_types, ignoring_names=ignoring_names, filter_out=True)
     
     # If merge labels was applied to the object detection, it has to be considered
     # for the groundtruth
@@ -1486,7 +1576,8 @@ def main(
             gt_in_objs_data = [gt_objs_data[i] for i in gt_in_indices]
             dt_in_objs_data = [dt_objs_data[i] for i in dt_in_indices]
 
-            gt_in_cc_polys = get_occlusion_polys(gt_in_objs_data, scene, camera_depth, camera_name, fk)
+            bev_mask, bev_mask_colored = get_occlusion_polys(gt_in_objs_data, gt_lanes, scene=scene, fov_coord_sys=camera_name, frame_num=fk, ray_max_distance=40.0, h_sp=0.01)
+
 
             cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
@@ -1574,5 +1665,5 @@ if __name__ == "__main__":
          max_association_distance=3.0,
          association_dist_type='v2v',
          save_openlabel_path=SAVE_OPENLABEL_PATH, 
-         debug=True, 
+         debug=False, 
          debug_ego_model_path=DEBUG_EGO_MODEL)
