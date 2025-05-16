@@ -90,41 +90,41 @@ The fact that the model with merged labels achieves equal or better mean F1-scor
     \toprule
     \textbf{Merged Class} & \textbf{Original Label} & \textbf{mIoU A} & \textbf{mIoU B} & \textbf{mF1 A} & \textbf{mF1 B} \\
     \midrule
-    background & background & 0.98 & 0.98 & 0.99 & 0.99 \\
+    background & background & 0.97 & 0.97 & 0.99 & 0.99 \\
     \midrule
     animal & animal & 0.00 & 0.00 & 0.00 & 0.00 \\
     \midrule
-    human.pedestrian.adult & human.pedestrian.adult & 0.12 & 0.14 & 0.17 & 0.19 \\
+    human.pedestrian.adult & human.pedestrian.adult & 0.07 & 0.08 & 0.09 & 0.11 \\
      & human.pedestrian.child & 0.00 & - & 0.00 & - \\
-     & human.pedestrian.construction\_worker & 0.01 & - & 0.01 & - \\
+     & human.pedestrian.construction\_worker & 0.00 & - & 0.00 & - \\
      & human.pedestrian.personal\_mobility & 0.00 & - & 0.00 & - \\
      & human.pedestrian.police\_officer & 0.00 & - & 0.00 & - \\
      & human.pedestrian.stroller & 0.00 & - & 0.00 & - \\
      & human.pedestrian.wheelchair & 0.00 & - & 0.00 & - \\
     \midrule
-    movable\_object.barrier & movable\_object.barrier & 0.11 & 0.17 & 0.13 & 0.21 \\
+    movable\_object.barrier & movable\_object.barrier & 0.08 & 0.14 & 0.09 & 0.17 \\
      & movable\_object.debris & 0.00 & - & 0.00 & - \\
      & movable\_object.pushable\_pullable & 0.00 & - & 0.00 & - \\
-     & movable\_object.trafficcone & 0.09 & - & 0.12 & - \\
-     & static\_object.bicycle\_rack & 0.01 & - & 0.01 & - \\
+     & movable\_object.trafficcone & 0.08 & - & 0.10 & - \\
+     & static\_object.bicycle\_rack & 0.00 & - & 0.00 & - \\
     \midrule
     vehicle.car & vehicle.bus.bendy & 0.00 & - & 0.00 & - \\
-     & vehicle.bus.rigid & 0.05 & - & 0.06 & - \\
-     & vehicle.car & 0.48 & 0.58 & 0.56 & 0.66 \\
-     & vehicle.construction & 0.02 & - & 0.03 & - \\
+     & vehicle.bus.rigid & 0.02 & - & 0.03 & - \\
+     & vehicle.car & 0.30 & 0.38 & 0.33 & 0.42 \\
+     & vehicle.construction & 0.01 & - & 0.01 & - \\
      & vehicle.emergency.ambulance & 0.00 & - & 0.00 & - \\
      & vehicle.emergency.police & 0.00 & - & 0.00 & - \\
      & vehicle.trailer & 0.00 & - & 0.00 & - \\
-     & vehicle.truck & 0.14 & - & 0.16 & - \\
+     & vehicle.truck & 0.08 & - & 0.09 & - \\
     \midrule
     vehicle.ego & vehicle.ego & 0.00 & 0.00 & 0.00 & 0.00 \\
     \midrule
-    vehicle.motorcycle & vehicle.bicycle & 0.02 & - & 0.03 & - \\
-     & vehicle.motorcycle & 0.06 & 0.07 & 0.07 & 0.09 \\
+    vehicle.motorcycle & vehicle.bicycle & 0.02 & - & 0.02 & - \\
+     & vehicle.motorcycle & 0.04 & 0.06 & 0.05 & 0.07 \\
     \midrule
-    flat.driveable\_surface & flat.driveable\_surface & 0.97 & 0.97 & 0.99 & 0.99 \\
+    flat.driveable\_surface & flat.driveable\_surface & 0.94 & 0.94 & 0.97 & 0.97 \\
     \bottomrule
-     & & 0.12 & 0.36 & 0.13 & 0.39 \\
+     & & 0.10 & 0.32 & 0.11 & 0.34 \\
     \bottomrule
     \end{tabular}
     \caption{Per-class metric comparison between Model A and merged Model B evaluated in BEV images}
