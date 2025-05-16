@@ -154,8 +154,17 @@ Para evaluar las máscaras de ocupación, oclusión y área conducible es necesa
 
 
 
+[4.1.2 Data Augmentations]
 
+El objetivo de esta sección es dual. Por el lado de la estrategia de entrenar los modelos de segmentacion semántica con imágenes en el dominio de la cámara, se quiere comprobar el efecto de aplicar las transformaciones geométricas como método de data augmentation technique para ver si se reduce el overfitting. Y, por otro lado, se quiere explorar cual de las dos técnicas descritas es mejor para realizar data augmentations de imágenes BEV: si el aplicar las mismas aumentaciones de datos que las geométricas para imágenes normales o realizar una modificación de los parámetros extrínsecos de la cámara antes de realizar las proyecciones.
 
+En este contexto, con la introducción de random cropping, horizontal flipping and rescaling augmentation strategies en imágenes normales, el comportamiento de overfitting se ve significativamete reducido como se muestra en la Figura X. Se puede observar además, que esta reducción del overfitting permite realizar entrenamientos más largos y mejorar el rendimiento del modelo en el conjunto de evaluación haciendo que converga en valores más elevados de mIoU. Este hecho, además, también se refleja en la evaluación de los modelos sobre el conjunto de test, en el que el modelo con aumento de datos supera al modelo que sufre de overfitting.
+
+En segundo lugar, al analizar la gráfica del proceso de entrenamiento de tres modelos entrenados con imágenes BEV, se observan diferencias significativas en el comportamiento del entrenamiento. El primer modelo, sin aumento de datos, exhibe un overfitting notable. En contraste, las estrategias de aumento de datos, tanto las tradicionales (volteo aleatorio, recorte aleatorio y reescalado) como la estrategia personalizada de modificar los parámetros extrínsecos de la cámara, logran reducir este overfitting.
+
+El modelo que emplea las técnicas de aumento de datos tradicionales muestra un error generalmente más alto durante el entrenamiento, con curvas de error de entrenamiento y validación muy cercanas y un mIoU en el conjunto de validación considerablemente inferior al de los otros dos modelos, lo que sugiere un posible underfitting y parece alinearse con la hipótesis inicial de que al aplicar estas estrategias el modelo puede no contar con suficiente información para el entrenamiento.
+
+Por otro lado, el modelo entrenado con la estrategia de aumento de datos personalizada, basada en la modificación de los parámetros extrínsecos de la cámara, muestra un overfitting mínimo. Esto permite un entrenamiento más prolongado y mejores resultados en el conjunto de validación, superando en rendimiento al modelo con overfitting. En general, los resultados sugieren que las técnicas de aumento de datos personalizadas para imágenes BEV ofrecen un rendimiento superior a las técnicas tradicionales aplicadas directamente a estas imágenes. Sin embargo, es necesario atender a la evaluación en el conjunto de test de los modelos. En la Figura X se muestra esta evaluación, y se puede observar como la diferencia entre los tres modelos no es tan significativa realmente. A pesar de que el modelo entrenado con modificación de extrínsecos presenta unos resultados algo superiores, la diferencia del rendimiento entre los otros dos modelos no es tan clara siendo en ciertos casos el modelo con aumentación de datos normales superior al modelo overfiteado en las clases relativas a vehículos.
 
 
 

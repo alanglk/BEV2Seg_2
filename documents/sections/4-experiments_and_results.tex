@@ -75,13 +75,7 @@ As previously discussed, to improve model performance on the dataset’s minorit
 
 Table~\ref{tab:merging_comparison_bev} shows the results of two models trained with camera-perspective images and evaluated on the same test set using \aclink{BEV} masks. Model A was trained using the full set of original semantic classes, while Model B was trained using the merged classes, thereby reducing the total number of labels. 
 
-\hl{Rewrite this!!!}
-In general, the results indicate that Model B achieves better metric results in all semantic merged classes than Model A, but...  
-
-
-In general the results indicate that in some specific classes, Model A achieves a higher \aclink{IoU}; however, in those same cases, Model B tends to maintain a similar or slightly better F1-score. The most notable improvement is observed in the \texttt{vehicle.car} class, where the merging strategy significantly boosts model performance. Nevertheless, the overall results reveal that while Model A achieves higher \aclink{IoU} scores in certain individual classes, Model B often maintains comparable or even slightly superior F1-scores in those same cases.
-
-The fact that the model with merged labels achieves equal or better mean F1-scores (mF1), even when its mean \aclink{IoU} is lower, suggests that simplifying the semantic space does not decrease the model’s ability to identify important instances. Instead, it reduces the penalty from underrepresented classes. Additionally, by reducing the number of classes, the overall average of the metrics improves, as it avoids dilution from irrelevant or sparsely populated classes. This makes label merging especially useful in cases where fine-grained segmentation isn’t necessary, and consistency across the whole model is more important.
+In general, the results indicate that both models achieve comparable performance on the majority classes, specifically \texttt{background} and \texttt{flat.driveable\_surface}. However, a significant difference is observed in the minority classes, where Model B outperforms Model A across all evaluation metrics. This suggests that simplifying the semantic space does not decrease the model's ability to identify important instances and, instead, it reduces the penalty from underrepresented classes. Additionally, by reducing the number of classes, the overall average of the metrics improves as it avoids dilution from irrelevant or sparsely populated classes. This makes label merging especially useful in cases where fine-grained segmentation isn't necessary and consistency across the whole model is more important.
 
 \begin{table}[h]
     \centering
@@ -219,11 +213,9 @@ In this context, a different approach was also considered: applying geometric tr
 \end{figure}
 
 
+This section has a dual purpose. First, the effect of applying geometric transformations to camera-perspective images as data augmetation strategy for training a traditional segmentation model in order to mitigate overfitting is studied. Second, the effectiveness of two described techniques for performing data augmentation on \aclink{BEV} images is explored: applying the same geometric augmentations used for regular images, or modifying the camera's extrinsic parameters before performing the projections.
 
-
-\hl{Comparison between normal geometric data augmentation techniques and camera's extrinsic parameters modifications.}
-
-With the inclusion of random cropping, flippingf and rescaling augmentation strategies on both normal and \aclink{BEV} images, the overfitting behavior was significantly reduced as shown in Figure~\ref{fig:before_after_data_aug}.
+Therefore, the introduction of data augmentation strategies such as random cropping, horizontal flipping, and rescaling on regular images significantly reduces overfitting, as shown in Figure~\ref{fig:normal_before_after_data_aug_logs}. This reduction in overfitting allows for longer training periods and improves model performance on the evaluation set, leading to convergence at higher \aclink{mIoU} values. This effect is also reflected in the evaluation of the models on the test set, where the model with data augmentation presents higher \aclink{mIoU} than the model affected by overfitting.
 
 \begin{figure}[h!]
     \centering
@@ -232,9 +224,27 @@ With the inclusion of random cropping, flippingf and rescaling augmentation stra
     \label{fig:normal_before_after_data_aug_logs}
 \end{figure}
 
-The objective of this section is to show what of the data augmentation techniques is better for \aclink{BEV} semantic segmentation training and how the modification of the camera extrinsic's parameters affects the semantic predictions.
+Secondly, the Figure~\ref{fig:bev_before_after_data_aug_logs} shows the trainig process graph for the three models trained with \aclink{BEV} images and reveals some significant differences. The first model, without any data augmentation, exhibits notable overfitting. In contrast, both data augmentation strategies, the traditional geometric augmentations (random flipping, random cropping, and rescaling) and the custom strategy of modifying the camera's extrinsic parameters, seems to partially reduce this overfitting.
 
-Despite significantly reducing the overfitting, normal data augmentations for \aclink{BEV} images
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_logs.png}
+    \caption{Training logs of models with BEV data augmentation techniques}
+    \label{fig:bev_before_after_data_aug_logs}
+\end{figure}
+
+Focusing on the model employing traditional data augmentation techniques on the BEV images, the training error is generally higher, and the training and validation error curves remain closely aligned with a considerably lower mIoU on the validation set compared to the other two models. This pattern suggests potential underfitting. This observation appears to support the initial hypothesis that directly applying traditional image augmentations to BEV representations might not provide the model with sufficiently informative variations for effective training in this specific domain.
+
+On the other hand, the model trained with the extrinsic's data augmentation strategy shows less overfitting than the model without any data augmentation technique. This allows for more extended training and achieves superior results on the validation set, outperforming the overfitted model. 
+
+Overall, the findings from the validation set suggest that the custom data augmentation techniques for BEV images offer better performance than directly applying traditional augmentations. However, it is crucial to examine the models' performance on the unseen test set. Figure~\ref{fig:bev_before_after_data_aug_test} illustrates this evaluation, revealing that the performance difference between the three models is not as substantial in reality. While the model trained with extrinsic parameter modifications shows slightly better results, the performance gap between the other two models is less clear, with the model using traditional data augmentation on BEV images occasionally surpassing the overfitted model in vehicle-related classes.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_test.png}
+    \caption{Different data augmentation stategies evaluated with BEV images.}
+    \label{fig:bev_before_after_data_aug_test}
+\end{figure}
 
 \subsubsection{raw2seg\_bev vs raw2bev\_seg}
 \hl{raw2seg\_bev results compared with raw2bev\_seg results.}

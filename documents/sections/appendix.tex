@@ -61,71 +61,6 @@ Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages for
 \end{figure}
 
 % ==========================================================
-\section{Rotation matrix to euler angles}
-Here \cite{euler_from_matrix} is the pseudocode.
-
-\begin{algorithm}
-    \caption{Ground Truth BEV Mask Generation (Single Frame)}
-    \label{algorithm:gt_bev_mask}
-    \footnotesize
-
-    \begin{algorithmic}[1]
-        \State \textbf{Input:} Object data ($objs\_data$), Lane data ($lane\_data$), Scene data ($scene$), FOV coordinate system ($fov\_coord\_sys$), Frame number ($frame\_num$), Ray maximum distance ($ray\_max\_distance$), BEV coordinate system ($bev\_coord\_sys$), Ray step length ($h\_sp$)
-        \State \textbf{Output:} BEV Mask ($bev\_mask$)
-
-        \State Initialize camera from $scene$ using $fov\_coord\_sys$ and $frame\_num$
-        \State Get camera height ($h$) and width ($w$)
-        \State Calculate field of view angle ($\alpha$)
-
-        \State Define ray origin: $rays\_orig \gets [0, 0, 0]^T$
-        \State Define ray angles: $rays\_angles \gets$ equally spaced angles from $-\alpha$ to $\alpha$ ($num\_rays$ samples)
-        \State Calculate ray directions ($rays\_dirs$) from $rays\_angles$
-        \State Define ray steps: $rays\_steps \gets$ equally spaced steps from 0 to $ray\_max\_distance$ ($steps$ samples)
-        \State Calculate ray points ($rays\_points$) using $rays\_orig$, $rays\_dirs$, and $rays\_steps$
-        \State Transform $rays\_points$ to homogeneous coordinates
-        \State Get transformation matrix ($transform\_4x4$) from $fov\_coord\_sys$ to $bev\_coord\_sys$ at $frame\_num$
-        \State Transform ray points to $bev\_coord\_sys$
-        \State Initialize $intersections$ matrix of size $(num\_rays \times steps)$
-
-        \For{$i$ in $[0, 1, \dots, \text{length}(objs\_data) - 1]$}  \Comment{For each object}
-            \State Get bounding box ($bbox$) from $objs\_data[i]$
-            \If{$objs\_data[i]$ coordinate system $\neq$ $bev\_coord\_sys$}
-                \State Transform $bbox$ to $bev\_coord\_sys$ using $scene$ and $frame\_num$
-            \EndIf
-            \State Update $intersections$ by checking for intersections between $rays\_points$ and $bbox$  \Comment{Using \texttt{bbox\_intersects\_with\_rays}}
-        \EndFor
-
-        \State Identify visible ray points (where $intersections = 0$) and create visible polygons ($visible\_polys$) \Comment{Using \texttt{create\_multipolygon}}
-        \State Identify occupied ray points (where $intersections = 1$) and create occupied polygons ($occuped\_polys$) \Comment{Using \texttt{create\_multipolygon}}
-        \State Identify occluded ray points (where $intersections = 2$) and create occluded polygons ($occluded\_polys$) \Comment{Using \texttt{create\_multipolygon}}
-
-        \State Define $bev\_height$, $bev\_width$, $bev\_x\_range$, and $bev\_y\_range$
-        \State Initialize empty BEV mask ($bev\_mask$)
-
-        \State Get transformation matrix ($lane\_T\_4x4$) for lanes, from 'odom' to $bev\_coord\_sys$ at $frame\_num$
-        \For{$k$ in $lane\_data$}  \Comment{For each lane}
-          \If{'object\_data' not in $lane\_data[k]$}
-                \State Continue  \Comment{Skip if no object data}
-            \EndIf
-            \State Get lane polygon data ($poly3d\_data$) from $lane\_data[k]['object\_data']['poly3d'][0]$
-            \State Assert that polygon is closed
-            \State Extract polygon points ($poly3d\_vals$)
-            \State Transform $poly3d\_vals$ to homogeneous coordinates
-            \State Assert all Z coordinates of lane polygon are 0
-            \State Transform lane polygon points to $bev\_coord\_sys$ using $lane\_T\_4x4$
-            \State Create lane polygon ($lane\_poly$)
-            \If $visible\_polys$ intersects $lane\_poly$
-                \State Rasterize $lane\_poly$ and assign 'driveable' label to $bev\_mask$
-            \EndIf
-        \EndFor
-
-        \State Rasterize $occluded\_polys$ and assign 'occluded' label to $bev\_mask$
-        \State Rasterize $occuped\_polys$ and assign 'occuped' label to $bev\_mask$
-        \State Color the BEV mask based on labels  \Comment{Using \texttt{target2image}}
-
-        \State \Return $bev\_mask\_colored$
-    \end{algorithmic}
-\end{algorithm}
 
 
 % ==========================================================
@@ -135,56 +70,45 @@ Here \cite{euler_from_matrix} is the pseudocode.
     \text{F1} &= \frac{2TP}{2TP + FP + FN} \\
     \text{IoU} &= \frac{TP}{TP + FP + FN}
     \end{aligned}
-    \label{eq:system}
-    \end{equation}
+\end{equation}
     
-    % Step 1: Solve F1 in terms of IoU
-    \noindent
-    We know that:
-    \[
-    \text{IoU} = \frac{TP}{TP + FP + FN} \Rightarrow TP + FP + FN = \frac{TP}{\text{IoU}}
-    \]
+% Step 1: Solve F1 in terms of IoU
+\noindent
+We know that:
+\[
+\text{IoU} = \frac{TP}{TP + FP + FN} \Rightarrow TP + FP + FN = \frac{TP}{\text{IoU}}
+\]
+
+\begin{equation}
+    \begin{aligned}
+        \text{F1} &= \frac{2TP}{2TP + FP + FN} = \frac{2TP}{TP + (TP + FP + FN)} = \frac{2TP}{TP + \frac{TP}{\text{IoU}}} \\
+        &= \frac{2TP}{TP \left(1 + \frac{1}{\text{IoU}}\right)} = \frac{2}{1 + \frac{1}{\text{IoU}}} = \frac{2\text{IoU}}{1 + \text{IoU}}
+    \end{aligned}
+\end{equation}
     
-    Now substitute into the expression for F1:
-    \[
-    \text{F1} = \frac{2TP}{2TP + FP + FN} = \frac{2TP}{TP + (TP + FP + FN)} = \frac{2TP}{TP + \frac{TP}{\text{IoU}}}
-    \]
+
+% Step 2: Solve IoU in terms of F1
+\noindent
+Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
+\[
+\text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}}
+\]
     
-    Factor \(TP\) out of the denominator:
-    \[
-    \text{F1} = \frac{2TP}{TP \left(1 + \frac{1}{\text{IoU}}\right)} = \frac{2}{1 + \frac{1}{\text{IoU}}}
-    \]
+\[
+\text{F1}(1 + \text{IoU}) = 2\text{IoU}
+\Rightarrow \text{F1} + \text{F1} \cdot \text{IoU} = 2 \cdot \text{IoU}
+\]
     
-    Now simplify:
-    \[
-    \text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}}
-    \]
+\[
+\text{F1} = 2\text{IoU} - \text{F1} \cdot \text{IoU}
+\Rightarrow \text{F1} = \text{IoU}(2 - \text{F1})
+\]
     
-    % Step 2: Solve IoU in terms of F1
-    \noindent
-    Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
-    \[
-    \text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}}
-    \]
+\[
+\text{IoU} = \frac{\text{F1}}{2 - \text{F1}}
+\]
     
-    Multiply both sides by \(1 + \text{IoU}\):
-    \[
-    \text{F1}(1 + \text{IoU}) = 2\text{IoU}
-    \Rightarrow \text{F1} + \text{F1} \cdot \text{IoU} = 2 \cdot \text{IoU}
-    \]
-    
-    Bring all terms to one side:
-    \[
-    \text{F1} = 2\text{IoU} - \text{F1} \cdot \text{IoU}
-    \Rightarrow \text{F1} = \text{IoU}(2 - \text{F1})
-    \]
-    
-    Now isolate \(\text{IoU}\):
-    \[
-    \text{IoU} = \frac{\text{F1}}{2 - \text{F1}}
-    \]
-    
-    \begin{equation}
+\begin{equation}
     \boxed{
     \text{F1} = \frac{2\text{IoU}}{1 + \text{IoU}} \qquad
     \text{IoU} = \frac{\text{F1}}{2 - \text{F1}}
