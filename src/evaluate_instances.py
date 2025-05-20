@@ -331,14 +331,14 @@ def find_border_indices(js_cluster:np.ndarray, ks_cluster:np.ndarray) -> Tuple[L
     js_border = js_border_right         + js_border_bottom + js_border_left + js_border_top[::-1]
     ks_border = ks_border_right[::-1]   + ks_border_bottom + ks_border_left + ks_border_top[::-1]
     return js_border, ks_border
-def create_multipolygon(rays_points:np.ndarray, js, ks, label="") -> MultiPolygon:
+def create_multipolygon(rays_points:np.ndarray, js, ks, label="", gt_occ_bev_masks_path:str="trash") -> MultiPolygon:
     # rays_points[(x, y, z), num_ray, num_step]
     xy_points = rays_points[:2, js, ks].T 
 
     if len(xy_points) == 0:
         return MultiPolygon()
 
-    cluster_path = os.path.join("trash", f"{label}.pkl")
+    cluster_path = os.path.join(gt_occ_bev_masks_path, f"{label}.pkl")
     if os.path.exists(cluster_path):
         with open(cluster_path, "rb") as f:
             db = pickle.load(f)
@@ -418,7 +418,16 @@ def rasterize_shapely(geometry:int, width:int, height:int, x_range:Tuple[float],
     )
 
     return raster.astype(bool)  # Convertir a booleano (True si hay geometría)
-def get_occlusion_polys(objs_data:dict, lane_data:dict, scene:scl.Scene, fov_coord_sys:str, frame_num:int, ray_max_distance:float = 50.0, bev_coord_sys:str='vehicle-iso8855', h_sp:float=0.01) -> List[np.ndarray]:
+def get_occlusion_polys(objs_data:dict, 
+                        lane_data:dict, 
+                        scene:scl.Scene, 
+                        fov_coord_sys:str, 
+                        frame_num:int, 
+                        ray_max_distance:float = 50.0, 
+                        bev_coord_sys:str='vehicle-iso8855', 
+                        h_sp:float=0.01, 
+                        gt_occ_bev_masks_path:str=None
+                        ) -> List[np.ndarray]:
     """Get the occlusion of 3d objects by projecting rays in the top-view
     """
     camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
@@ -463,15 +472,15 @@ def get_occlusion_polys(objs_data:dict, lane_data:dict, scene:scl.Scene, fov_coo
     # Build a Graph -> Identify connected components -> Create Multipolygons
     js, ks = np.where(intersections == 0.0) # visible
     visible_points  = rays_points[:, js, ks]
-    visible_polys   = create_multipolygon(rays_points, js, ks, label=f"visible_{frame_num}")
+    visible_polys   = create_multipolygon(rays_points, js, ks, label=f"visible_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path)
 
     js, ks = np.where(intersections == 1.0) # occuped
     occuped_points  = rays_points[:, js, ks]
-    occuped_polys   = create_multipolygon(rays_points, js, ks, label=f"occuped_{frame_num}")
+    occuped_polys   = create_multipolygon(rays_points, js, ks, label=f"occuped_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path)
 
     js, ks = np.where(intersections == 2.0) # occluded
     occluded_points = rays_points[:, js, ks]
-    occluded_polys  = create_multipolygon(rays_points, js, ks, label=f"occluded_{frame_num}")
+    occluded_polys  = create_multipolygon(rays_points, js, ks, label=f"occluded_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path)
     
     # TODO: Add lane polys and rasterize on the BEV common space
     bev_height, bev_width = BEV2SEG_2_Interface.BEV_HEIGH, BEV2SEG_2_Interface.BEV_WIDTH 
@@ -479,7 +488,7 @@ def get_occlusion_polys(objs_data:dict, lane_data:dict, scene:scl.Scene, fov_coo
     bev_x_range = (-1.0, BEV2SEG_2_Interface.BEV_MAX_DISTANCE)
     bev_y_range = (-((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2,
                     ((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2)
-    bev_mask = np.zeros((bev_height, bev_width))
+    bev_mask = np.ones((bev_height, bev_width)) * occ2name2id['background']
 
     # Rasterize driveable area
     lane_T_4x4, _ = scene.get_transform(cs_src='odom', cs_dst=bev_coord_sys, frame_num=frame_num)
@@ -512,12 +521,16 @@ def get_occlusion_polys(objs_data:dict, lane_data:dict, scene:scl.Scene, fov_coo
     bev_mask[mask == True] = occ2name2id['occluded']
     mask = rasterize_shapely(occuped_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
     bev_mask[mask == True] = occ2name2id['occuped']
+
+    # Apply visible mask
+    visible_mask = rasterize_shapely(visible_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
+    bev_mask[visible_mask == False] = occ2name2id['background']
     bev_mask_colored = target2image(bev_mask, colormap=occ2id2color)
 
     # For saving masks
-    gt_vec_mask_path = os.path.join("trash", f"gt_vec_mask_{frame_num}.png")
-    gt_ras_mask_path = os.path.join("trash", f"gt_ras_mask_{frame_num}.png")
-    gt_ras_mask_colored_path = os.path.join("trash", f"gt_ras_mask_colored_{frame_num}.png")
+    gt_vec_mask_path = os.path.join(gt_occ_bev_masks_path, f"gt_vec_mask_{frame_num}.png")
+    gt_ras_mask_path = os.path.join(gt_occ_bev_masks_path, f"gt_occ_mask_{frame_num}.png")
+    gt_ras_mask_colored_path = os.path.join(gt_occ_bev_masks_path, f"gt_occ_mask_colored_{frame_num}.png")
     
     # Debug vec
     plt.ioff()
@@ -1442,11 +1455,13 @@ data = {
 }
 """
 def main(
+        scene_name:str,
         openlabel_path:str,
         save_data_path:str,
         semantic_types: List[str],
         ignoring_names: List[str],
-        camera_depth:float = 15.0,
+        gt_occ_bev_masks_path:str=None,
+        camera_depth:float = BEV2SEG_2_Interface.BEV_MAX_DISTANCE,
         max_association_distance:float = 3.0,
         association_dist_type:str = 'v2v',
         save_openlabel_path:str = None,
@@ -1461,6 +1476,9 @@ def main(
         save_openlabel_path = os.path.abspath(save_openlabel_path)
     scene_path = os.path.abspath(os.path.dirname(openlabel_path))
     save_data_path = os.path.abspath(save_data_path)
+    
+    if gt_occ_bev_masks_path is not None:
+        check_paths([gt_occ_bev_masks_path])
 
     # Load OpenLABEL
     vcd = core.OpenLABEL()
@@ -1475,6 +1493,7 @@ def main(
     model_config = metadata['model_config']
 
     # Evaluation params
+    assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
     eval_name                   = metadata['scene_name']
     camera_name                 = model_config['scene']['camera_name']
     merge_semantic_labels_flag  = model_config['semantic']['merge_semantic_labels_flag'] # True
@@ -1576,7 +1595,8 @@ def main(
             gt_in_objs_data = [gt_objs_data[i] for i in gt_in_indices]
             dt_in_objs_data = [dt_objs_data[i] for i in dt_in_indices]
 
-            bev_mask, bev_mask_colored = get_occlusion_polys(gt_in_objs_data, gt_lanes, scene=scene, fov_coord_sys=camera_name, frame_num=fk, ray_max_distance=40.0, h_sp=0.01)
+            if gt_occ_bev_masks_path is not None:
+                bev_mask, bev_mask_colored = get_occlusion_polys(gt_in_objs_data, gt_lanes, scene=scene, fov_coord_sys=camera_name, frame_num=fk, ray_max_distance=40.0, h_sp=0.01, gt_occ_bev_masks_path=gt_occ_bev_masks_path)
 
 
             cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
@@ -1632,23 +1652,45 @@ def main(
         vcd.add_metadata_properties({'eval_config': eval_config})
         vcd.save(save_openlabel_path)
     
-    # # Save evaluation data
-    # with open(save_data_path, "wb") as f:
-    #     pickle.dump(data, f)
+    # Save evaluation data
+    print(f"Saving data in {save_data_path}...")
+    with open(save_data_path, "wb") as f:
+        pickle.dump(data, f)
     
 
 if __name__ == "__main__":   
     parser = argparse.ArgumentParser(description="Script for evaluating 3D detections.")
-    # parser.add_argument('openlabel_path', type=str, help="Path to the openlabel with the ground truth and annotated detections")
-    # parser.add_argument('save_path', type=str, help="Path to the openlabel with the ground truth and annotated detections")
-
+    parser.add_argument('scene_path', type=str, help="Path to the scene. This path must have the 'generated' folder and the 'scene' folder with the 'detections_openlabel.json' file that has the ground truth and annotated detections")
+    parser.add_argument('save_path', type=str, help="Output .pkl path")
+    
     parser.add_argument('--semantic_types', nargs="+", default=["vehicle.car"], help="List of semantic types to consider")
     parser.add_argument('--ignoring_names', nargs="+", default=["ego_vehicle"], help="List of object names to ignore")
     parser.add_argument('--save_openlabel_path', type=str, default=None, help="If set, the associated openlabel will be saved")
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
     args = parser.parse_args()
+    
+    scene_name = os.path.dirname(args.scene_path)
+    openlabel_path = os.path.join(args.scene_path, 'scene', 'detections_openlabel.json')
+    gt_occ_bev_masks_path = os.path.join(args.save, 'generated', 'gt_occ_bev_mask')
+    
+    main(scene_name=scene_name,
+         openlabel_path=openlabel_path, 
+         save_data_path=args.save_path,
+         gt_occ_bev_masks_path=gt_occ_bev_masks_path,
+         semantic_types=args.semantic_types,
+         ignoring_names=args.ignoring_names,
+         camera_depth=BEV2SEG_2_Interface.BEV_MAX_DISTANCE,
+         max_association_distance=3.0,
+         association_dist_type='v2v',
+         save_openlabel_path=None, 
+         debug=False, 
+         debug_ego_model_path=None)
+    exit()
+
+
 
     OPENLABEL_PATH      = "./tmp/my_scene/scene/detections_openlabel.json"
+    GT_OCC_MASKS_PAHT   = "./tmp/my_scene/generated/gt_occ_bev_mask"
     SAVE_DATA_PATH      = "./data/pipeline_3d_evaluations.pkl"              
     SAVE_OPENLABEL_PATH = None # "./tmp/my_scene/nuscenes_sequence/associated_openlabel.json"
     DEBUG_EGO_MODEL     = "./assets/carlota_3d"
@@ -1657,8 +1699,10 @@ if __name__ == "__main__":
     semantic_types = [ "vehicle.car" ]
     ignoring_names = [ "ego_vehicle" ]
 
-    main(openlabel_path=OPENLABEL_PATH, 
+    main(scene_name="scene-0061",
+         openlabel_path=OPENLABEL_PATH, 
          save_data_path=SAVE_DATA_PATH,
+         gt_occ_bev_masks_path=GT_OCC_MASKS_PAHT,
          semantic_types=semantic_types,
          ignoring_names=ignoring_names,
          camera_depth=15.0,

@@ -218,12 +218,15 @@ def main(config:dict):
     vcd.load_from_file(scene_openlabel_path)
     scene = scl.Scene(vcd=vcd)
     frame_keys = vcd.data['openlabel']['frames'].keys()
-
+    metadata = vcd.get_metadata()
+    scene_name = os.path.dirname(scene_path)
+    assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
+    
     # Save model_config in metadata:
     vcd.add_metadata_properties({'model_config': config})
 
     # Open-CV windows
-    cv2.namedWindow("DEBUG", cv2.WINDOW_NORMAL)
+    # cv2.namedWindow("DEBUG", cv2.WINDOW_NORMAL)
     
     # Create device for model inference
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -236,10 +239,11 @@ def main(config:dict):
     raw_seg2bev.set_openlabel(vcd)
     
     BMM = BEVMapManager(scene_path=scene_path, gen_flags={
-            'all': False, 
-            'pointcloud': False, 
+            'all': True, 
+            'pointcloud': True, 
             'instances': True, 
-            'occ_bev_mask': True, 
+            'occ_bev_mask': True,
+            'dt_occ_bev_mask':True,
             'tracking': False
         })
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)
@@ -257,7 +261,6 @@ def main(config:dict):
         cuboid_semantic_labels = cuboid_semantic_labels
     )
 
-
     global uid
     uid = 0
     if vcd.get_objects() is not None:
@@ -269,7 +272,6 @@ def main(config:dict):
         frame_properties    = frame['frame_properties']
         raw_image_path      = frame_properties['streams'][camera_name]['stream_properties']['uri']
         raw_image_path      = os.path.join(scene_path, "scene", raw_image_path)
-        # sample_token        = frame_properties['sample_token']
 
         # ##############################################################
         # Load input image #############################################
@@ -341,6 +343,8 @@ def main(config:dict):
             instance_pcds = BMM.load_occ_bev_masks(raw_image_path)
         # bev_blended = get_blended_image(bev_image_cuboids, raw2seg_bev.mask2image(bev_mask_sb))
         instance_pcds, bev_image_occ_ocl = IBM.run(bev_mask_sb, instance_pcds, frame_num=fk, bev_image=bev_image_cuboids)
+        output_bev_mask, output_bev_mask_colored = IBM.get_output_mask(bev_mask_sb, instance_pcds)
+        BMM.save_dt_occ_bev_masks([f"dt_occ_mask_{fk}", f"dt_occ_mask_colored_{fk}"], [output_bev_mask, output_bev_mask_colored])
         
         # ##############################################################
         # Apply tracking data to instances #############################
@@ -359,10 +363,10 @@ def main(config:dict):
         
         # ##############################################################
         # Odometry Stitching ###########################################
-        # print(f"# Draw cuboids on RAW image {'#'*36}")
-        # accum_pcd = ODS.add_frame_pcd(instance_pcds, camera_name, fk, use_frame_color = False)
-        # accum_cuboids = ODS.add_frame_cuboids(instance_pcds, camera_name, fk)
-        # o3d.io.write_point_cloud(os.path.join(scene_path, "scene", "ground_scene_pcd.pcd"), accum_pcd)
+        print(f"# Draw cuboids on RAW image {'#'*36}")
+        accum_pcd = ODS.add_frame_pcd(instance_pcds, camera_name, fk, use_frame_color = False)
+        accum_cuboids = ODS.add_frame_cuboids(instance_pcds, camera_name, fk)
+        o3d.io.write_point_cloud(os.path.join(scene_path, "scene", "ground_scene_pcd.pcd"), accum_pcd)
 
         # ##############################################################
         # Visualization ################################################
@@ -371,7 +375,7 @@ def main(config:dict):
         all_geometries = pcd_semantic + pcd_cuboids + pcd_oriented_cuboids + [create_plane_at_y(2.0)] + [coordinate_frame]
         # all_geometries = accum_cuboids + [accum_pcd]
         # all_geometries = []
-        o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
+        # o3d.visualization.draw_geometries(all_geometries, window_name="DEBUG") 
         
         
         # ##############################################################
@@ -413,10 +417,10 @@ def main(config:dict):
         
         # ##############################################################
         # Annotations ##################################################
-        # print(f"# Annotating cuboids on vcd {'#'*36}")
-        # transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
-        # annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
-        # vcd.save(os.path.join(scene_path, "scene", "detections_openlabel.json"))
+        print(f"# Annotating cuboids on vcd {'#'*36}")
+        transform_4x4, _ = scene.get_transform(cs_src=camera_name, cs_dst="odom", frame_num=fk)
+        annotate_cuboids_on_vcd(instance_pcds, vcd, fk, transform_4x4, cuboid_semantic_labels=['vehicle.car'], initial_traslation_4x1=ODS.initial_translation_4x1)
+        vcd.save(os.path.join(scene_path, "scene", "detections_openlabel.json"))
         
         # # print()
         # # Check for a key press (if a key is pressed, it returns the ASCII code)
@@ -424,7 +428,7 @@ def main(config:dict):
         #     break
         
     # Release resources
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
     
 
 if __name__ == "__main__":

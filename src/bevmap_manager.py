@@ -11,7 +11,7 @@ import os
 
 
 class BEVMapManager():
-    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask', 'tracking']
+    GEN_FOLDERS = ['semantic', 'depth', 'pointcloud', 'instances', 'occ_bev_mask', 'dt_occ_bev_mask', 'tracking']
     
     def __init__(self, 
                  scene_path: str, 
@@ -192,6 +192,18 @@ class BEVMapManager():
         with open(occ_path, "wb") as f:
             pickle.dump(occ_bev_masks, f)
     
+    def save_dt_occ_bev_masks(self, mask_names:List[str], occ_bev_masks: List[np.ndarray]):
+        for (mask_name, mask) in zip(mask_names, occ_bev_masks):
+            mask_path = self._get_path(mask_name, 'dt_occ_bev_mask', '.png')
+            assert len(mask.shape) >= 2
+            if len(mask.shape) != 3:
+                aux = np.zeros((mask.shape[0], mask.shape[1], 3))
+                aux[:, :, 0] = mask
+                aux[:, :, 1] = mask
+                aux[:, :, 2] = mask
+                mask = aux
+            cv2.imwrite(mask_path, mask)
+
     def save_tracking_frame(self, frame_num:int, image_path:str, instance_pcds:dict, tracking_semantic_labels:List[str]):
         """Save files to perform object trackig
         The file format for each frame is:

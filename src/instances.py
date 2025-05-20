@@ -9,8 +9,10 @@ from vcd import scl, draw, utils
 #         break
 #
 
-from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuid2dynamic
+from oldatasets.NuImages.nulabels import nuid2color, nuid2name, nuname2label, nuid2dynamic
+from oldatasets.Occ2.occ2labels import occ2name2id, occ2id2color
 from oldatasets.common.utils import target2image
+
 
 from my_utils import create_cuboid_edges, intersection_factor, get_blended_image, get_pcds_of_semantic_label, get_pallete, filter_instances
 
@@ -433,6 +435,64 @@ class InstanceBEVMasks():
                     # cv2.waitKey(0)
                 return instance_pcds, bev_image
         return instance_pcds, None
+
+    def get_output_mask(self,
+            bev_mask: np.ndarray,
+            instance_pcds:dict, 
+            ) -> Tuple[dict, np.ndarray]:
+        """
+        INPUT:
+            - bev_mask: (H, W, C) where C is going to be ignored
+            - instance_pcds: dict of panoptic segmentation of the pointcloud with bev masks for instances
+        OUTPUT:
+            instance_pcds: 
+                [{  'label': str, 
+                    'label_id': int,
+                    'camera_name': str,
+                    'dynamic': bool, 
+                    'pcd': np.ndarray, 
+                    'pcd_colors': np.ndarray,
+                    'instance_pcds': [{
+                        'inst_id': int, 
+                        'pcd': np.ndarray, 
+                        'pcd_colors': np.ndarray
+                    }],
+                    'instance_3dboxes':[{
+                        'inst_id': int, 
+                        'center': (x_pos, y_pos, z_pos), 
+                        'dimensions': (bbox_width, bbox_height, bbox_depth)  
+                    }],
+                    'instance_bev_mask':[{
+                        'inst_id': int,
+                        'occupancy_mask': (H, W) binary mask,
+                        'oclussion_mask': (H, W) binary mask
+                    }]
+                }]
+        """
+
+        if len(bev_mask.shape) > 2:
+            bev_mask = bev_mask[:, :, 0] # Get the first channel
+
+        res_mask = np.zeros(bev_mask.shape)
+
+        # Driveable area
+        res_mask[bev_mask == nuname2label['flat.driveable_surface'].trainId] = occ2name2id['driveable']
+
+        for semantic_pcd in instance_pcds:
+            if not semantic_pcd['dynamic']:
+                continue 
+            if semantic_pcd['label'] not in self.selected_semantic_labels:
+                continue
+            # FOR EACH vehicle.car CLASS
+
+            assert 'instance_bev_mask' in semantic_pcd
+            for inst in semantic_pcd['instance_bev_mask']:
+                assert res_mask.shape == inst['occupancy_mask'].shape == inst['oclussion_mask'].shape
+                res_mask[inst['oclussion_mask'] == 1] = occ2name2id['occluded']
+                res_mask[inst['occupancy_mask'] == 1] = occ2name2id['occuped']
+
+        res_mask_colored = target2image(res_mask, colormap=occ2id2color)
+        return res_mask, res_mask_colored
 
 class InstanceRAWDrawer():
     DEFAULT_DRAWING_LABELS = ['vehicle.car']
