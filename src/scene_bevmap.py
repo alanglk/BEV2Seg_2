@@ -219,7 +219,7 @@ def main(config:dict):
     scene = scl.Scene(vcd=vcd)
     frame_keys = vcd.data['openlabel']['frames'].keys()
     metadata = vcd.get_metadata()
-    scene_name = os.path.dirname(scene_path)
+    scene_name = os.path.basename(scene_path)
     assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
     
     # Save model_config in metadata:
@@ -272,12 +272,12 @@ def main(config:dict):
         frame_properties    = frame['frame_properties']
         raw_image_path      = frame_properties['streams'][camera_name]['stream_properties']['uri']
         raw_image_path      = os.path.join(scene_path, "scene", raw_image_path)
-
         # ##############################################################
         # Load input image #############################################
         print(f"# Load input image {'#'*45}")
         raw_image = cv2.imread(raw_image_path)
-
+        assert raw_image is not None
+        
         # ##############################################################
         # Generate semantic masks ######################################
         print(f"# Generate semantic masks {'#'*38}")

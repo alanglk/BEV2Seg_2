@@ -24,6 +24,9 @@ import cv2
 from collections import defaultdict
 from typing import List, Tuple
 
+from scipy.spatial import ConvexHull
+from shapely.geometry import Polygon
+from shapely.affinity import rotate as shapely_rotate
 
 class InstanceScenePCD():
     def __init__(self, 
@@ -196,9 +199,6 @@ class InstanceScenePCD():
                 #         psi = - phi + np.arctan2(-R[0, 1], -R[0, 2])
                 #     rx, ry, rz = psi, rho, phi
 
-                from scipy.spatial import ConvexHull
-                from shapely.geometry import Polygon
-                from shapely.affinity import rotate as shapely_rotate
                 def get_yaw_fixed_obb(points):
                     # Step 1: Project points to YZ plane
                     points_xz = points[:, [1, 2]]
@@ -343,6 +343,7 @@ class InstanceBEVMasks():
             intersection_factors = {}
 
             # Read 3d cuboids data on image frame
+            assert 'camera_name' in semantic_pcd and semantic_pcd['camera_name'] is not None
             camera = self.scene.get_camera(semantic_pcd['camera_name'], frame_num)
             semantic_pcd['instance_bev_mask'] = []
             for bbox_index, bbox in enumerate(semantic_pcd['instance_3dboxes']):
