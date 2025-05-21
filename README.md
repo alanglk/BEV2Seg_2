@@ -168,3 +168,34 @@ srun --pty singularity run --nv --bind /gpfs/VICOMTECH/Databases/GeneralDatabase
 EOF
 )
 ```
+
+
+setup.py para 3D-Metrics:
+```python
+from setuptools import setup, find_packages
+
+VERSION = "0.1"
+
+setup(
+    name="3D-Metrics",
+    version=VERSION,
+    author="Adam, Michael G. and  Piccolrovazzi, Martin and Eger, Sebastian and Steinbach, Eckehard",
+    author_email="",
+    description="Bounding Box Disparity: 3D Metrics for Object Detection with Full Degree of Freedom",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/M-G-A/3D-Metrics",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    install_requires=[
+        "numpy",
+        "open3d",
+    ],
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires='>=3.6',
+)
+```
