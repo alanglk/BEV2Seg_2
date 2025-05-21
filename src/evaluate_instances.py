@@ -2,24 +2,25 @@ from vcd import core, scl, types, utils
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 
+from my_utils import get_pallete, DEFAULT_MERGE_DICT, parse_mtl, parse_obj_with_materials
+from oldatasets.Occ2.occ2labels import occ2name2id, occ2id2color
+from oldatasets.common.utils import target2image
+from oldatasets.common.bev_vcd import Dataset2BEV
+from src.bev2seg_2 import BEV2SEG_2_Interface
+
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import seaborn as sns
+
 import open3d as o3d
 import textwrap
 import threading
 import time
-
-from my_utils import get_pallete, DEFAULT_MERGE_DICT, parse_mtl, parse_obj_with_materials
-from oldatasets.Occ2.occ2labels import occ2name2id, occ2id2color
-from oldatasets.common.utils import target2image
+import cv2
 
 # import open3d.visualization.gui as gui
 # import open3d.visualization.rendering as rendering
 from three_d_metrics.open3d_addon import * # 3d metrics
-from src.bev2seg_2 import BEV2SEG_2_Interface
-
-import cv2
 
 from shapely.geometry import MultiPolygon, Polygon, MultiPoint, Point
 from sklearn.cluster import DBSCAN
@@ -124,7 +125,14 @@ def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_n
             obj_dict[tp].pop(uid)
         return obj_dict
 
-    gt_lanes = gt_objs['objects']['lane'].copy() if 'lane' in gt_objs['objects'] else None 
+    # Lanes and driveable area (intersections...)
+    gt_lanes = {}
+    if 'road_segment' in gt_objs['objects']:
+        gt_lanes.update( gt_objs['objects']['road_segment'].copy() ) 
+    if 'lane' in gt_objs['objects']:
+        gt_lanes.update( gt_objs['objects']['lane'].copy() ) 
+    
+    # Filter out non selected objects from gt
     if filter_out:
         gt_objs['objects'] = filter_out(gt_objs['objects'], selected_types)     if selected_types is not None else gt_objs['objects']
         dt_objs['objects'] = filter_out(dt_objs['objects'], selected_types)     if selected_types is not None else dt_objs['objects']
@@ -331,7 +339,7 @@ def find_border_indices(js_cluster:np.ndarray, ks_cluster:np.ndarray) -> Tuple[L
     js_border = js_border_right         + js_border_bottom + js_border_left + js_border_top[::-1]
     ks_border = ks_border_right[::-1]   + ks_border_bottom + ks_border_left + ks_border_top[::-1]
     return js_border, ks_border
-def create_multipolygon(rays_points:np.ndarray, js, ks, label="", gt_occ_bev_masks_path:str="trash") -> MultiPolygon:
+def create_multipolygon(rays_points:np.ndarray, js, ks, eps:float=0.5, label="", gt_occ_bev_masks_path:str="trash") -> MultiPolygon:
     # rays_points[(x, y, z), num_ray, num_step]
     xy_points = rays_points[:2, js, ks].T 
 
@@ -432,11 +440,10 @@ def get_occlusion_polys(objs_data:dict,
     """
     camera = scene.get_camera(camera_name=fov_coord_sys, frame_num=frame_num)
 
-    h, w = camera.height, camera.width
     d = ray_max_distance
     K_3x3 = camera.K_3x3
     fx = K_3x3[0, 0]
-    alpha = np.arctan((w/2)/fx)
+    alpha = np.arctan((camera.width/2)/fx) + 0.1
     
     # Launch rays
     num_rays    = 100
@@ -476,7 +483,7 @@ def get_occlusion_polys(objs_data:dict,
 
     js, ks = np.where(intersections == 1.0) # occuped
     occuped_points  = rays_points[:, js, ks]
-    occuped_polys   = create_multipolygon(rays_points, js, ks, label=f"occuped_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path)
+    occuped_polys   = create_multipolygon(rays_points, js, ks, label=f"occuped_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path, eps=0.01)
 
     js, ks = np.where(intersections == 2.0) # occluded
     occluded_points = rays_points[:, js, ks]
@@ -496,11 +503,13 @@ def get_occlusion_polys(objs_data:dict,
     for k in lane_data.keys():
         if not 'object_data' in lane_data[k]:
             continue # Basura que se ha colado supongo
-        # Solo hay un poly3d y es cerrado
+        # Solo hay un poly3d
         assert len(lane_data[k]['object_data']['poly3d']) == 1 
         poly3d_data = lane_data[k]['object_data']['poly3d'][0]
         assert 'closed' in poly3d_data and 'val' in poly3d_data and 'name' in poly3d_data
-        assert poly3d_data['name'] == 'polygon' and poly3d_data['closed'] == True  
+        assert poly3d_data['name'] == 'polygon' 
+        if not poly3d_data['closed'] == True:
+            continue # No es un polígono cerrado  
         
         poly3d_vals = np.array(poly3d_data['val'])
         N = poly3d_vals.size // 3 # 3 axis as it is a 3D poly
@@ -522,11 +531,16 @@ def get_occlusion_polys(objs_data:dict,
     mask = rasterize_shapely(occuped_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
     bev_mask[mask == True] = occ2name2id['occuped']
 
-    # Apply visible mask
-    visible_mask = rasterize_shapely(visible_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
-    bev_mask[visible_mask == False] = occ2name2id['background']
-    bev_mask_colored = target2image(bev_mask, colormap=occ2id2color)
+    # Apply BEV visible mask
+    visible_mask = np.ones((camera.height, camera.width, 3), dtype=np.uint8) * 255
+    bev_visible_mask = Dataset2BEV(fov_coord_sys, scene, BEV2SEG_2_Interface.BEV_MAX_DISTANCE, BEV2SEG_2_Interface.BEV_WIDTH, BEV2SEG_2_Interface.BEV_HEIGH)._img2bev(visible_mask, frame_num)[:, :, 0]
+    bev_visible_mask = np.asarray(bev_visible_mask, dtype=bool)
+    assert len(np.unique(bev_visible_mask)) > 1
+    bev_mask = bev_mask * bev_visible_mask
 
+    # Colored mask
+    bev_mask_colored = target2image(bev_mask, colormap=occ2id2color)
+    
     # For saving masks
     gt_vec_mask_path = os.path.join(gt_occ_bev_masks_path, f"gt_vec_mask_{frame_num}.png")
     gt_ras_mask_path = os.path.join(gt_occ_bev_masks_path, f"gt_occ_mask_{frame_num}.png")
@@ -539,11 +553,11 @@ def get_occlusion_polys(objs_data:dict,
     plt.scatter(visible_points[0],  visible_points[1],  s=0.5, color="blue", label="visible")
     plt.scatter(occuped_points[0],  occuped_points[1],  s=0.5, color="red", label="intersection")
     plt.scatter(occluded_points[0], occluded_points[1], s=0.5, color="black", label="occlusion")
-    plot_ray_polys(MultiPolygon(lane_multipoly), "#ffc065", label="driveable")
+    # plot_ray_polys(MultiPolygon(lane_multipoly), "#ffc065", label="driveable")
     plot_ray_polys(visible_polys, "blue", label = "visible poly")
     plot_ray_polys(occuped_polys, "red")
     plot_ray_polys(occluded_polys, "black")
-    plt.legend()
+    # plt.legend()
     plt.savefig(gt_vec_mask_path)
     plt.close(figure)
     # plt.show()
@@ -1455,7 +1469,6 @@ data = {
 }
 """
 def main(
-        scene_name:str,
         openlabel_path:str,
         save_data_path:str,
         semantic_types: List[str],
@@ -1475,6 +1488,7 @@ def main(
         check_paths([save_openlabel_path])
         save_openlabel_path = os.path.abspath(save_openlabel_path)
     scene_path = os.path.abspath(os.path.dirname(openlabel_path))
+    scene_name = os.path.basename(scene_path)
     save_data_path = os.path.abspath(save_data_path)
     
     if gt_occ_bev_masks_path is not None:
@@ -1493,7 +1507,7 @@ def main(
     model_config = metadata['model_config']
 
     # Evaluation params
-    assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
+    # assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
     eval_name                   = metadata['scene_name']
     camera_name                 = model_config['scene']['camera_name']
     merge_semantic_labels_flag  = model_config['semantic']['merge_semantic_labels_flag'] # True
@@ -1561,7 +1575,7 @@ def main(
     # Debug init
     global _renderer, _debug, _debug_3d, _debug_plt
     _debug = debug
-    _debug_3d = True
+    _debug_3d = False
     _debug_plt = False
 
     # Main loop
@@ -1669,12 +1683,10 @@ if __name__ == "__main__":
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
     args = parser.parse_args()
     
-    scene_name = os.path.dirname(args.scene_path)
     openlabel_path = os.path.join(args.scene_path, 'scene', 'detections_openlabel.json')
-    gt_occ_bev_masks_path = os.path.join(args.save, 'generated', 'gt_occ_bev_mask')
+    gt_occ_bev_masks_path = os.path.join(args.scene_path, 'generated', 'gt_occ_bev_mask')
     
-    main(scene_name=scene_name,
-         openlabel_path=openlabel_path, 
+    main(openlabel_path=openlabel_path, 
          save_data_path=args.save_path,
          gt_occ_bev_masks_path=gt_occ_bev_masks_path,
          semantic_types=args.semantic_types,
@@ -1699,8 +1711,7 @@ if __name__ == "__main__":
     semantic_types = [ "vehicle.car" ]
     ignoring_names = [ "ego_vehicle" ]
 
-    main(scene_name="scene-0061",
-         openlabel_path=OPENLABEL_PATH, 
+    main(openlabel_path=OPENLABEL_PATH, 
          save_data_path=SAVE_DATA_PATH,
          gt_occ_bev_masks_path=GT_OCC_MASKS_PAHT,
          semantic_types=semantic_types,
