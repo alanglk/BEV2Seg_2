@@ -1,0 +1,307 @@
+% ================================================
+% =                 EXPERIMENTS                  = 
+% ================================================ 
+
+This section includes all experiments carried out for evaluating the difference between the two approaches considered in the BEV2Seg\_2 pipeline, experiments to study what is the influence of extrinsic parameters modification as data augmentation technique for semantic segmentation of BEV images and the final evaluation of the proposed annotation pipeline of occupancy, occlusion and driveable areas.
+
+\subsection{BEV2Seg\_2}
+
+Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions. During fine-tuning for the segmentation task, encoder layers were left unfrozen, allowing the entire model to adapt to the training data. Input images were preprocessed using the \textit{SegformerImageProcessor}, which includes resizing to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing with ImageNet mean and standard deviation values~\cite{imagenet}. This preprocessing step ensures the input format is consistent with what the pretrained encoders expect.
+
+Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mean intersection over union is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training and the loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way following the Segformer implementation.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{c l c}
+        \toprule
+        \textbf{Component} & \textbf{Specifications} & \textbf{Num workers} \\
+        \midrule
+        CPU         & Intel Xeon Gold 6230 (80) @ 3.900GHz & 8 \\
+        GPU         & NVIDIA Tesla V100-SXM2-32GB & 2 \\      
+        Memmory     & 772643MiB & - \\
+        OS          & Ubuntu 22.04.3 LTS x86\_64 & - \\
+        \bottomrule
+    \end{tabular}
+    \caption{ Hardware used for experiments }
+    \label{tab:hardware}
+\end{table}
+
+Regarding to the used notation, the models that follow the segment-then-IPM pipeline to obtain BEV semantic masks are referred to as \texttt{raw2seg\_bev}, while those that first apply IPM and then perform segmentation are named \texttt{raw2bev\_seg}.
+
+The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for $20.7K$ steps without applying any regularization technique. This initial experiment was performed to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/overfitting_bev_nu.png}
+    \caption{Training and evaluation loss of raw2seg\_bev and raw2bev\_seg MiT-b0 models without any regularization technique}
+    \label{fig:overfitting_mit-b0}
+\end{figure}
+
+As shown in Figure~\ref{fig:overfitting_mit-b0}, both models showed clear signs of overfitting. While the training loss continued to decrease continuously, the validation loss began to increase, indicating a lack of generalization and failure to converge. These results highlight the importance of introducing regularization techniques even for small model sizes. Additionally, no signs of exploding gradients were observed during the training of these models. 
+
+Two main approaches were selected to tackle the overfitting problem: weight decay (also known as L2 regularization) and data augmentation. Weight decay penalizes large weights during training, and makes the model more robust and less prone to memorizing irrelevant details; while data augmentation techniques introduces variability in the training dataset enabling the model to adapt better to unseen data. However, the introduction of data augmentation techniques into \aclink{BEV} images domain is not trivial and raises another research question wich is tackled in Section~\ref{sec:data_augmentation}.
+
+It is also important to highlight the difference in metrics between the two models. Even though the backbone and training hyperparameters remain the same, there is a noticeable difference in both the loss values and the \aclink{mIoU} between the models. This difference is primarily due to the fact that the evaluation datasets differ. Specifically, the approach that segments the image first and then reprojects it is evaluated using semantic masks in the camera view, while the approach that first reprojects images into \aclink{BEV} and then performs segmentation is evaluated using masks directly in the \aclink{BEV} domain.
+
+This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_evaluation}, where the model \texttt{raw2segbev\_mit-b0\_v0.3} is evaluated on the test set twice: once using semantic masks in the camera domain and once using \aclink{BEV} masks. The figure displays the per-class \aclink{mIoU} for all the semantic categories the model was trained on, and two main observations emerge.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.2_new_test_evaluation.png}
+    \caption{Model evaluated with normal and BEV images}
+    \label{fig:normal_vs_bev_evaluation}
+\end{figure}
+
+First, there's a clear imbalance in performance between dominant classes such as \texttt{background} and \texttt{flat.driveable\_area}, and the remaining, less frequent classes. Many of the minority classes show extremely low or even zero \aclink{IoU} scores. This is partly due to the inherent class imbalance in the dataset: some semantic classes have no annotated pixels at all (see Appendix~\ref{appendix:OLDatasets} for more details).
+
+Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to 15 meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
+
+All these factors lead to a lower total number of pixels in the BEV dataset. As a result, each misclassified pixel has a greater impact on the overall evaluation, making errors more costly and consequently lowering the average performance metrics.
+
+To address this, many training methods use class weighting in the loss function to penalize misclassifications of minority classes more heavily than those of majority classes. However, in this particular project, it is not essential to maintain all class distinctions provided by the dataset. Therefore, we investigate whether merging semantic classes can help mitigate the effects of class imbalance.
+
+With all of this in place, the training strategy is designed to support experimentation in order to answer three main research questions:
+
+\begin{itemize}
+    \item \textit{Does the label's merging strategy helps increasing the model's performance on the low presence classes?}
+    \item \textit{Which data augmentation technique is more effective for trainig a model directly on \aclink{BEV} images on a semantic segmentation task?}
+    \item \textit{Which of the two approaches performs better for BEV driveable area segmentation?}
+\end{itemize}
+
+\hl{Mention the used hyperparameters for training the models.}
+
+\subsubsection{Merging labels} \label{sec:merging_labels}
+As previously discussed, to improve model performance on the dataset’s minority classes, a semantic label merging strategy was applied. This approach combines less represented semantic classes into more general, representative categories. Notably, this same merging strategy was already used in the annotation pipeline, so it was incorporated during training using the same look-up table of merging rules described in Table 3. The training and evaluation scripts were adapted accordingly to apply the merging rules consistently.
+
+Table~\ref{tab:merging_comparison_bev} shows the results of two models trained with camera-perspective images and evaluated on the same test set using \aclink{BEV} masks. Model A was trained using the full set of original semantic classes, while Model B was trained using the merged classes, thereby reducing the total number of labels. 
+
+In general, the results indicate that both models achieve comparable performance on the majority classes, specifically \texttt{background} and \texttt{flat.driveable\_surface}. However, a significant difference is observed in the minority classes, where Model B outperforms Model A across all evaluation metrics. This suggests that simplifying the semantic space does not decrease the model's ability to identify important instances and, instead, it reduces the penalty from underrepresented classes. Additionally, by reducing the number of classes, the overall average of the metrics improves as it avoids dilution from irrelevant or sparsely populated classes. This makes label merging especially useful in cases where fine-grained segmentation isn't necessary and consistency across the whole model is more important.
+
+\begin{table}[h]
+    \centering
+    \tiny
+    \begin{tabular}{llcccc}
+    \toprule
+    \textbf{Merged Class} & \textbf{Original Label} & \textbf{mIoU A} & \textbf{mIoU B} & \textbf{mF1 A} & \textbf{mF1 B} \\
+    \midrule
+    background & background & 0.97 & 0.97 & 0.99 & 0.99 \\
+    \midrule
+    animal & animal & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \midrule
+    human.pedestrian.adult & human.pedestrian.adult & 0.07 & 0.08 & 0.09 & 0.11 \\
+     & human.pedestrian.child & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.construction\_worker & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.personal\_mobility & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.police\_officer & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.stroller & 0.00 & - & 0.00 & - \\
+     & human.pedestrian.wheelchair & 0.00 & - & 0.00 & - \\
+    \midrule
+    movable\_object.barrier & movable\_object.barrier & 0.08 & 0.14 & 0.09 & 0.17 \\
+     & movable\_object.debris & 0.00 & - & 0.00 & - \\
+     & movable\_object.pushable\_pullable & 0.00 & - & 0.00 & - \\
+     & movable\_object.trafficcone & 0.08 & - & 0.10 & - \\
+     & static\_object.bicycle\_rack & 0.00 & - & 0.00 & - \\
+    \midrule
+    vehicle.car & vehicle.bus.bendy & 0.00 & - & 0.00 & - \\
+     & vehicle.bus.rigid & 0.02 & - & 0.03 & - \\
+     & vehicle.car & 0.30 & 0.38 & 0.33 & 0.42 \\
+     & vehicle.construction & 0.01 & - & 0.01 & - \\
+     & vehicle.emergency.ambulance & 0.00 & - & 0.00 & - \\
+     & vehicle.emergency.police & 0.00 & - & 0.00 & - \\
+     & vehicle.trailer & 0.00 & - & 0.00 & - \\
+     & vehicle.truck & 0.08 & - & 0.09 & - \\
+    \midrule
+    vehicle.ego & vehicle.ego & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \midrule
+    vehicle.motorcycle & vehicle.bicycle & 0.02 & - & 0.02 & - \\
+     & vehicle.motorcycle & 0.04 & 0.06 & 0.05 & 0.07 \\
+    \midrule
+    flat.driveable\_surface & flat.driveable\_surface & 0.94 & 0.94 & 0.97 & 0.97 \\
+    \bottomrule
+     & & 0.10 & 0.32 & 0.11 & 0.34 \\
+    \bottomrule
+    \end{tabular}
+    \caption{Per-class metric comparison between Model A and merged Model B evaluated with BEV images}
+    \label{tab:merging_comparison_bev}
+\end{table}
+    
+
+
+
+\subsubsection{Data augmentation} \label{sec:data_augmentation}
+Data augmentations are commonly used in deep learning models to mitigate overfitting during training and improve model generalization. There exists multiple types of data augmentation on the image domain: from pixel-based transformations, such as color space modifications, histogram equalization or filtering operations; to geometric transformations, including translations, rotations, shearings and homographies. These techniques have been widely applied in computer vision tasks and have shown to enhance model performance. However, performing data augmentation in \aclink{BEV} is not an easy task, as \aclink{IPM} images are already homographies of camera images, resulting in inherent distorsions.
+
+Filtering operations can be applied to both standard and \aclink{BEV} images but geometric transformations were selected as the primary data augmentation method for camera domain images following the strategies employed in training the SegFormer model \cite{segformer}. Accordingly, random resizing, random cropping, and horizontal flipping were chosen as augmentation operations for perspective images.
+
+Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image may lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure~\ref{fig:bev_cropping}). 
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c c c}
+
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_0_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_1_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_2_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_3_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_4_bev.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_5_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_6_bev.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/mini/mini_7_bev.png} \\ 
+        
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_0_9.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_1_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_2_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_3_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_4_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_5_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_6_1.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_image_7_2.png} \\ 
+
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_0_9.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_1_2.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_2_5.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_3_5.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_4_3.png} & 
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_5_2.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_6_1.png} &
+        \includegraphics[width=0.12\textwidth]{images/methodology/data_augmentations/bev_crop_mask_7_2.png} \\
+
+    \end{tabular}
+    
+    \caption{Random cropping and horizontal flipping on BEV images. Original BEV images on first row; random flipped and cropped images on second row and corresponding semantic masks on last row.}
+    \label{fig:bev_cropping}
+\end{figure}
+
+In this context, a different approach was also considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique may enable the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure~\ref{fig:bev_data_aug}).
+
+\begin{figure}[h]
+    \centering
+    % Row labels
+    \setlength{\tabcolsep}{1pt}  % Reduce column padding
+    \renewcommand{\arraystretch}{0.5}
+    \begin{tabular}{c c c c c c}
+        & $-0.25$ rad & $-0.125$ rad & $0.0$ rad & $0.125$ rad & $0.25$ rad \\ 
+        
+        \rotatebox{90}{\textbf{Yaw}} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rx_0.25_4.png} \\ 
+        
+        \rotatebox{90}{\textbf{Pitch}} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/rz_0.25_4.png} \\ 
+
+        \rotatebox{90}{\textbf{Roll}} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_-0.25_0.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_-0.125_1.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.0_2.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.125_3.png} & 
+        \includegraphics[width=0.15\textwidth]{images/methodology/data_augmentations/ry_0.25_4.png} \\ 
+        
+    \end{tabular}
+    
+    \caption{Effect of camera transformations on BEV projection. The first row shows variations in the yaw axes, the second in pitch, and the third in roll.}
+    \label{fig:bev_data_aug}
+\end{figure}
+
+
+This section has a dual purpose. First, the effect of applying geometric transformations to camera-perspective images as data augmetation strategy for training a traditional segmentation model in order to mitigate overfitting is studied. Second, the effectiveness of two described techniques for performing data augmentation on \aclink{BEV} images is explored: applying the same geometric augmentations used for regular images, or modifying the camera's extrinsic parameters before performing the projections.
+
+Therefore, the introduction of data augmentation strategies such as random cropping, horizontal flipping, and rescaling on regular images significantly reduces overfitting, as shown in Figure~\ref{fig:normal_before_after_data_aug_logs}. This reduction in overfitting allows for longer training periods and improves model performance on the evaluation set, leading to convergence at higher \aclink{mIoU} values. This effect is also reflected in the evaluation of the models on the test set, where the model with data augmentation presents higher \aclink{mIoU} than the model affected by overfitting.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/nor_before_after_data_aug_logs.png}
+    \caption{Before and after regularization techniques on models trained with camera-domain images}
+    \label{fig:normal_before_after_data_aug_logs}
+\end{figure}
+
+Secondly, the Figure~\ref{fig:bev_before_after_data_aug_logs} shows the trainig process graph for the three models trained with \aclink{BEV} images and reveals some significant differences. The first model, without any data augmentation, exhibits notable overfitting. In contrast, both data augmentation strategies, the traditional geometric augmentations (random flipping, random cropping, and rescaling) and the custom strategy of modifying the camera's extrinsic parameters, seems to partially reduce this overfitting.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_logs.png}
+    \caption{Training logs of models with BEV data augmentation techniques}
+    \label{fig:bev_before_after_data_aug_logs}
+\end{figure}
+
+Focusing on the model employing traditional data augmentation techniques on the BEV images, the training error is generally higher, and the training and validation error curves remain closely aligned with a considerably lower mIoU on the validation set compared to the other two models. This pattern suggests potential underfitting. This observation appears to support the initial hypothesis that directly applying traditional image augmentations to BEV representations might not provide the model with sufficiently informative variations for effective training in this specific domain.
+
+On the other hand, the model trained with the extrinsic's data augmentation strategy shows less overfitting than the model without any data augmentation technique. This allows for more extended training and achieves superior results on the validation set, outperforming the overfitted model. 
+
+Overall, the findings from the validation set suggest that the custom data augmentation techniques for BEV images offer better performance than directly applying traditional augmentations. However, it is crucial to examine the models' performance on the unseen test set. Figure~\ref{fig:bev_before_after_data_aug_test} illustrates this evaluation, revealing that the performance difference between the three models is not as substantial in reality. While the model trained with extrinsic's parameters modification shows slightly better results, the performance gap between the other two models is less clear, with the model using traditional data augmentation on BEV images occasionally surpassing the overfitted model in vehicle-related classes.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_test.png}
+    \caption{Different data augmentation stategies evaluated with BEV images.}
+    \label{fig:bev_before_after_data_aug_test}
+\end{figure}
+
+\subsubsection{raw2seg\_bev vs raw2bev\_seg}
+The Table~\ref{tab:model_comparison} shows a comparative analysis of semantic segmentation performance across different models, categorized into two distinct \aclink{BEV} mask generation pipelines: "\aclink{IPM} Then Segmenting" and "Segmenting Then \aclink{IPM}". Values represent the \aclink{mIoU} for the merged semantic classes (Section~\ref{sec:merging_labels}), with "Mean" indicating the average \aclink{mIoU} across all displayed classes for each model. Also, models are categorized by their architecture (MiT-B0, MiT-B2, MiT-B4) and the used data augmentation technique (O: No data augmentation, overfitted model; N: Normal data augmentation; E: Camera's extrinsic parameters modification)
+
+\begin{table}[h]
+    \centering
+
+    \begin{threeparttable}
+        \tiny
+        \newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+        \begin{tabular}{l | C{0.7cm} C{1.3cm} C{1cm} C{1.2cm} C{1cm} C{0.7cm} C{0.7cm} C{1.3cm} | c}
+            \toprule
+            \textbf{Model} & \textbf{animal} & \textbf{background} & \textbf{\makecell{flat.\\driveable\\\textunderscore surface}} & \textbf{\makecell{human.\\pedestrian.\\adult}} & \textbf{\makecell{movable\\\textunderscore object.\\barrier}} & \textbf{\makecell{vehicle.\\car}} & \textbf{\makecell{vehicle.\\ego}} & \textbf{\makecell{vehicle.\\motorcycle}} & \textbf{Mean} \\
+            \midrule
+
+            \multicolumn{10}{l}{\textbf{IPM Then Segmenting}} \\
+            \midrule
+            \multirow{1}{*}{\text{MiT-B0 O}}  & 0.00 & 0.97 & 0.93 & 0.04 & 0.14 & 0.32 & 0.00 & 0.04 & 0.30 \\
+            \multirow{1}{*}{\text{MiT-B0 E}}  & 0.00 & 0.97 & 0.94 & 0.04 & 0.14 & 0.34 & 0.00 & 0.04 & 0.31 \\
+            \multirow{1}{*}{\text{MiT-B2 E}}  & 0.00 & 0.97 & 0.95 & 0.05 & 0.17 & 0.36 & 0.00 & 0.05 & 0.32 \\
+            \multirow{1}{*}{\text{MiT-B4 E}}  & 0.00 & 0.98 & 0.95 & 0.06 & 0.17 & 0.36 & 0.00 & 0.06 & 0.32 \\
+            \multirow{1}{*}{\text{MiT-B0 N}}  & 0.00 & 0.97 & 0.94 & 0.03 & 0.14 & 0.32 & 0.00 & 0.03 & 0.30 \\
+            \multirow{1}{*}{\text{MiT-B2 N}}  & 0.00 & 0.97 & 0.94 & 0.04 & 0.15 & 0.33 & 0.00 & 0.04 & 0.31 \\
+            \multirow{1}{*}{\text{MiT-B4 N}}  & 0.00 & 0.97 & 0.94 & 0.05 & 0.14 & 0.33 & 0.00 & 0.04 & 0.31 \\
+            \midrule[1pt]
+
+            \multicolumn{10}{l}{\textbf{Segmenting Then IPM}} \\
+            \midrule
+            \multirow{1}{*}{\text{MiT-B0 O}}  & 0.00 & 0.97 & 0.94 & 0.08 & 0.14 & 0.38 & 0.00 & 0.06 & 0.32 \\
+            \multirow{1}{*}{\text{MiT-B0 N}}  & 0.00 & 0.98 & 0.95 & 0.09 & 0.18 & 0.45 & 0.00 & 0.06 & 0.34 \\
+            \multirow{1}{*}{\text{MiT-B2 N}}  & 0.00 & 0.98 & \textbf{0.95} & \textbf{0.11} & \textbf{0.20} & \textbf{0.48} & 0.00 & 0.08 & \textbf{0.35} \\
+            \multirow{1}{*}{\text{MiT-B4 N}}  & 0.00 & \textbf{0.98} & 0.95 & 0.11 & 0.20 & 0.47 & 0.00 & \textbf{0.08} & 0.35 \\
+            \bottomrule
+        \end{tabular}
+
+    
+        % Notas de tabla
+        \begin{tablenotes} 
+            \item[] O: Overfitted. N: Normal. E: Extrinsic.
+        \end{tablenotes}
+    \end{threeparttable} 
+
+
+    \caption{Models comparison.}
+    \label{tab:model_comparison}
+\end{table}
+
+A direct comparison of the two pipelines reveals a clear advantage for "Segmenting Then IPM." This approach, which segments in the original perspective before reprojecting to BEV, consistently achieves higher overall mean mIoU values, ranging from 0.32 to a peak of 0.35. In contrast, the "IPM Then Segmenting" pipeline, where images are transformed to BEV prior to segmentation, yields lower mean mIoU scores, typically between 0.30 and 0.32 across all models. This suggests that performing semantic segmentation in the native image space before projection is generally more effective for preserving information crucial to accuracy.
+
+Delving into class-wise performance highlights key strengths and weaknesses for both methodologies. Both pipelines excel in segmenting background and flat.driveable\_surface, consistently achieving very high mIoU scores, often above 0.90. The "Segmenting Then IPM" pipeline further solidifies its lead in these robust classes, with the MiT-B4 N model achieving an impressive 0.98 for background, marking it as the top performer across all configurations. Crucially, a consistent mIoU of 0.00 is observed for animal and vehicle.ego across all models and both pipelines. This specific zero performance is not indicative of a model or pipeline failure, but rather, as confirmed by external context, stems from insufficient pixel representation for these categories within the dataset itself, fundamentally limiting the models' ability to learn or evaluate them effectively.
+
+Beyond these high-performing or data-limited classes, the "Segmenting Then IPM" pipeline demonstrates significant improvements in categories that posed greater challenges for its counterpart. human.pedestrian.adult notably sees its mIoU more than double to 0.11 (MiT-B2 N and MiT-B4 N), a substantial gain. Similarly, movable\_object.barrier and vehicle.car experience marked increases, with vehicle.car achieving a peak of 0.48 by MiT-B2 N (the highest score for any model in this class across all tested configurations). While still a very low score, vehicle.motorcycle also shows modest improvement, reaching 0.08 with MiT-B4 N in this more effective pipeline. These improvements suggest that preserving detailed object features and context from the original image view is particularly beneficial for more complex and often smaller or less consistently represented objects in BEV.
+
+Regarding model architecture and training state, a subtle trend of increasing performance is observed with larger MiT models (from B0 to B4) within each pipeline, though these gains are generally marginal compared to the impact of the pipeline choice itself. Within the "Segmenting Then IPM" group, the MiT-B2 N model stands out as the best overall performer, achieving the highest mean mIoU of 0.35 and leading in several critical classes including flat.driveable\_surface, human.pedestrian.adult, movable\_object.barrier, and vehicle.car. This comprehensive analysis underscores the critical influence of the BEV transformation strategy on semantic segmentation accuracy, highlighting that segmenting in the native image space prior to reprojection is a more effective approach for achieving robust results across a diverse range of semantic classes.
+
+
+\subsection{Annotation evaluation}
+\hl{Explain the selected scene, the two experiments carried out and their results.}
+
+
