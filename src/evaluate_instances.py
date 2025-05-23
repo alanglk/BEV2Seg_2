@@ -1677,14 +1677,22 @@ if __name__ == "__main__":
     parser.add_argument('scene_path', type=str, help="Path to the scene. This path must have the 'generated' folder and the 'scene' folder with the 'detections_openlabel.json' file that has the ground truth and annotated detections")
     parser.add_argument('save_path', type=str, help="Output .pkl path")
     
+    parser.add_argument('--gen_bev_masks', action='store_true', help="If passed ground truth occupancy-occlusion-driveable masks will be generated in scene folder")
+    parser.add_argument('--save_openlabel_path', type=str, default=None, help="If set, the associated OpenLABEL will be saved")
     parser.add_argument('--semantic_types', nargs="+", default=["vehicle.car"], help="List of semantic types to consider")
     parser.add_argument('--ignoring_names', nargs="+", default=["ego_vehicle"], help="List of object names to ignore")
-    parser.add_argument('--save_openlabel_path', type=str, default=None, help="If set, the associated openlabel will be saved")
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
     args = parser.parse_args()
     
+    check_paths([args.scene_path])
+
     openlabel_path = os.path.join(args.scene_path, 'scene', 'detections_openlabel.json')
-    gt_occ_bev_masks_path = os.path.join(args.scene_path, 'generated', 'gt_occ_bev_mask')
+    gt_occ_bev_masks_path = None
+    if args.gen_bev_masks:
+        gt_occ_bev_masks_path = os.path.join(args.scene_path, 'generated', 'gt_occ_bev_mask')
+        if not os.path.exists(gt_occ_bev_masks_path):
+            print(f"Folder '{gt_occ_bev_masks_path}' doesn't exist. Creating it now...")
+            os.makedirs(gt_occ_bev_masks_path, exist_ok=True)
     
     main(openlabel_path=openlabel_path, 
          save_data_path=args.save_path,
@@ -1695,7 +1703,7 @@ if __name__ == "__main__":
          max_association_distance=3.0,
          association_dist_type='v2v',
          save_openlabel_path=None, 
-         debug=False, 
+         debug=args.debug, 
          debug_ego_model_path=None)
     exit()
 

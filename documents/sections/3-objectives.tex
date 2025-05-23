@@ -1,0 +1,21 @@
+% ================================================
+% =                 OBJECTIVES                   =
+% ================================================ 
+
+This master's thesis aims to address key challenges in \aclink{BEV} semantic segmentation and its practical applications within autonomous driving systems. While initially motivated by the investigation of optimal BEV segmentation strategies, this work also explores a tangible real-world application of these techniques.
+
+Respectively, the main objectives of this thesis are:
+
+\begin{enumerate}
+    \item \textbf{Evaluate \aclink{BEV} segmentation strategies performance for planar elements:} To empirically determine whether a semantic segmentation model directly trained on \aclink{BEV} images outperforms a traditional pipeline that involves segmentation in image space followed by \aclink{IPM} reprojection, specifically focusing on the segmentation of planar elements. In addressing this primary question, other crucial sub-questions are also investigated:
+        \begin{itemize}
+            \item \textbf{Asses label merging impact:} To evaluate if merging semantically similar labels during training can enhance model performance, parcularly for low-presence classes in \aclink{BEV} images.
+            \item \textbf{Identify effective data augmentation:} To determine which data augmentation techniques are most effective for training semantic segmentation models directly on \aclink{BEV} images.
+        \end{itemize}
+    \item \textbf{Develop a \aclink{BEV} scene annotation pipeline:} To implement a practical application of \aclink{BEV} semantic segmentation by creating an automated pipeline for generating occupancy, occlusion, and drivable area masks from vehicular scenes. This directly addresses the need for real-world utility of \aclink{BEV} semantic masks for downstream tasks such as motion planning and dynamic obstacle handling.
+\end{enumerate}
+
+To achieve the stated objectives, this master's thesis relied on a diverse set of software tools and hardware resources for dataset generation, model training and validation, and annotation pipeline implementation. Python was the main programming language used for most of the custom implementations. Docker was extensively used for software packaging and environment consistency, facilitating interactions with a High-Performance Computing system for model training and enabling the creation of automated systems essential for annotation generation. Furthermore, various visualization tools such as WebLABEL and Open3D were employed to support development and analysis throughout the project.
+
+This project was conducted over a seven-month period at Vicomtech  \footnote{\url{https://www.vicomtech.org/en/}}. Vicomtech, is a research center in applied Artificial Intelligence, VisualComputing, and Interaction which provided the necessary hardware infrastructure and technical support for this thesis.
+

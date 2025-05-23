@@ -794,7 +794,7 @@ def main(scene_path:str, camera_name:str='CAM_FRONT'):
     vcd.load_from_file(scene_openlabel_path)
 
     # BEV Params
-    raw2segmodel_path       = "models/segformer_nu_formatted/raw2seg_bev_mit-b0_v0.2"
+    raw2segmodel_path       = "models/segformer_nu_formatted/raw2segbev_mit-b0_v0.2"
     raw_seg2bev = Raw2Seg_BEV(raw2segmodel_path, None, device=None)
     raw_seg2bev.set_openlabel(vcd)
 
