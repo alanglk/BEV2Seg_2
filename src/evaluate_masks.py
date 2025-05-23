@@ -57,6 +57,7 @@ def get_eval_mask_paths(folder_path: str, base_pattern: str = 'dt_occ_mask') -> 
             paths[frame_key] = os.path.join(folder_path, file_name)
     return paths
 
+from src.evaluate_instances import get_gt_dt_inf
 
 def main(scene_path:str,
          output_path:str,

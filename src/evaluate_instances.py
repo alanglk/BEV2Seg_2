@@ -54,6 +54,10 @@ class FramePresence(TypedDict):
 class AnnotationInfo(TypedDict):
     objects: Dict[str, ObjInfo] # Semantic-type - ObjInfo
     frame_presence: Dict[int, FramePresence] # frame num - FramePresence
+class TurningDataType(TypedDict):
+    turning_flag: bool
+    pos: Tuple[float, float, float]
+    ypr: Tuple[float, float, float]
 
 def get_gt_dt_inf(all_objects:ObjInfo, selected_types:List[str]=None, ignoring_names:List[str]=None, filter_out:bool = False) -> Tuple[AnnotationInfo, AnnotationInfo]:
     """
@@ -567,6 +571,62 @@ def get_occlusion_polys(objs_data:dict,
     cv2.imwrite(gt_ras_mask_colored_path, bev_mask_colored)
     
     return bev_mask, bev_mask_colored
+
+
+def get_turning_data(vcd:core.OpenLABEL, lane_data:dict) -> Dict[int, TurningDataType]:
+        lane_multipoly = []
+        for k in lane_data.keys():
+            if not 'object_data' in lane_data[k]:
+                continue # Basura que se ha colado supongo
+            # Solo hay un poly3d
+            assert len(lane_data[k]['object_data']['poly3d']) == 1 
+            poly3d_data = lane_data[k]['object_data']['poly3d'][0]
+            assert 'closed' in poly3d_data and 'val' in poly3d_data and 'name' in poly3d_data
+            assert poly3d_data['name'] == 'polygon' 
+            if not poly3d_data['closed'] == True:
+                continue # No es un polígono cerrado  
+            
+            # TODO: Error aquí
+            poly3d_vals = np.array(poly3d_data['val'])[:, 2:]
+            lane_poly       = Polygon(poly3d_vals)
+            lane_multipoly.append((lane_poly, False)) # lane_poly, Intersects with vehicle
+        
+        # Distinguis turning and normal areas
+        turning_dict:Dict[int, TurningDataType]     = {}
+        plot_positions:List[Tuple[float, float]]    = []
+        frame_keys = vcd.data['openlabel']['frames'].keys()
+        for fk in frame_keys:
+            frame_properties = vcd.get_frame(frame_num=fk)['frame_properties']
+            frame_odometry  = frame_properties['transforms']['vehicle-iso8855_to_odom']['odometry_xyzypr']
+            pos             =  frame_odometry[:3]
+            ypr             = frame_odometry[3:]
+            
+            plot_positions.append( (pos[0], pos[1]) )
+
+            # Check which lanes instersects with vehicle trajectory
+            for i in range(len(lane_multipoly)):
+                if lane_multipoly[i][0].intersects(Point(pos[0], pos[1], pos[2])):
+                    lane_multipoly[i][1] = True
+
+
+            # TODO: Complete this
+            is_turning = False
+
+            turning_dict[0] = TurningDataType(turning_flag=is_turning, pos=list(pos), ypr=list(ypr))
+
+        # Get only lanes that intersects with the vehicle trajectory
+        lane_multipoly = [lane for lane, intersects_with_vehicle in lane_multipoly if intersects_with_vehicle]
+        lane_multipoly = MultiPolygon(lane_multipoly)
+
+        
+        # Plot the map with turning info
+        plot_positions = np.array(plot_positions)
+        xs, ys = plot_positions[:, 0], plot_positions[:, 1]
+
+        fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+        plot_ray_polys(lane_multipoly, "#ffc065", label="driveable", ax=ax)
+        ax.plot(xs, ys, marker="x", color = "blue")
+        plt.show()
 
 def rotate_3d(points, angles):
     """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
@@ -1507,6 +1567,7 @@ def main(
     model_config = metadata['model_config']
 
     # Evaluation params
+    # TODO: Remove this comment
     # assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
     eval_name                   = metadata['scene_name']
     camera_name                 = model_config['scene']['camera_name']
@@ -1571,6 +1632,11 @@ def main(
     if merge_semantic_labels_flag:
         gt_objs_inf = merge_semantic_labels(gt_objs_inf) # Merge semantic labes as was made to custom detections
         dt_objs_inf = merge_semantic_labels(dt_objs_inf) # It does nothing (in theory)
+
+
+    # Get Turning or not Information dict
+    turning_data = get_turning_data(vcd, lane_data=gt_lanes)
+    exit()
 
     # Debug init
     global _renderer, _debug, _debug_3d, _debug_plt
