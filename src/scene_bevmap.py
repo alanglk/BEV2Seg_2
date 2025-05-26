@@ -184,9 +184,13 @@ def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:i
             return vcd
 
 
-def main(config:dict):   
+def main(scene_path:str):
+    # BEVMap scene config
+    config_path = os.path.join(scene_path, "config.toml")
+    config = load_config(config_path)
+
     # Params   
-    scene_path                  = config['scene']['scene_path']
+    assert scene_path == config['scene']['scene_path'], f"Scene path in 'config.toml' doesnt match actual scene_path"
     camera_name                 = config['scene']['camera_name']
 
     raw2segmodel_path           = config['semantic']['raw2segmodel_path']
@@ -432,18 +436,12 @@ def main(config:dict):
     
 
 if __name__ == "__main__":
-
-    
-    # CUDA_VISIBLE_DEVICES=7 python3 src/scene_bevmap.py ./config/my_scene.toml
+    # CUDA_VISIBLE_DEVICES=7 python3 src/scene_bevmap.py ./tmp/my_scene
     
     # Definir los argumentos
     parser = argparse.ArgumentParser(description="Scene BEV Map")
-    parser.add_argument('config_file', type=str, help='Configuration toml file for generating the scene')
+    parser.add_argument('scene_path', type=str, help="Path to the scene. This path must have the 'config.toml' and 'original_openlabel.json' files and the 'scene' folder")
     args = parser.parse_args()
     
-    # BEVMap scene config
-    config_path = args.config_file
-    config = load_config(config_path)
-
     # Run scene generation
-    main(config)
+    main(args.scene_path)
