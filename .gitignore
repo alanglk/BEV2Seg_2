@@ -16,6 +16,8 @@ tmp/
 /models/**/overfitted*/
 /models/**/checkpoint*/
 
+/data/eval_debug/
+
 *.mp4
 *.gz
 *.tar
