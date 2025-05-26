@@ -647,7 +647,10 @@ def get_turning_data(vcd:core.OpenLABEL,
             turning_dict[fk] = TurningDataType(turning_flag=is_turning, pos=list(pos), ypr=list(ypr))
             prev_yaw = current_yaw
         
-        
+        global _debug_plt
+        if not  _debug_plt:
+            return turning_dict
+
         # Plotting!!!!
         plot_positions:List[Tuple[float, float]]    = []
         plot_turning_color: List[str] = []
@@ -1058,6 +1061,7 @@ def _debug_clear_plt(frame_num:int):
         ax1 = _plt_figure.add_subplot(2, 2, 1)
         _plt_axes.append(ax1)
         ax2 = _plt_figure.add_subplot(2, 2, 2)
+        ax2.axis('off')
         _plt_axes.append(ax2)
         ax3 = _plt_figure.add_subplot(2, 2, 3, projection='3d', proj_type = 'ortho', elev=30, azim=-80)
         _plt_axes.append(ax3)
@@ -1610,6 +1614,8 @@ def main(
         debug_ego_model_path:str=None
         ):
 
+    
+
     # Check wheter the file exists
     check_paths([openlabel_path])
     if save_openlabel_path is not None:
@@ -1621,6 +1627,14 @@ def main(
     
     if gt_occ_bev_masks_path is not None:
         check_paths([gt_occ_bev_masks_path])
+
+    # Debug init
+    global _renderer, _debug, _debug_3d, _debug_plt
+    _debug = debug
+    if _debug:
+        _debug_3d = True
+        _debug_plt = True
+        print(f"[DEBUG] Debugging evaluation of 3d intances -> _debug_3d: {_debug_3d}, _debug_plt: {_debug_plt}")
 
     # Load OpenLABEL
     vcd = core.OpenLABEL()
@@ -1708,12 +1722,6 @@ def main(
     turning_data = get_turning_data(vcd, lane_data=gt_lanes, WINDOW_SIZE_FRAMES=WINDOW_SIZE_FRAMES, TURNING_THRESHOLD=TURNING_THRESHOLD)
     print(f"Turning flags: {[v['turning_flag'] for _, v in turning_data.items()]}")
 
-    # Debug init
-    global _renderer, _debug, _debug_3d, _debug_plt
-    _debug = debug
-    _debug_3d = False
-    _debug_plt = False
-
     # Main loop
     frame_keys = vcd.data['openlabel']['frames'].keys()
     for fk in tqdm(frame_keys, desc="frames"):
@@ -1758,7 +1766,7 @@ def main(
             if _debug:
                 
                 if _debug_plt:
-                    # debug_show_cost_matrix(padded_cost_matrix, assignments, gt_in_uids, dt_in_uids, tp, fk)
+                    debug_show_cost_matrix(padded_cost_matrix, assignments, gt_in_uids, dt_in_uids, tp, fk)
                     _debug_show_plt()
 
                 # Render 3d scene
@@ -1803,9 +1811,10 @@ def main(
         vcd.save(save_openlabel_path)
     
     # Save evaluation data
-    print(f"Saving data in {save_data_path}...")
-    with open(save_data_path, "wb") as f:
-        pickle.dump(data, f)
+    if not _debug:
+        print(f"Saving data in {save_data_path}...")
+        with open(save_data_path, "wb") as f:
+            pickle.dump(data, f)
     
 
 if __name__ == "__main__":   
