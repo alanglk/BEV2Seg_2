@@ -185,12 +185,16 @@ def annotate_cuboids_on_vcd(instance_pcds:dict, vcd: core.OpenLABEL, frame_num:i
 
 
 def main(scene_path:str):
+    scene_name = os.path.basename(scene_path)
+    
     # BEVMap scene config
-    config_path = os.path.join(scene_path, "config.toml")
+    config_path = os.path.join(scene_path, f"{scene_name}.toml")
     config = load_config(config_path)
 
     # Params   
-    assert scene_path == config['scene']['scene_path'], f"Scene path in 'config.toml' doesnt match actual scene_path"
+    assert scene_path == config['scene']['scene_path'], f"Scene path in 'config.toml' ({config['scene']['scene_path']}) doesnt match actual scene_path ({scene_path})"
+    assert scene_name == metadata['scene_name'], f"Scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
+    
     camera_name                 = config['scene']['camera_name']
 
     raw2segmodel_path           = config['semantic']['raw2segmodel_path']
@@ -223,9 +227,7 @@ def main(scene_path:str):
     scene = scl.Scene(vcd=vcd)
     frame_keys = vcd.data['openlabel']['frames'].keys()
     metadata = vcd.get_metadata()
-    scene_name = os.path.basename(scene_path)
-    assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
-    
+
     # Save model_config in metadata:
     vcd.add_metadata_properties({'model_config': config})
 
