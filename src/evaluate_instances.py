@@ -1601,6 +1601,7 @@ data = {
 }
 """
 def main(
+        scene_path:str,
         openlabel_path:str,
         save_data_path:str,
         semantic_types: List[str],
@@ -1617,13 +1618,12 @@ def main(
     
 
     # Check wheter the file exists
-    check_paths([openlabel_path])
+    check_paths([scene_path, openlabel_path])
     if save_openlabel_path is not None:
         check_paths([save_openlabel_path])
         save_openlabel_path = os.path.abspath(save_openlabel_path)
-    scene_path = os.path.abspath(os.path.dirname(openlabel_path))
-    scene_name = os.path.basename(scene_path)
-    save_data_path = os.path.abspath(save_data_path)
+    scene_name      = os.path.basename(scene_path)
+    save_data_path  = os.path.abspath(save_data_path)
     
     if gt_occ_bev_masks_path is not None:
         check_paths([gt_occ_bev_masks_path])
@@ -1649,7 +1649,6 @@ def main(
     model_config = metadata['model_config']
 
     # Evaluation params
-    # TODO: Remove this comment
     assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
     eval_name                   = metadata['scene_name']
     camera_name                 = model_config['scene']['camera_name']
@@ -1839,7 +1838,8 @@ if __name__ == "__main__":
             print(f"Folder '{gt_occ_bev_masks_path}' doesn't exist. Creating it now...")
             os.makedirs(gt_occ_bev_masks_path, exist_ok=True)
     
-    main(openlabel_path=openlabel_path, 
+    main(scene_path=args.scene_path,
+         openlabel_path=openlabel_path, 
          save_data_path=args.save_path,
          gt_occ_bev_masks_path=gt_occ_bev_masks_path,
          semantic_types=args.semantic_types,
