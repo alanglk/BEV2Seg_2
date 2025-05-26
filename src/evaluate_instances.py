@@ -10,6 +10,7 @@ from src.bev2seg_2 import BEV2SEG_2_Interface
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.patches import Patch
 import seaborn as sns
 
 import open3d as o3d
@@ -29,10 +30,11 @@ from scipy.spatial import Delaunay
 import rasterio
 from rasterio import features
 
+from collections import deque
 import copy
 
 from tqdm import tqdm
-from typing import TypedDict, Dict, List, Tuple
+from typing import TypedDict, Dict, List, Tuple, Optional
 import argparse
 import pickle
 import json
@@ -395,12 +397,13 @@ def create_multipolygon(rays_points:np.ndarray, js, ks, eps:float=0.5, label="",
         if poly.is_valid:
             polygons.append(poly)
     return MultiPolygon(polygons)
-def plot_ray_polys(multipolygon:MultiPolygon, color:str, label:str = "", ax:Axes = None):
+def plot_ray_polys(multipolygon: MultiPolygon, color: str, ax: plt.Axes = None):
+    if ax is None:
+        ax = plt.gca() # Get current axes if not provided
     for poly in multipolygon.geoms:
         fx, fy = poly.exterior.xy
-        plt.plot(fx, fy, color=color)
-        plt.fill(fx, fy, color=color, alpha=0.3, label=label)
-
+        ax.plot(fx, fy, color=color, linewidth=1, zorder=0) # Plot boundary line
+        ax.fill(fx, fy, color=color, alpha=0.3, zorder=0) # Fill area
 def rasterize_shapely(geometry:int, width:int, height:int, x_range:Tuple[float], y_range:Tuple[float]):
     """
     Rasteriza una geometría de Shapely (Polygon o MultiPolygon) en un array numpy.
@@ -558,7 +561,7 @@ def get_occlusion_polys(objs_data:dict,
     plt.scatter(occuped_points[0],  occuped_points[1],  s=0.5, color="red", label="intersection")
     plt.scatter(occluded_points[0], occluded_points[1], s=0.5, color="black", label="occlusion")
     # plot_ray_polys(MultiPolygon(lane_multipoly), "#ffc065", label="driveable")
-    plot_ray_polys(visible_polys, "blue", label = "visible poly")
+    plot_ray_polys(visible_polys, "blue")
     plot_ray_polys(occuped_polys, "red")
     plot_ray_polys(occluded_polys, "black")
     # plt.legend()
@@ -572,8 +575,20 @@ def get_occlusion_polys(objs_data:dict,
     
     return bev_mask, bev_mask_colored
 
+def get_turning_data(vcd:core.OpenLABEL, 
+                     lane_data:dict,
+                     WINDOW_SIZE_FRAMES:int=5,
+                     TURNING_THRESHOLD:float = np.deg2rad(5.0),
+                     map_color:str       = "#FF9800",
+                     straight_color:str  = "#00A697",
+                     turning_color:str   = "#C00071"
+                     ) -> Dict[int, TurningDataType]:
+        """
+        Number of frames to look back (e.g., 5 frames = 0.5 seconds at 10Hz)
+        Yaw change threshold over the window -> e.g., 10 degrees change over 0.5 seconds (5 frames)
+        """
 
-def get_turning_data(vcd:core.OpenLABEL, lane_data:dict) -> Dict[int, TurningDataType]:
+        # Get lanes that intersects with vehicle's trajectory
         lane_multipoly = []
         for k in lane_data.keys():
             if not 'object_data' in lane_data[k]:
@@ -586,22 +601,25 @@ def get_turning_data(vcd:core.OpenLABEL, lane_data:dict) -> Dict[int, TurningDat
             if not poly3d_data['closed'] == True:
                 continue # No es un polígono cerrado  
             
-            # TODO: Error aquí
-            poly3d_vals = np.array(poly3d_data['val'])[:, 2:]
-            lane_poly       = Polygon(poly3d_vals)
-            lane_multipoly.append((lane_poly, False)) # lane_poly, Intersects with vehicle
+            poly3d_vals     = np.array(poly3d_data['val'])
+            N               = poly3d_vals.size // 3 # 3 axis as it is a 3D poly
+            poly3d_vals_Nx3 = poly3d_vals.reshape((N, 3))
+            lane_vals       = poly3d_vals_Nx3[:, :2]
+            lane_poly       = Polygon(lane_vals)
+            lane_multipoly.append([lane_poly, False]) # lane_poly, Intersects with vehicle
         
         # Distinguis turning and normal areas
         turning_dict:Dict[int, TurningDataType]     = {}
-        plot_positions:List[Tuple[float, float]]    = []
+        prev_yaw: Optional[float] = None # Stores the yaw from the previous frame (in radians)
+        recent_yaw_diffs: deque[float] = deque(maxlen=WINDOW_SIZE_FRAMES)
+
         frame_keys = vcd.data['openlabel']['frames'].keys()
         for fk in frame_keys:
             frame_properties = vcd.get_frame(frame_num=fk)['frame_properties']
             frame_odometry  = frame_properties['transforms']['vehicle-iso8855_to_odom']['odometry_xyzypr']
             pos             =  frame_odometry[:3]
             ypr             = frame_odometry[3:]
-            
-            plot_positions.append( (pos[0], pos[1]) )
+            current_yaw = ypr[0]
 
             # Check which lanes instersects with vehicle trajectory
             for i in range(len(lane_multipoly)):
@@ -611,22 +629,72 @@ def get_turning_data(vcd:core.OpenLABEL, lane_data:dict) -> Dict[int, TurningDat
 
             # TODO: Complete this
             is_turning = False
+            if prev_yaw is not None:
+                yaw_diff = current_yaw - prev_yaw
+                # Normalize angle difference to be within -pi to pi radians
+                # This handles wrap-around from approx +pi to -pi correctly.
+                # math.fmod(x, y) returns x % y, but handles negative x correctly.
+                # The result of (x + pi) % (2*pi) - pi will be in (-pi, pi]
+                normalized_yaw_diff = np.fmod(yaw_diff + np.pi, 2 * np.pi) - np.pi
+                recent_yaw_diffs.append(normalized_yaw_diff)
 
-            turning_dict[0] = TurningDataType(turning_flag=is_turning, pos=list(pos), ypr=list(ypr))
+                # Only start detecting turns once we have enough data in the window
+                if len(recent_yaw_diffs) == WINDOW_SIZE_FRAMES:
+                    average_yaw_rate = sum(recent_yaw_diffs) / WINDOW_SIZE_FRAMES
+                    if abs(average_yaw_rate) > TURNING_THRESHOLD:
+                        is_turning = True
+
+            turning_dict[fk] = TurningDataType(turning_flag=is_turning, pos=list(pos), ypr=list(ypr))
+            prev_yaw = current_yaw
+        
+        
+        # Plotting!!!!
+        plot_positions:List[Tuple[float, float]]    = []
+        plot_turning_color: List[str] = []
+        for k, v in turning_dict.items():
+            plot_positions.append((v['pos'][0], v['pos'][1]))
+            if v['turning_flag']:
+                plot_turning_color.append(turning_color)
+            else:
+                plot_turning_color.append(straight_color)
+
 
         # Get only lanes that intersects with the vehicle trajectory
         lane_multipoly = [lane for lane, intersects_with_vehicle in lane_multipoly if intersects_with_vehicle]
         lane_multipoly = MultiPolygon(lane_multipoly)
 
+        # Change xs for ys
+        rotated_lane_polys = []
+        for poly in lane_multipoly.geoms:
+            rotated_coords = [(y, x) for x, y in poly.exterior.coords]
+            rotated_lane_polys.append(Polygon(rotated_coords))
+        lane_multipoly = MultiPolygon(rotated_lane_polys)
         
         # Plot the map with turning info
         plot_positions = np.array(plot_positions)
-        xs, ys = plot_positions[:, 0], plot_positions[:, 1]
+        xs, ys = plot_positions[:, 1], plot_positions[:, 0]
 
         fig, ax = plt.subplots(1, 1, figsize=(12, 12))
-        plot_ray_polys(lane_multipoly, "#ffc065", label="driveable", ax=ax)
-        ax.plot(xs, ys, marker="x", color = "blue")
+        plot_ray_polys(lane_multipoly, map_color, ax=ax)
+        
+        for i in range(len(xs) - 1):
+            # Plot the line segment from current point to next point
+            ax.plot(xs[i:i+2], ys[i:i+2], color=plot_turning_color[i], linewidth=2, zorder=1)
+            # Plot the marker at the current point
+            ax.plot(xs[i], ys[i], marker="x", color=plot_turning_color[i], markersize=8, zorder=2) 
+        if len(xs) > 0:
+            # Ensure the last point also has a marker, as the loop only goes up to the second-to-last
+            ax.plot(xs[-1], ys[-1], marker="x", color=plot_turning_color[-1], markersize=8, zorder=2)
+        
+        ax.invert_xaxis()
+        ax.set_aspect('equal', adjustable='box')
+        map_patch = Patch(color=map_color, alpha=0.3, label='Lane') # Use the same alpha as in fill
+        straight_line   = plt.Line2D([0], [0], color=straight_color, linewidth=2, linestyle='-', marker='x')
+        turning_line    = plt.Line2D([0], [0], color=turning_color, linewidth=2, linestyle='-', marker='x')
+        ax.legend([map_patch, straight_line, turning_line], ['Lane', 'Straight', 'Turning'], loc='best')
         plt.show()
+
+        return turning_dict
 
 def rotate_3d(points, angles):
     """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
@@ -1568,7 +1636,7 @@ def main(
 
     # Evaluation params
     # TODO: Remove this comment
-    # assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
+    assert scene_name == metadata['scene_name'], f"scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
     eval_name                   = metadata['scene_name']
     camera_name                 = model_config['scene']['camera_name']
     merge_semantic_labels_flag  = model_config['semantic']['merge_semantic_labels_flag'] # True
@@ -1635,8 +1703,10 @@ def main(
 
 
     # Get Turning or not Information dict
-    turning_data = get_turning_data(vcd, lane_data=gt_lanes)
-    exit()
+    WINDOW_SIZE_FRAMES = 5
+    TURNING_THRESHOLD =  np.deg2rad(5)
+    turning_data = get_turning_data(vcd, lane_data=gt_lanes, WINDOW_SIZE_FRAMES=WINDOW_SIZE_FRAMES, TURNING_THRESHOLD=TURNING_THRESHOLD)
+    print(f"Turning flags: {[v['turning_flag'] for _, v in turning_data.items()]}")
 
     # Debug init
     global _renderer, _debug, _debug_3d, _debug_plt
@@ -1683,7 +1753,7 @@ def main(
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
             
             _tp, _fp, _fn, _dd, _ded, _IoU_v, _v2v_dist, _bbd = compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids) 
-            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'ded':_ded, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd } }
+            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'ded':_ded, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd }, 'turning_data':turning_data[fk] }
 
             if _debug:
                 
