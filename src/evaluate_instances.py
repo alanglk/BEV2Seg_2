@@ -41,6 +41,11 @@ import json
 import sys
 import os
 
+
+WINDOW_SIZE_FRAMES = 5
+TURNING_THRESHOLD =  np.deg2rad(5.0)
+RELATIVE_ROTATION_THRESHOLD = np.deg2rad(15.0)
+
 def check_paths(paths: List[str]):
     for path in paths:
         if not os.path.exists(path):
@@ -626,8 +631,6 @@ def get_turning_data(vcd:core.OpenLABEL,
                 if lane_multipoly[i][0].intersects(Point(pos[0], pos[1], pos[2])):
                     lane_multipoly[i][1] = True
 
-
-            # TODO: Complete this
             is_turning = False
             if prev_yaw is not None:
                 yaw_diff = current_yaw - prev_yaw
@@ -698,6 +701,30 @@ def get_turning_data(vcd:core.OpenLABEL,
         plt.show()
 
         return turning_dict
+
+def get_relative_rotation_from_ego(objs_data:dict, objs_uids:list, vcd:core.OpenLABEL, frame_num:int, rotation_treshold:float) -> dict:
+    obj_rel_rotation = {}
+    for i in range(len(objs_data)):
+        assert i in range(len(objs_uids))
+
+        frame_properties = vcd.get_frame(frame_num=frame_num)['frame_properties']
+        frame_odometry  = frame_properties['transforms']['vehicle-iso8855_to_odom']['odometry_xyzypr']
+        v_pos             = frame_odometry[:3]
+        v_ypr             = frame_odometry[3:]
+
+        assert objs_data[i]['coordinate_system'] == 'odom', f"annotated object coord frame {objs_data[i]['coordinate_system']} is not 'odom'"
+        bbox = objs_data[i]['val'] # [ x, y, z, rx, ry, rz, sx, sy, sz ]
+        
+        b_uid = objs_uids[i]
+        b_pos = [ bbox[0], bbox[1], bbox[2] ]
+        b_rot = [ bbox[3], bbox[4], bbox[5] ]
+        b_siz = [ bbox[6], bbox[7], bbox[8] ]
+        
+        yaw_diff = np.abs(v_ypr[0] - b_rot[2]) # yaw - rz
+        rotated = yaw_diff > rotation_treshold
+        obj_rel_rotation[b_uid] = {'pos': b_pos, 'rot': b_rot, 'size': b_siz, 'yaw_diff':yaw_diff, 'rotated': rotated}
+        
+    return obj_rel_rotation
 
 def rotate_3d(points, angles):
     """ Rotate a set of 3D points (Nx3) by angles (rx, ry, rz) (radians) around the origin """
@@ -1440,6 +1467,9 @@ class Debug3DRenderer:
         self.ego_vehicle_bbox.R = r_3x3
         ego_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(self.ego_vehicle_bbox)
         ego_set.paint_uniform_color(self.ego_bbox_color)
+        
+        ego_axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=ego_center)
+        ego_axis.rotate(r_3x3)
 
         if self.ego_mesh is not None:
             ego_mesh = copy.deepcopy(self.ego_mesh)
@@ -1450,6 +1480,7 @@ class Debug3DRenderer:
             self.vis.add_geometry(ego_mesh)
 
         self.vis.add_geometry(ego_set)
+        self.vis.add_geometry(ego_axis)
 
         # Configurar la cámara para mirar hacia abajo (mirada top-down)
         self.ctr.set_zoom(0.2)  
@@ -1664,7 +1695,7 @@ def main(
     
     # Create data dict for saving evaluation data
     data = {}
-    if os.path.exists(save_data_path):
+    if os.path.exists(save_data_path) and not _debug:
         print(f"Loading evaluation data from: {save_data_path}")
         with open(save_data_path, "rb") as f:
             data = pickle.load(f)
@@ -1716,8 +1747,6 @@ def main(
 
 
     # Get Turning or not Information dict
-    WINDOW_SIZE_FRAMES = 5
-    TURNING_THRESHOLD =  np.deg2rad(5)
     turning_data = get_turning_data(vcd, lane_data=gt_lanes, WINDOW_SIZE_FRAMES=WINDOW_SIZE_FRAMES, TURNING_THRESHOLD=TURNING_THRESHOLD)
     print(f"Turning flags: {[v['turning_flag'] for _, v in turning_data.items()]}")
 
@@ -1754,13 +1783,14 @@ def main(
 
             if gt_occ_bev_masks_path is not None:
                 bev_mask, bev_mask_colored = get_occlusion_polys(gt_in_objs_data, gt_lanes, scene=scene, fov_coord_sys=camera_name, frame_num=fk, ray_max_distance=40.0, h_sp=0.01, gt_occ_bev_masks_path=gt_occ_bev_masks_path)
-
+            
+            objects_relative_rotation = get_relative_rotation_from_ego(gt_in_objs_data, gt_in_uids, vcd=vcd, rotation_treshold=RELATIVE_ROTATION_THRESHOLD, frame_num=fk)
 
             cost_matrix = get_cost_matrix(gt_in_objs_data, dt_in_objs_data, scene=scene, frame_num=fk, dist_type=association_dist_type)
             padded_cost_matrix, assignments = assign_detections_to_ground_truth(cost_matrix, max_association_distance=max_association_distance)
             
             _tp, _fp, _fn, _dd, _ded, _IoU_v, _v2v_dist, _bbd = compute_3d_detection_metrics(gt_in_objs_data, dt_in_objs_data, assignments, cost_matrix, scene=scene, frame_num=fk, gt_uids=gt_in_uids, dt_uids=dt_in_uids) 
-            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'ded':_ded, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd }, 'turning_data':turning_data[fk] }
+            data[eval_name]['frames'][fk][tp] = { 'gt_uids': gt_in_uids, 'dt_uids': dt_in_uids, 'assignments':assignments, 'metrics':{ 'tp': _tp, 'fp': _fp, 'fn': _fn, 'dd':_dd, 'ded':_ded, 'IoU_v': _IoU_v, 'v2v_dist': _v2v_dist, 'bbd': _bbd }, 'gt_rel_rotation': objects_relative_rotation, 'vehicle_turning_data':turning_data[fk] }
 
             if _debug:
                 
