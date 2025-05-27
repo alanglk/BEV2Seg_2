@@ -307,6 +307,16 @@ This comprehensive analysis underscores the critical influence of the BEV transf
 \subsection{Annotation evaluation}
 \hl{Explain the selected scene, the two experiments carried out and their results.}
 
+- Explicar escena seleccionada
+- Explicar parámetros de evaluación 3D (fov distance...)
+- Explicar asignaciones (un pequeño análisis de los true positives, false positives y false negatives)
+- Explicar el caso de la diferencia absoluta en dimensiones (agrupando por alineación con la cámara)
+- Introducir BBD para identificar outliers y demás (hay que hacer un análisis sencillo)
+- Explicar el caso del objeto 129 que tiene una oclusion parcial siendo únicamente visible la parte superior del vehículo haciendo que el error en el eje vertical sea muy superior a las otras dimensiones
+- Explicar el caso 154 en el que se refleja muy bien como cuando el vehículo está alineado con la cámara el eje que peor se estima es el de profundidad, mientras que cuando el objeto rota estos ejes cambian. Esto demuestra de forma clara la limitación del sistema de utilizar AABB.
+
+
+
 
 \begin{figure}[h!]
     \centering
