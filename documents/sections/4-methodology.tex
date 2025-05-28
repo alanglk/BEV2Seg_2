@@ -565,7 +565,7 @@ These distinct cases are illustrated in Figure~\ref{fig:bbox_disparity}.
 
 On the other hand, to evaluate the error in the estimation of the detected object's dimensions, the absolute difference between the dimensions of the predicted and ground truth cuboids along each axis (length, width, and height) has been considered. This allows for the analysis of which dimension exhibits the greatest error and under what conditions.
 
-The evaluation process begins by defining the spatial region in which the detections produced by the pipeline will be considered. Since the system is capable of generating predictions at distances greater than those actually used for producing the \aclink{BEV} occupancy and occlusion masks, the evaluation range is restricted to the same area used for generating those masks. Specifically, this involves projecting the camera's field of view onto the ground plane and limiting the maximum detection distance to 15 meters. As a result, only the predictions and ground truth elements that fall within this projected polygon at a given time frame are included in the evaluation.
+The evaluation process begins by defining the spatial region in which the detections produced by the pipeline will be considered. Since the system is capable of generating predictions at distances greater than those actually used for producing the \aclink{BEV} occupancy and occlusion masks, the evaluation range is restricted to the same area used for generating those masks. Specifically, this involves projecting the camera's field of view onto the ground plane and limiting the maximum detection distance to $30$ meters. As a result, only the predictions and ground truth elements that fall within this projected polygon at a given time frame are included in the evaluation.
 
 Then, the matching between predictions and ground truth is performed, formalized as a Linear Sum Assignment Problem (LSAP) and solved using the Hungarian algorithm. Because of this, the cost matrix is initially calculated as the v2v distance between all ground truth and prediction instances.  However, unlike a standard LSAP, this implementation incorporates a maximum distance threshold for valid assignments. Detections with no sufficiently close ground truth counterparts are removed before solving the LSAP, and the cost matrix is padded to a square shape. Finally, assignments exceeding the distance threshold are discarded after the LSAP solution, ensuring only meaningful matches are retained. 
 \hl{Maybe it is interesting to add an Appendix about this}
@@ -573,18 +573,18 @@ Then, the matching between predictions and ground truth is performed, formalized
 Finally, the following metrics are calculated:
 \begin{itemize}
     \item \textbf{TP/FP/FN}: Computed from prediction-ground truth associations.
-    \item \textbf{DD}: Volume difference between associated cuboids.
-    \item \textbf{DED}: Absolute difference per axis (length, width, height).
-    \item \textbf{v2v}: Minimum distance between convex hulls.
-    \item \textbf{IoU}: 3D intersection-over-union.
-    \item \textbf{BBD}: Dissimilarity metric for overlapping/non-overlapping boxes.
+    \item \textbf{DD}: Volume difference between associated cuboids. % Diference in Dimensions
+    \item \textbf{DED}: Absolute difference per axis (length, width, height). % Difference in Each Dimension 
+    \item \textbf{v2v}: Minimum distance between convex hulls. % Volume-Volume Distance
+    \item \textbf{IoU}: 3D intersection-over-union. % Volumetric IoU
+    \item \textbf{BBD}: Dissimilarity metric for overlapping/non-overlapping boxes. % Bounding Box Disparity
 \end{itemize}
 
 
 \subsubsubsection{BEV masks evaluation}
 To evaluate the occupancy, occlusion, and drivable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
 
-This algorithm calculates camera viewing angles along the $\hat{x}_c$ axis to define $N$ rays. A step length $h$ is also defined, which determines the intervals at which each ray will sample points to classify them as visible, occluded, or belonging to an occupied area. All rays originate from the camera coordinate frame and are subsequently transformed to the vehicle's coordinate frame as it is the coordinate system in which the \aclink{BEV} masks are generated (see Section\ref{sec:BEVDataset}).
+This algorithm calculates camera viewing angles along the $\hat{x}_c$ axis to define $N$ rays. A step length $h$ is also defined, which determines the intervals at which each ray will sample points to classify them as visible, occluded, or belonging to an occupied area. All rays originate from the camera coordinate frame and are subsequently transformed to the vehicle's coordinate frame as it is the coordinate system in which the \aclink{BEV} masks are generated (see Section~\ref{sec:BEVDataset}).
 
 Once these rays and their corresponding check points are established in the \aclink{BEV} mask coordinate frame, the point classification process begins. An iteration process goes through camera-visible objects (also transformed to the vehicle coordinate frame) and check if the base of the object's bounding box contains each ray's point. Here, three outcomes are possible: no intersection, indicating a visible point; intersection, classifying the point as occupied; or no current intersection but a previous intersection along the same ray, resulting in occlusion classification.
 

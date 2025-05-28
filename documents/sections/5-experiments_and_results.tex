@@ -54,7 +54,7 @@ This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_e
 
 First, there's a clear imbalance in performance between dominant classes such as \texttt{background} and \texttt{flat.driveable\_area}, and the remaining, less frequent classes. Many of the minority classes show extremely low or even zero \aclink{IoU} scores. This is partly due to the inherent class imbalance in the dataset: some semantic classes have no annotated pixels at all (see Appendix~\ref{appendix:OLDatasets} for more details).
 
-Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to 15 meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
+Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to $30$ meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
 
 All these factors lead to a lower total number of pixels in the BEV dataset. As a result, each misclassified pixel has a greater impact on the overall evaluation, making errors more costly and consequently lowering the average performance metrics.
 
@@ -305,54 +305,59 @@ This comprehensive analysis underscores the critical influence of the BEV transf
 
 
 \subsection{Annotation evaluation}
-\hl{Explain the selected scene, the two experiments carried out and their results.}
-
-- Explicar escena seleccionada
-- Explicar parámetros de evaluación 3D (fov distance...)
-- Explicar asignaciones (un pequeño análisis de los true positives, false positives y false negatives)
-- Explicar el caso de la diferencia absoluta en dimensiones (agrupando por alineación con la cámara)
-- Introducir BBD para identificar outliers y demás (hay que hacer un análisis sencillo)
-- Explicar el caso del objeto 129 que tiene una oclusion parcial siendo únicamente visible la parte superior del vehículo haciendo que el error en el eje vertical sea muy superior a las otras dimensiones
-- Explicar el caso 154 en el que se refleja muy bien como cuando el vehículo está alineado con la cámara el eje que peor se estima es el de profundidad, mientras que cuando el objeto rota estos ejes cambian. Esto demuestra de forma clara la limitación del sistema de utilizar AABB.
-
-
-
+For the pipeline's evaluation, NuScenes scene 'scene-0061' \footnote{\url{https://youtu.be/4gkyUWSZUkg?si=y5D9iybgzkv37Bko}} was used. This scene, captured in 'singapore-onenorth', includes object annotations, map data, and odometry at 2Hz for a total of 39 frames. The scene features a parked truck, a construction area, an intersection requiring a left turn, and the ego-vehicle following a van. The ego-vehicle's path is shown in Figure~\ref{fig:scene_ego_path}.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./images/experiments/ground_truth_turning_5deg.png}
-    \caption{Scene turning map}
-    \label{fig:scene_turning_map}
+    \caption{Scene ego-vehicle's route}
+    \label{fig:scene_ego_path}
 \end{figure}
 
 
-\begin{table}[h!]
-    \centering
-    \begin{tabular}{|c|c|c|c|}
-    \hline
-     & DED-x & DED-y & DED-z \\
-    \hline
-    Mean metrics & 3.06 & 0.99 & 0.83 \\
-    \hline
-    \end{tabular}
-    \caption{All frames means}
-    \label{tab:sadkjfhaslkjd}
-\end{table}
 
 \begin{table}[h!]
     \centering
-    \begin{tabular}{|c|c|c|c|}
-    \hline
-    & DED-x & DED-y & DED-z \\
-    \hline
-    Aligned & 2.34 & 0.43 & 0.27 \\
-    \hline
-    Not aligned & 3.32 & 1.20 & 1.03 \\
-    \hline
+    \begin{tabular}{|l|c|c|c|}
+        \hline
+        \textbf{Category} & \textbf{DED-x (m)} & \textbf{DED-y (m)} & \textbf{DED-z (m)} \\
+        \hline
+        
+        \multicolumn{4}{|l|}{\textbf{Overall Mean}} \\
+        \hline
+        All Objects & 3.06 & 0.99 & 0.83 \\
+        \hline
+
+        \multicolumn{4}{|l|}{\textbf{Metrics Grouped by Alignment}} \\
+        \hline
+        Aligned Objects & 2.34 & 0.43 & 0.27 \\
+        Non-Aligned Objects & 3.32 & 1.20 & 1.03 \\
+        
+        \hline
     \end{tabular}
-    \caption{Metrics grouped by alignment}
-    \label{tab:dsfadsaf}
+    \begin{tablenotes}
+        \item[] DED: Difference in Each Dimension. Metrics are in meters.
+    \end{tablenotes}
+    \caption{Mean Dimensional Error Differences (DED) for 3D Object Detections}
+    \label{tab:combined_ded_metrics}
 \end{table}
 
 
-    
+
+
+
+
+\hl{Complete this bullet points.}
+\begin{itemize}
+    \item Explicar escena seleccionada
+    \item Explicar parámetros de evaluación 3D (fov distance...)
+    \item Explicar asignaciones (un pequeño análisis de los true positives, false positives y false negatives)
+    \item Explicar el caso de la diferencia absoluta en dimensiones (agrupando por alineación con la cámara)
+    \item Introducir BBD para identificar outliers y demás (hay que hacer un análisis sencillo)
+    \item Explicar el caso del objeto 129 que tiene una oclusion parcial siendo únicamente visible la parte superior del vehículo haciendo que el error en el eje vertical sea muy superior a las otras dimensiones
+    \item Explicar el caso 154 en el que se refleja muy bien como cuando el vehículo está alineado con la cámara el eje que peor se estima es el de profundidad, mientras que cuando el objeto rota estos ejes cambian. Esto demuestra de forma clara la limitación del sistema de utilizar AABB.
+\end{itemize}
+
+
+
+

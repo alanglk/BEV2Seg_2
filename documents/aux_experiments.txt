@@ -1,6 +1,6 @@
 ¿Se ha explicado qué es una máscara semántica?
 
-[3.1.3 Validation and comparison]
+[4.1.3 Validation and comparison]
 
 A la hora de validar y comparar distintos modelos de segmentación es fundamental utilizar una base de datos común y emplear métricas adecuadas que permitan evaluar el rendimiento de forma cuantitativa y objetiva. El primer requisito se garantiza mediante el uso del conjunto de test del dataset, el cual no ha sido previamente expuesto a los modelos a comparar, asegurando así una evaluación imparcial y representativa de su capacidad de generalización.
 
@@ -18,7 +18,7 @@ Con todo esto se ha elegido mean intersection over union como la métrica princi
 
 
 
-[4.1 Después de las medidas propuestas para solucionar el overfitting]
+[5.1 Después de las medidas propuestas para solucionar el overfitting]
 
 Además, es importante destacar la diferencia de métricas entre los dos modelos. A pesar de que el backbone y los hiperparámetros de entrenamiento se hayan mantenido iguales, es notoria la diferencia en los losses y mean intersection over union que presentan ambos modelos. Esto se debe principalmente a que los datasets de evaluación son distintos ya que el approach de segmentar primero una imagen para luego reproyectarla se evalúa con máscaras semánticas en el dominio de la cámara, mientras que el approach de reproyectar imágenees y luego segmentar se evalua directamente con máscaras en BEV.
 
@@ -33,7 +33,7 @@ Todos estos factores hacen que la cantidad total de píxeles sea menor en el con
 Para solucionar esto, muchos métodos de entrenamiento emplean pesos asociados a cada clase para que a la hora de computar el loss en cada iteración del entrenamiento el efecto de cometer un error en la predicción de una clase minoritaria sea sustancialmente superior al predecir mal una clase mayoritaria. Sin embargo, debido a la naturaleza del proyecto, no es necesario tener una segmentación en clases tan precisas como las que proporciona el dataset, por lo que se ha decidido explorar si al realizar un merge de las clases semánticas se minimiza el efecto del desbalanceo de las clases.
 
 
-[4.1.1 Merging labels]
+[5.1.1 Merging labels]
 Como se ha comentado, con el fin de mejorar el rendimiento de los modelos en las clases minoritarias del dataset se ha decidido hacer un merge de las clases semánticas en clases más representativas. Esta estrategia es la mima en la empleada en el pipeline de anotación implementado, por lo que se ha decidido implementarlo en tiempo de entrenamiento utilizando el mismo conjunto look up table de reglas de merging semánticos de labels que el descrito el la tabla 3 adaptando los scripts de entrenamiento y evaluación para considerar el merging look up table.
 
 En la Figura X se presentan los resultados comparativos de dos modelos evaluados sobre el mismo conjunto de test con máscaras en vista BEV. El Modelo A ha sido entrenado con todas las clases semánticas originales, mientras que el Modelo B utiliza la estrategia de merging, reduciendo así el número total de clases consideradas. Los resultados muestran que, en algunas clases específicas, el Modelo A logra un mayor valor de Intersection over Union (IoU); sin embargo, en esos mismos casos, el F1-score (o Dice coefficient) del Modelo B suele mantenerse similar o incluso mejorar ligeramente.
@@ -42,7 +42,7 @@ La diferencia más significativa entre las métricas de las clases corresponde a
 
 
 
-[4.1.2 Sustituye al With the inclusion of...]
+[5.1.2 Sustituye al With the inclusion of...]
 
 Se puede observar que con la inclusión de las técnicas de regularización descritas para imágenes normales y BEV, el overfitting de los modelos ha sido reducido de forma significativa permitiendo entrenamientos más largos. Sin embargo, a pesar de que estas técnicas de regularización permiten que el loss en el conjunto de validación continúe descendiendo y permite mejorar el mean intersection over union de los modelos entrenados con imágenes normales, los resultados de mIoU de las imágenes BEV son ligeramente inferiores a los obtenidos con el modelo overfiteado. Esto puede deberse a que los conjuntos de validación y de test tienen el mismo tamaño (un 10% del conjunto total cada uno) estando compuestos por muy pocas imágenes (al rededor de 1600 cada uno). Al partir ambos del mismo conjunto inicial y compartir la misma distribución, puede darse el caso de que el overfitting en validación afecte al conjunto de test al no presentar una variabilidad significativa respecto al conjunto de validación. Esto puede explicar el porqué aquellas clases mayoritarias presentan mejores resultados con los modelos overfiteados tanto en imágenes normales como en BEV (ver Figura fusionada de RAW-SEG-BEV y RAW-BEV-SEG para todas las clases).
 
@@ -51,7 +51,7 @@ NECESITO LOS LOGS DE raw2bevseg_mit-b0_v0.5 y reentrenar raw2bevseg_mit-b0_v0.4 
 
 
 
-[3.2.5.1 3D detections evaluation]
+[4.2.5.1 3D detections evaluation]
 
 Como se ha comentado anteriormente, el objetivo final del pipeline de anotación es el de generar máscaras de ocupación, oclusión y área conducible. Para realizar esto se toman máscaras semánticas del entorno tanto en el dominio de la cámara como en vista BEV y se realiza un proceso intermedio de detección 3D de objetos a partir de imágenes monoculares en el dominio de la cámara con el fin de estimar las dimensiones de los obstáculos. Esta detección 3D se realiza con algoritmos de clustering de nubes de puntos y resulta de especial interés el medir cómo de precisas son estas detecciones.
 
@@ -148,13 +148,13 @@ Estas métricas permiten evaluar de manera más precisa y adaptada la calidad de
 
 
 
-[3.2.5.2 BEV masks evaluation]
+[4.2.5.2 BEV masks evaluation]
 
 Para evaluar las máscaras de ocupación, oclusión y área conducible es necesario generar un ground truth con el que comparar la salida del pipeline de anotación. Para ello
 
 
 
-[4.1.2 Data Augmentations]
+[5.1.2 Data Augmentations]
 
 El objetivo de esta sección es dual. Por el lado de la estrategia de entrenar los modelos de segmentacion semántica con imágenes en el dominio de la cámara, se quiere comprobar el efecto de aplicar las transformaciones geométricas como método de data augmentation technique para ver si se reduce el overfitting. Y, por otro lado, se quiere explorar cual de las dos técnicas descritas es mejor para realizar data augmentations de imágenes BEV: si el aplicar las mismas aumentaciones de datos que las geométricas para imágenes normales o realizar una modificación de los parámetros extrínsecos de la cámara antes de realizar las proyecciones.
 
@@ -168,7 +168,39 @@ Por otro lado, el modelo entrenado con la estrategia de aumento de datos persona
 
 
 
-[4.1.3 Raw2SegBEV vs Raw2BEVSeg]
+[5.1.3 Raw2SegBEV vs Raw2BEVSeg]
+
+
+
+
+
+
+[5.2 Annotation evaluation]
+
+Para realizar la evaluación del pipeline se ha tomado una escena anotada de NuScenes. Concretamente es la escena 'scene-0061', que tiene anotaciones de objetos, el mapa y odometría cada 2Hz sumando un total de 39 frames anotados. Concretamente, esta escena está capturada en 'singapore onenorth' y <introducir descripción de la escena> (Parked truck, construction, intersection, turn left, following a van). El tramo que realiza el ego.vehicle es el que se muestra en la Figura X.
+
+El vehículo comienza al lado de un camión que es visible por la cámara frontal durante los 4 primeros frames (siendo que en el cuarto solo se visualiza una pequeña esquina del camión). Además, en el segundo frame de la escena ya se visualiza un vehículo en el carril derecho y a partir del tercer frame se comienza a visualizar la furgoneta que toma la salida de la izquierda y que el ego vehicle seguirá hasta el final de la escena. Durante todo el tramo se producen varias oclusiones y visualizaciones parciales de los objetos, por lo que es una situación lo suficientemente representativa como para evaluar el output del pipeline y comprobar los puntos fuertes y carencias del mismo.
+
+Por otro lado, cada objeto de la escena, tanto anotaciones del ground truth como las detecciones realizadas, cuentan con un identificador único y, además, como se especificó en la Sección X, el proceso de evaluación realiza una asociación entre las detecciones y los objetos anotados, resultando en que por cada frame existe un número variable de métricas obtenidas (cada métrica se obtiene entre par anotación ground-truth y detección pipeline).
+
+Las medias de las métricas calculadas se toman entre todas las asociaciones evaluadas y todos los frames de la escena y están representadas en la Tabla X. Además, en esta tabla también se muestran las métricas de los objetos y frames pero agrupadas por su alineación con la cámara frontal del vehículo. Esta agrupación se calcula considerando la diferencia en el yaw angle entre los objetos anotados del ground truth y la orientación del vehículo. Si esta diferencia en ángulos sobrepasa los 15 grados, se considera que el objeto no está alineado con la cámara frontal.
+
+Si atendemos a la media total de la diferencia en dimensiones por cada uno de los ejes, comprobamos que el eje X tiene un índice de error notablemente superior a los ejes Y y Z del sistema de coordenadas del vehículo. Siendo que el eje X en el sistema de coordenadas del vehículo se corresponde con el eje de profundidad de la cámara, este hecho parece corresponderse a que la estimación del depht de los objetos es bastante inferior a la estimación del alto y ancho. Esto además se refuerza con las medias agrupadas por alineación con la cámara o no: los objetos alineados con la cámara destacan por tener un error en la estimación de profundidad notablemente superior mientras que las estimaciones de alto y ancho se ajustan bastante al ground truth (medias de 43cm y 27cm en los errores de estimación de anchura y altura respectivamente ); mientras que aquellos objetos que no se alinean con la cámara tienen índices de error superiores no solo en profundidad si no que en todos los ejes. Este hecho refleja la sobre-estimación del footprint en ancho y profundidad cuando los objetos no se alinean con la cámara como se muestra en el caso particular de la Figura X. Sin embargo, en este último caso, cabría esperar que el error en altura se mantuviera más o menos similar a pesar de que la alineación del objeto con la cámara no se diera, ya que la altura debería de mantenerse similar (el objeto solo está desalineado con rotación en el eje Z). Para ello, se ha realizado un análisis con más detalle atendiendo a las métricas de cada uno de los objetos del ground truth para los que se han realizado detecciones. 
+
+Los casos más destacables que reflejan distintos aspectos del funcionamiento del sistema de anotación para la estimación de las dimensiones de objetos son los casos del camión aparcado al inicio de la escena (con id 41); la furgoneta que se mantiene delante del ego-vehicle (que tiene el id 154) y una excavadora que se encuentra parada a la mitad de la curva de la escena (id 129) (ver Figura X en la que se encuentran representados estos tres objetos). La evolucion de los errores en las estimaciones de dimensiones de los objetos por cada frame se pueden observar en la Figura X, donde además aparece representada en una barra horizontal si en el frame actual el objeto está alineado con la cámara o no.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
