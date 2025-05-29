@@ -19,7 +19,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}", // Esto ejecuta el archivo que esté abierto
-            "args": ["config/scene-0061.toml"],
+            "args": ["./tmp/scene-0061", "./data/pipeline_3d_evaluations.pkl", "--debug"],
             // "args": ["data/class_balance.json"],
             // "args": ["config/segformer_nu.toml"],
             "console": "integratedTerminal",

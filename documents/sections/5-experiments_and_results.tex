@@ -314,29 +314,48 @@ For the pipeline's evaluation, NuScenes scene 'scene-0061' \footnote{\url{https:
     \label{fig:scene_ego_path}
 \end{figure}
 
-
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{|l|c|c|}
+    \hline
+    \multicolumn{1}{|c|}{} & \multicolumn{2}{c|}{\textbf{Predicted}} \\
+    \cline{2-3}
+     & Positive & Negative \\
+    \hline
+    \textbf{Actual Positive} & 92 (TP) & 15 (FN) \\
+    \hline
+    \textbf{Actual Negative} & 23 (FP) & 0 (TN) \\
+    \hline
+    \end{tabular}
+    \caption{True positives, False positives and False negatives}
+    \label{tab:scene_confusion_matrix}
+\end{table}
 
 \begin{table}[h!]
     \centering
     \begin{tabular}{|l|c|c|c|}
         \hline
+        % \textbf{Category} & \textbf{BBD} & \textbf{DED-x (m)} & \textbf{DED-y (m)} & \textbf{DED-z (m)} \\
         \textbf{Category} & \textbf{DED-x (m)} & \textbf{DED-y (m)} & \textbf{DED-z (m)} \\
         \hline
         
         \multicolumn{4}{|l|}{\textbf{Overall Mean}} \\
         \hline
+        % All Objects & 1.11 & 3.06 & 0.99 & 0.83 \\
         All Objects & 3.06 & 0.99 & 0.83 \\
         \hline
 
         \multicolumn{4}{|l|}{\textbf{Metrics Grouped by Alignment}} \\
         \hline
-        Aligned Objects & 2.34 & 0.43 & 0.27 \\
-        Non-Aligned Objects & 3.32 & 1.20 & 1.03 \\
-        
+        % Aligned & 0.91 & 2.34 & 0.43 & 0.27 \\
+        % Not aligned & 1.19 & 3.32 & 1.20 & 1.03 \\
+        Aligned & 2.34 & 0.43 & 0.27 \\
+        Not aligned & 3.32 & 1.20 & 1.03 \\
         \hline
     \end{tabular}
     \begin{tablenotes}
-        \item[] DED: Difference in Each Dimension. Metrics are in meters.
+        % \item[] BBD: Bounding Box Disparity.
+        \item[] DED: Difference in Each Dimension.
     \end{tablenotes}
     \caption{Mean Dimensional Error Differences (DED) for 3D Object Detections}
     \label{tab:combined_ded_metrics}
@@ -353,9 +372,9 @@ For the pipeline's evaluation, NuScenes scene 'scene-0061' \footnote{\url{https:
     \item Explicar parámetros de evaluación 3D (fov distance...)
     \item Explicar asignaciones (un pequeño análisis de los true positives, false positives y false negatives)
     \item Explicar el caso de la diferencia absoluta en dimensiones (agrupando por alineación con la cámara)
-    \item Introducir BBD para identificar outliers y demás (hay que hacer un análisis sencillo)
     \item Explicar el caso del objeto 129 que tiene una oclusion parcial siendo únicamente visible la parte superior del vehículo haciendo que el error en el eje vertical sea muy superior a las otras dimensiones
     \item Explicar el caso 154 en el que se refleja muy bien como cuando el vehículo está alineado con la cámara el eje que peor se estima es el de profundidad, mientras que cuando el objeto rota estos ejes cambian. Esto demuestra de forma clara la limitación del sistema de utilizar AABB.
+    \item Introducir BBD para identificar outliers y demás (hay que hacer un análisis sencillo)
 \end{itemize}
 
 
