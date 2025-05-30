@@ -1,4 +1,6 @@
-from vcd import core, scl, types, utils
+from vcd import core, scl, types
+from vcd import utils as vcd_utils
+
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 
@@ -282,7 +284,7 @@ def get_camera_fov_polygon(scene:scl.Scene, camera_depth:float, fov_coord_sys:st
     fov_poly_3d = np.array([[0, 0, 0], [delta_x, 0, d], [-delta_x, 0, d]])
 
     N, _ = fov_poly_3d.shape # (N, 3) where N is the number of points
-    fov_poly_4xN = utils.add_homogeneous_row(fov_poly_3d.T)
+    fov_poly_4xN = vcd_utils.add_homogeneous_row(fov_poly_3d.T)
     
     # Transform to the odom coordinate system
     fov_poly_4xN_t = scene.transform_points3d_4xN(fov_poly_4xN, cs_src=fov_coord_sys, cs_dst='odom', frame_num=frame_num)
@@ -474,7 +476,7 @@ def get_occlusion_polys(objs_data:dict,
     rays_3xN    = rays_points.reshape(3, -1)                        # Shape (3, num_rays * steps)
     
     # Transform rays points to odom frame 
-    rays_4xN        = utils.add_homogeneous_row(rays_3xN)
+    rays_4xN        = vcd_utils.add_homogeneous_row(rays_3xN)
     transform_4x4   = scene.get_transform(fov_coord_sys, bev_coord_sys, frame_num)[0]
     rays_trans_4xN  = transform_4x4 @ rays_4xN
     rays_trans_3xN  = rays_trans_4xN[:3]
@@ -526,7 +528,7 @@ def get_occlusion_polys(objs_data:dict,
         poly3d_vals = np.array(poly3d_data['val'])
         N = poly3d_vals.size // 3 # 3 axis as it is a 3D poly
         poly3d_vals_3xN = poly3d_vals.reshape((N, 3)).T
-        poly3d_vals_4xN = utils.add_homogeneous_row(poly3d_vals_3xN)
+        poly3d_vals_4xN = vcd_utils.add_homogeneous_row(poly3d_vals_3xN)
         assert np.sum(poly3d_vals_4xN[2, :]) == 0.0,  "All lane poly Zs are 0"
         
         poly3d_vals_4xN = lane_T_4x4 @ poly3d_vals_4xN # Transform to the bev coor sys
@@ -1323,11 +1325,11 @@ class Debug3DRenderer:
         frame_odometry = frame_properties['transforms']['vehicle-iso8855_to_odom']['odometry_xyzypr']
         t_vec =  frame_odometry[:3]
         ypr = frame_odometry[3:]
-        r_3x3 = utils.euler2R(ypr)
-        transform_4x4 = utils.create_pose(R=r_3x3, C=np.array([t_vec]).reshape(3, 1))
+        r_3x3 = vcd_utils.euler2R(ypr)
+        transform_4x4 = vcd_utils.create_pose(R=r_3x3, C=np.array([t_vec]).reshape(3, 1))
 
         ego_center_3x1 = np.zeros((3, 1))
-        ego_center_4x1 = utils.add_homogeneous_row(ego_center_3x1)
+        ego_center_4x1 = vcd_utils.add_homogeneous_row(ego_center_3x1)
         ego_center_3x1 = (transform_4x4 @ ego_center_4x1)[:3].ravel()
 
         return ego_center_3x1, r_3x3, [2.0, 2.0, 2.0]

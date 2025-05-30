@@ -1,8 +1,15 @@
 {
-    "python.analysis.extraPaths": [".venv/bin/activate"],
-    "python.autoComplete.extraPaths": [ "${workspaceFolder}/oldatasets", "${workspaceFolder}/3D-Metrics" ],
+    "python.analysis.extraPaths": [
+      "${workspaceFolder}/oldatasets",
+      "${workspaceFolder}/3D-Metrics"
+    ],
+    "python.autoComplete.extraPaths": [
+      "${workspaceFolder}/oldatasets",
+      "${workspaceFolder}/3D-Metrics"
+    ],
     "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.defaultInterpreterPath": "./.venv/bin/python3",
+    "python.defaultInterpreterPath": "~/.pyenv/versions/venv310/bin/python",
+
     "terminal.integrated.env.linux": { "PYTHONPATH": "${workspaceFolder}" },
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": false,
