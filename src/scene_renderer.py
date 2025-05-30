@@ -16,6 +16,7 @@ from bevmap_manager import BEVMapManager
 from vehicle_gridmap import VehicleGridMap
 from bev2seg_2 import Raw2Seg_BEV
 
+import argparse
 import os
 
 class Settings:
@@ -804,7 +805,12 @@ def main(scene_path:str, camera_name:str='CAM_FRONT'):
     gui.Application.instance.run()
 
 if __name__ == "__main__":
-    scene_path = "./tmp/my_scene" # args.scene_path
+    parser = argparse.ArgumentParser(description="Script for evaluating 3D detections.")
+    parser.add_argument('scene_path', type=str, help="Path to the scene. This path must have the 'generated' folder and the 'scene' folder with the 'detections_openlabel.json' file that has the ground truth and annotated detections")
+    args = parser.parse_args()
+    
+    # scene_path = "./tmp/my_scene" # args.scene_path
+    scene_path = args.scene_path
     
     main(scene_path=scene_path, camera_name='CAM_FRONT')
 
