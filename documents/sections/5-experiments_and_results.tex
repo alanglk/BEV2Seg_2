@@ -307,12 +307,15 @@ This comprehensive analysis underscores the critical influence of the BEV transf
 \subsection{Annotation evaluation}
 For the pipeline's evaluation, NuScenes scene 'scene-0061' \footnote{\url{https://youtu.be/4gkyUWSZUkg?si=y5D9iybgzkv37Bko}} was used. This scene, captured in 'singapore-onenorth', includes object annotations, map data, and odometry at 2Hz for a total of 39 frames. The scene features a parked truck, a construction area, an intersection requiring a left turn, and the ego-vehicle following a van. The ego-vehicle's path is shown in Figure~\ref{fig:scene_ego_path}.
 
+
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./images/experiments/ground_truth_turning_5deg.png}
     \caption{Scene ego-vehicle's route}
     \label{fig:scene_ego_path}
 \end{figure}
+
+The ego-vehicle starts next to a truck, visible by the front camera for the first 4 frames (with only a small corner of the truck visible in the fourth). Furthermore, in the second frame of the scene, a vehicle is already visible in the right lane, and from the third frame onwards, the van that takes the left exit and that the ego-vehicle will follow until the end of the scene begins to be visible. Throughout the entire segment, several occlusions and partial visualizations of the objects occur, making it a sufficiently representative situation to evaluate the pipeline's output and identify its strengths and weaknesses.
 
 \begin{table}[h!]
     \centering
@@ -363,7 +366,33 @@ For the pipeline's evaluation, NuScenes scene 'scene-0061' \footnote{\url{https:
 
 
 
+\subparagraph*{Evaluation Methodology and Overall Performance}
+Each object in the scene, encompassing both ground truth annotations and the pipeline's detections, is assigned a unique identifier. As detailed in Section X (replace X with your section number/label), the evaluation process associates detections with annotated objects. This results in a variable number of metrics per frame, with each metric derived from a ground-truth annotation and pipeline detection pair. This evaluation was conducted with a Field of View (FOV) range of 30 meters. The volume-to-volume (v2v) distance was employed as the association metric, with the maximum association distance established at 3.0 meters.
 
+\subparagraph*{Using these parameters, the confusion matrix presented in Table} [tab:confusion\_matrix] (replace tab:confusion\_matrix with your table label) was generated. This table aggregates all instances between detections and the visible ground truth across all frames of the scene. In this context, a True Positive (TP) signifies a detection correctly associated with a ground truth object. A False Positive (FP) indicates a detection that was not associated with any ground truth object, and a False Negative (FN) represents a ground truth object that the pipeline failed to detect.
+The accumulated confusion matrix reveals that out of 107 ground truth objects within the camera's FOV, the system successfully estimated 92. This leaves 15 ground truth objects either undetected or with highly noisy predictions. Notably, the system also generated 23 FPs, corresponding to noisy predictions (often due to inadequately filtered object point clouds) for objects not present in the ground truth.
+Overall, the Precision of the pipeline is approximately 80.0\%. This indicates that when the system predicts an object, it is correct 80\% of the time, suggesting a relatively low rate of false positives. The Recall is approximately 86.0\%. This means the pipeline successfully detected 86\% of all actual 3D objects present in the scene, demonstrating its ability to find most of the relevant objects.
+
+\subparagraph*{Dimensional Accuracy Assessment}
+Among all TPs, an evaluation of dimension estimation accuracy was performed, with the results compiled in Table [tab:dimension\_accuracy\_metrics] (replace tab:dimension\_accuracy\_metrics with your table label). This table also presents metrics for objects and frames, grouped according to their alignment with the vehicle's front camera. This grouping is determined by the yaw angle difference between the annotated ground truth objects and the vehicle's orientation. An object is considered not aligned if this angular difference exceeds 15 degrees.
+
+Observing the mean total difference in dimensions for each axis (X, Y, Z of the vehicle's coordinate system), the X-axis (corresponding to the camera's depth axis) exhibits a markedly higher error rate compared to the Y-axis (width) and Z-axis (height). This suggests that the object depth estimation is considerably less accurate than height and width estimations. This observation is further substantiated by the metrics grouped by camera alignment. Objects aligned with the camera show a significantly higher error in depth estimation, whereas height and width estimations are relatively close to the ground truth (mean errors of 43cm and 27cm for width and height estimation, respectively). Conversely, objects not aligned with the camera display higher error rates not only in depth but across all axes. This reflects an over-estimation of the footprint (width and depth) when objects are not aligned with the camera, as illustrated in the specific case shown in Figure [fig:footprint\_overestimation\_example] (replace fig:footprint\_overestimation\_example with your figure label).
+However, for non-aligned objects, one might anticipate the height error to remain relatively stable, as the height should be largely unaffected by a Z-axis rotation. This discrepancy prompted a more detailed analysis focusing on the metrics for each ground truth object for which detections were made.
+
+\subparagraph*{Case Studies on Dimensional Estimation}
+To illustrate different facets of the annotation system's performance in object dimension estimation, three specific cases are highlighted: the parked truck at the scene's commencement (ID 41); the van preceding the ego-vehicle (ID 154); and an excavator stationary mid-curve (ID 129). These three objects are depicted in Figure [fig:case\_study\_object\_representation] (replace fig:case\_study\_object\_representation with your figure label). The evolution of dimensional estimation errors for these objects on a per-frame basis is presented in Figure [fig:dimension\_error\_evolution] (replace fig:dimension\_error\_evolution with your figure label), which also indicates via a horizontal bar whether the object is aligned with the camera in the current frame.
+
+\subparagraph*{Parked Truck (ID 41)}
+For the parked truck, the length estimation error is initially around 2 meters. However, in the final frames of its visibility, this error escalates to nearly 7 meters. This is mainly because the truck is parked and the ego-vehicle overtakes it, causing the visible area of the truck to change considerably in each frame. Frame 2 provides the most visible information, while frame 5 provides the least, as only the side of the truck's front is visible, leading to a highly inaccurate instantaneous depth estimation for the vehicle.
+
+\subparagraph*{Leading Van (ID 154)}
+The evolution of dimensional errors for the van exemplifies the system's typical behavior concerning object alignment with the camera. In the initial frames, when the van is aligned, there is a high error in length estimation but lower errors in height and width. As the van progressively rotates relative to the camera, the length estimation error diminishes, accompanied by an increase in the width estimation error. The height estimation error remains relatively constant, barring some outliers. When the van realigns with the camera, the predominant error reverts to length estimation. This behavior underscores a significant limitation of the annotation system when employing Axis-Aligned Bounding Boxes (AABBs).
+
+\subparagraph*{Stationary Excavator (ID 129)}
+The case of the parked excavator is notable due to an unusually high height estimation error, consistently exceeding 2 meters in almost all frames where it is visible. This is closely linked to occlusion: as shown in Figure [fig:excavator\_occlusion\_detail] (replace fig:excavator\_occlusion\_detail and specify frame X in your caption), which visualizes the ground truth and detection in frame X, the van interposes itself between the ego-vehicle and the excavator. Consequently, only the upper part of the excavator is visible, significantly impairing its height estimation.
+
+\subparagraph*{Bounding Box Disparity (BBD) Analysis}
+The Bounding Box Disparity (BBD) serves as a valuable metric for assessing the positional accuracy of cuboids and for readily identifying potential incorrect detections. For instance, Figure [fig:van\_bbd\_evolution\_graph] (replace fig:van\_bbd\_evolution\_graph with your figure label) illustrates the BBD evolution for the van throughout the scene. The horizontal line in this graph denotes the BBD metric's intrinsic threshold separating Intersection over Union (IoU) based calculations from Volume-to-Volume (V2V) based ones. An example is the initial detection of the van in frame 2, which exhibits a BBD greater than 1. This signifies that the detection does not intersect with the ground truth bounding box, as depicted in Figure [fig:van\_bbd\_no\_intersection\_example] (replace fig:van\_bbd\_no\_intersection\_example with your figure label). Generally, a high BBD can indicate an erroneous detection, as observed in frames 12 and 13 for this object.
 
 
 \hl{Complete this bullet points.}
