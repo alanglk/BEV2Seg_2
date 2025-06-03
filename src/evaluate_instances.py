@@ -36,7 +36,7 @@ from collections import deque
 import copy
 
 from tqdm import tqdm
-from typing import TypedDict, Dict, List, Tuple, Optional
+from typing import TypedDict, Dict, List, Tuple, Optional, Any
 import argparse
 import pickle
 import json
@@ -45,7 +45,8 @@ import os
 
 
 WINDOW_SIZE_FRAMES = 5
-TURNING_THRESHOLD =  np.deg2rad(5.0)
+# TURNING_THRESHOLD =  np.deg2rad(5.0)
+TURNING_THRESHOLD =  np.deg2rad(90.0)
 RELATIVE_ROTATION_THRESHOLD = np.deg2rad(15.0)
 
 def check_paths(paths: List[str]):
@@ -582,6 +583,56 @@ def get_occlusion_polys(objs_data:dict,
     
     return bev_mask, bev_mask_colored
 
+def plot_path(xs, ys, plot_colors, marker:str='x', zorder_base:int = 1, alpha:float=1.0, ax:Axes = None):
+    if ax is None:
+        ax = plt.gca()
+    marker_zorder = zorder_base
+    line_zorder = zorder_base +1
+    for i in range(len(xs) - 1):
+        # Plot the line segment from current point to next point
+        ax.plot(xs[i:i+2], ys[i:i+2], color=plot_colors[i], linewidth=2, zorder=marker_zorder, alpha=alpha)
+        if marker is not None:
+            # Plot the marker at the current point
+            ax.plot(xs[i], ys[i], marker=marker, color=plot_colors[i], markersize=8, zorder=line_zorder, alpha=alpha) 
+    if len(xs) > 0 and marker is not None:
+        # Ensure the last point also has a marker, as the loop only goes up to the second-to-last
+        ax.plot(xs[-1], ys[-1], marker=marker, color=plot_colors[-1], markersize=8, zorder=marker_zorder, alpha=alpha)
+
+def plot_object_path(object_uid, 
+                     frame_keys:List[Any], 
+                     vcd:core.OpenLABEL, 
+                     stationary:bool = False, 
+                     color:str="#7700A0",
+                     coord_sys:str='odom', 
+                     ax:Axes=None):
+    assert len(frame_keys) > 0
+    if ax is None:
+        ax = plt.gca()
+    
+    if stationary:
+        bbox = vcd.get_object_data(object_uid, 'bbox3D', frame_num=frame_keys[0])
+        obx = get_oriented_bbox_from_vals(bbox['val'])
+        # center = obx.center
+        aux = np.asarray(obx.get_box_points())
+        aux = aux[np.where(aux <= 1.0)[0]][:, :2]
+        aux = aux[:, ::-1]
+        aux = np.array([aux[0], aux[1], aux[3], aux[2]])
+        poly = Polygon(aux)
+        plot_ray_polys(MultiPolygon([poly]), color=color, ax=ax)
+        return
+    
+    positions, colors = [], []
+    for fk in frame_keys:
+        bbox = vcd.get_object_data(object_uid, 'bbox3D', frame_num=fk)
+        obx = get_oriented_bbox_from_vals(bbox['val'])
+        center = obx.center
+        positions.append(center)
+        colors.append(color)
+    positions = np.array(positions)
+    xs, ys = positions[:, 1], positions[:, 0]
+    plot_path(xs, ys, colors, zorder_base=2, alpha=0.7, marker=None, ax=ax)
+
+
 def get_turning_data(vcd:core.OpenLABEL, 
                      lane_data:dict,
                      WINDOW_SIZE_FRAMES:int=5,
@@ -620,7 +671,8 @@ def get_turning_data(vcd:core.OpenLABEL,
         prev_yaw: Optional[float] = None # Stores the yaw from the previous frame (in radians)
         recent_yaw_diffs: deque[float] = deque(maxlen=WINDOW_SIZE_FRAMES)
 
-        frame_keys = vcd.data['openlabel']['frames'].keys()
+        is_any_turn = False
+        frame_keys = list(vcd.data['openlabel']['frames'].keys())
         for fk in frame_keys:
             frame_properties = vcd.get_frame(frame_num=fk)['frame_properties']
             frame_odometry  = frame_properties['transforms']['vehicle-iso8855_to_odom']['odometry_xyzypr']
@@ -649,6 +701,7 @@ def get_turning_data(vcd:core.OpenLABEL,
                     if abs(average_yaw_rate) > TURNING_THRESHOLD:
                         is_turning = True
 
+            is_any_turn = is_any_turn or is_turning
             turning_dict[fk] = TurningDataType(turning_flag=is_turning, pos=list(pos), ypr=list(ypr))
             prev_yaw = current_yaw
         
@@ -678,28 +731,50 @@ def get_turning_data(vcd:core.OpenLABEL,
             rotated_lane_polys.append(Polygon(rotated_coords))
         lane_multipoly = MultiPolygon(rotated_lane_polys)
         
-        # Plot the map with turning info
-        plot_positions = np.array(plot_positions)
-        xs, ys = plot_positions[:, 1], plot_positions[:, 0]
-
+        # Plot the map with vehicle and objects info
         fig, ax = plt.subplots(1, 1, figsize=(12, 12))
         plot_ray_polys(lane_multipoly, map_color, ax=ax)
         
-        for i in range(len(xs) - 1):
-            # Plot the line segment from current point to next point
-            ax.plot(xs[i:i+2], ys[i:i+2], color=plot_turning_color[i], linewidth=2, zorder=1)
-            # Plot the marker at the current point
-            ax.plot(xs[i], ys[i], marker="x", color=plot_turning_color[i], markersize=8, zorder=2) 
-        if len(xs) > 0:
-            # Ensure the last point also has a marker, as the loop only goes up to the second-to-last
-            ax.plot(xs[-1], ys[-1], marker="x", color=plot_turning_color[-1], markersize=8, zorder=2)
-        
+        plot_positions = np.array(plot_positions)
+        xs, ys = plot_positions[:, 1], plot_positions[:, 0]
+        plot_path(xs, ys, plot_turning_color, ax=ax)
+
+        # UID 41 -> Parked truck
+        parked_truck_color = "#7700A0"
+        plot_object_path('41', frame_keys, vcd, color=parked_truck_color, stationary=True, ax=ax)
+        parked_truck_patch = Patch(color=parked_truck_color, alpha=0.3, label='Parked Truck')
+
+
+        # UID 154 -> Followed Van
+        van_color = "#FF0064"
+        plot_object_path('154', frame_keys, vcd, color=van_color, stationary=False, ax=ax)
+        van_line  = plt.Line2D([0], [0], color=van_color, linewidth=2, linestyle='-')
+
+        # UID 129 -> Parked Excavator
+        parked_excavator_color = "#00A032"
+        plot_object_path('129', frame_keys, vcd, color=parked_excavator_color, stationary=True, ax=ax)
+        parked_excavator_patch = Patch(color=parked_excavator_color, alpha=0.3, label='Parked Excavator')
+
         ax.invert_xaxis()
         ax.set_aspect('equal', adjustable='box')
+        legend_objs = []
+        
         map_patch = Patch(color=map_color, alpha=0.3, label='Lane') # Use the same alpha as in fill
         straight_line   = plt.Line2D([0], [0], color=straight_color, linewidth=2, linestyle='-', marker='x')
-        turning_line    = plt.Line2D([0], [0], color=turning_color, linewidth=2, linestyle='-', marker='x')
-        ax.legend([map_patch, straight_line, turning_line], ['Lane', 'Straight', 'Turning'], loc='best')
+        
+        legend_objs = [map_patch, straight_line]
+        legend_labels = ['Lane', 'Ego-Vehicle']
+
+        if is_any_turn:
+            turning_line    = plt.Line2D([0], [0], color=turning_color, linewidth=2, linestyle='-', marker='x')
+            legend_objs.append(turning_line)
+            legend_labels.append('Turning')
+
+        legend_objs += [parked_truck_patch, van_line, parked_excavator_patch]
+        legend_labels += ['Parked Truck', 'Followed Van', 'Parked Excavator']
+
+        ax.legend(legend_objs, legend_labels, loc='best')
+        
         plt.show()
 
         return turning_dict
