@@ -378,84 +378,81 @@ Among all TPs, an evaluation of dimension estimation accuracy was performed, wit
 Observing the mean total difference in dimensions for each axis of the vehicle's coordinate system ($\mathbf{\hat{x}_v}$, $\mathbf{\hat{y}_v}$, $\mathbf{\hat{z}_v}$), the x-axis (aligned with the camera's depth axis $\mathbf{\hat{z}_c}$) exhibits a markedly higher error rate compared to the y-axis (width) and z-axis (height). This suggests that the object depth estimation is considerably less accurate than height and width estimations. Metrics grouped by camera alignment further support this observation, as objects aligned with the camera show a significantly higher error in depth estimation, whereas height and width estimations are relatively close to the ground truth (mean errors of 43cm and 27cm for width and height estimation, respectively). In contrast, objects not aligned with the camera display higher error rates not only in depth but across all axes. This reflects an over-estimation of the footprint (width and depth) when objects are not aligned with the camera, as illustrated in the specific case shown in Figure~\ref{fig:scene_open3d_cases_b}.
 However, for non-aligned objects, one might anticipate the height error to remain relatively stable, as the height should be largely unaffected by a z-axis rotation. This discrepancy prompted a more detailed analysis focusing on the metrics for each ground truth object for which detections were made.
 
-\hl{Review this figure. Add frame number to the figure.}
 \begin{figure}[h!]
     \centering
     \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\linewidth]{images/experiments/evaluation_frames/3d_evaluation_frame_2.png}
-        \caption{Parked truck (ID 41)}
+        \includegraphics[width=\linewidth]{images/experiments/evaluation_frames/3d_evaluation_frame_1_canva.png}
+        \caption{}
         \label{fig:scene_open3d_cases_a}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{images/experiments/evaluation_frames/3d_evaluation_frame_12.png}
-        \caption{Followed van (ID 154)}
+        \includegraphics[width=\textwidth]{images/experiments/evaluation_frames/3d_evaluation_frame_9_canva.png}
+        \caption{}
         \label{fig:scene_open3d_cases_b}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{images/shared/no_signal.jpg}
-        \caption{Excavator (ID 129)}
+        \includegraphics[width=\textwidth]{images/experiments/evaluation_frames/3d_evaluation_frame_12_excavator_problem_canva.png}
+        \caption{}
         \label{fig:scene_open3d_cases_c}
     \end{subfigure}
-    \caption{Some scene's situations}
+    \caption{Scene analysis examples. (a) Accurate dimension estimation for a parked truck; (b) Footprint mismatch due to object-camera misalignment; (c) Occlusion challenge with the excavator.}
     \label{fig:scene_open3d_cases}
 \end{figure}
 
-To illustrate different facets of the annotation system's performance in object dimension estimation, three specific cases are highlighted: the parked truck at the scene's commencement (ID 41); the van preceding the ego-vehicle (ID 154); and an excavator stationary mid-curve (ID 129). These three objects are depicted in Figure~\ref{fig:scene_open3d_cases}. The evolution of dimensional estimation errors for these objects on a per-frame basis is presented in Figure~\ref{fig:scene_ded_cases}, which also indicates via a horizontal bar whether the object is aligned with the camera in the current frame.
+To illustrate different facets of the annotation system's performance in object dimension estimation, three specific cases are highlighted: the parked truck at the scene's commencement (ID 41); the van preceding the ego-vehicle (ID 154); and an excavator stationary mid-curve (ID 129). These three objects are shown in Figure~\ref{fig:scene_open3d_cases}. The evolution of dimensional estimation errors for these objects on a per-frame basis is presented in Figure~\ref{fig:scene_ded_cases}, which also indicates via a horizontal bar whether the object is aligned with the camera in the current frame.
 
 \begin{figure}[h!]
     \centering
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\linewidth]{images/shared/no_signal.jpg}
-        \caption{Parked truck (ID 41)}
-        \label{fig:scene_ded_cases_a}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{images/experiments/evaluation_frames/ded_followed_van_id154.png}
-        \caption{Followed van (ID 154)}
-        \label{fig:scene_ded_cases_b}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{images/shared/no_signal.jpg}
-        \caption{Excavator (ID 129)}
-        \label{fig:scene_ded_cases_c}
-    \end{subfigure}
-    \caption{Difference in Each Dimension (DED) metrics of selected objects along scene's frames. Bottom horizontal bar indicates alignment with the camera with blue color, and not aligment with red color.}
+    \includegraphics[width=\linewidth]{./images/experiments/ded_selected_objects.png}
+    \caption{Difference in Each Dimension (DED) metrics of selected objects along scene's frames. Bottom horizontal bar indicates alignment with the camera.}
     \label{fig:scene_ded_cases}
 \end{figure}
 
-For the parked truck, the length estimation error is initially around $2$ meters. However, in the final frames of its visibility, this error escalates to nearly $7$ meters. This is mainly because the truck is parked and the ego-vehicle overtakes it, causing the visible area of the truck to change considerably in each frame. Frame $2$ provides the most visible information, while frame $5$ provides the least, as only the side of the truck's front is visible, leading to a highly inaccurate instantaneous depth estimation for the vehicle.
+For the parked truck, the length estimation error is initially around $2$ meters. However, in the final frames of its visibility, this error escalates to nearly $7$ meters. This is mainly because the truck is parked and the ego-vehicle overtakes it, causing the visible area of the truck to change considerably in each frame. Frame $1$ provides the most visible information (Figure~\ref{scene_open3d_cases_a}), while frame $4$ provides the least, as only the side of the truck's front is visible, leading to a highly inaccurate instantaneous depth estimation for the vehicle.
 
 The evolution of dimensional errors for the van illustrates the system's typical behavior concerning object alignment with the camera. In the initial frames, when the van is aligned, there is a high error in length estimation but lower errors in height and width. As the van progressively rotates relative to the camera, the length estimation error decreases, accompanied by an increase in the width estimation error. The height estimation error remains relatively constant, except for a few outliers. When the van realigns with the camera, the predominant error reverts to length estimation. This behavior reveals a significant limitation of the annotation system when using \acp{AABB}.
 
-The case of the parked excavator is notable due to an unusually high height estimation error, consistently exceeding 2 meters in almost all frames where it is visible. This is closely linked to occlusion: as shown in Figure~\ref{fig:scene_open3d_cases_c}, which visualizes the ground truth and detection in frame \hl{12}, the van interposes itself between the ego-vehicle and the excavator. Consequently, only the upper part of the excavator is visible, significantly impacting the accuracy of its height estimation.
+The case of the parked excavator is notable due to an unusually high height estimation error, consistently exceeding 2 meters in almost all frames where it is visible. This is closely linked to occlusion: as shown in Figure~\ref{fig:scene_open3d_cases_c}, which visualizes the ground truth and detection in frame 12, the van interposes itself between the ego-vehicle and the excavator. Consequently, only the upper part of the excavator is visible, significantly impacting the accuracy of its height estimation.
 
 \subsubsection{Position estimation accuracy}
-The Bounding Box Disparity (BBD) serves as a valuable metric for assessing the positional accuracy of cuboids and for readily identifying potential incorrect detections. For instance, Figure~\ref{fig:van_bbd_through_frames_a} illustrates the BBD evolution for the van throughout the scene. The horizontal line in this graph denotes the BBD metric's intrinsic threshold separating Intersection over Union (IoU) based calculations from Volume-to-Volume (V2V) based ones. An example is the initial detection of the van in frame 2, which exhibits a BBD greater than 1. This signifies that the detection does not intersect with the ground truth bounding box, as depicted in Figure~\ref{fig:van_bbd_through_frames_b}. 
+The Bounding Box Disparity (BBD) serves as a valuable metric for assessing the positional accuracy of cuboids and for readily identifying potential incorrect detections. For instance, Figure~\ref{fig:van_bbd_through_frames_a} illustrates the BBD evolution for the van throughout the scene. The horizontal line in this graph denotes the BBD metric's intrinsic threshold separating Intersection over Union (IoU) based calculations from Volume-to-Volume (V2V) based ones. An example is the initial detection of the van in frame 2, which exhibits a BBD greater than 1. This signifies that the detection does not intersect with the ground truth bounding box. 
+
+% \begin{figure}[h!]
+%     \centering
+%     \includegraphics[width=0.6\linewidth]{images/experiments/bbd_followed_van.png}
+%     \caption{Followed van BBD evolution through frames.}
+%     \label{fig:van_bbd_through_frames}
+% \end{figure}
 
 \begin{figure}[h!]
     \centering
-    \begin{subfigure}[b]{0.45\textwidth}
-        \includegraphics[width=\linewidth]{images/shared/no_signal.jpg}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\linewidth]{images/experiments/bbd_followed_van.png}
         \caption{}
         \label{fig:van_bbd_through_frames_a}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \includegraphics[width=\textwidth]{images/shared/no_signal.jpg}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{images/experiments/evaluation_frames/3d_evaluation_frame_3_canva.png}
         \caption{}
         \label{fig:van_bbd_through_frames_b}
     \end{subfigure}
-    \caption{Followed van BBD evolution through frames (a) and van detection with no ground truth bounding box intersection (b).}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{images/experiments/evaluation_frames/3d_evaluation_frame_13_canva.png}
+        \caption{}
+        \label{fig:van_bbd_through_frames_c}
+    \end{subfigure}
+    \caption{Analysis of van position detection error over time. (a) Illustrates the BBD evolution of the van through sequential frames; (b) Shows a significant depth error observed in frame 3; (c) Presents an example of poor object detection in frame 13.}
     \label{fig:van_bbd_through_frames}
 \end{figure}
 
-Generally, a high BBD can indicate an erroneous detection, as observed in frames 12 and 13 for this object (see Figure \hl{X}). However, such cases may not always indicate a detection failure. They can also result from depth estimation errors. This is illustrated by the van in frame 2 (see Figure \hl{X}), where the predicted depth is underestimated compared to the actual distance, yet the relative dimensions of the van are preserved.
 
-In this sense, BBD stands out as a reliable metric for detecting potential outliers, particularly when BBD exceeds 1. On the other hand, when BBD remains below 1, it can be interpreted as an inverse confidence score: the lower the BBD, the more accurate the bounding box prediction is likely to be. Accordingly, most of the van detections maintain a BBD below 1, with an average value of approximately \hl{X}. This suggests that, although the predicted bounding boxes may not align perfectly with the ground truth, their spatial positioning remains relatively consistent and acceptable throughout the scene.
+Generally, a high BBD can indicate an erroneous detection, as observed in frames 12 and 13 for this object (see Figure Figure~\ref{fig:van_bbd_through_frames_c}). However, such cases may not always indicate a detection failure. They can also result from depth estimation errors. This is illustrated by the van in frame 3 (see Figure~\ref{fig:van_bbd_through_frames_b}), where the predicted depth is underestimated compared to the actual distance, yet the relative dimensions of the van are preserved.
+
+In this sense, BBD stands out as a reliable metric for detecting potential outliers, particularly when BBD exceeds 1. On the other hand, when BBD remains below 1, it can be interpreted as an inverse confidence score: the lower the BBD, the more accurate the bounding box prediction is likely to be. Accordingly, most of the van detections maintain a BBD below 1, with an average value of approximately $0.67$ and a standar deviation of $0.11$. This suggests that, although the predicted bounding boxes may not align perfectly with the ground truth, their spatial positioning remains relatively consistent and acceptable throughout the scene.
 
 \subsubsection{Occupancy, occlusion and driveable masks evaluation}
 \hl{Complete this.}
