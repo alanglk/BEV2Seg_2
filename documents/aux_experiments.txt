@@ -198,3 +198,9 @@ Finalmente, el caso de la excavadora aparcada es destacable ya que presenta un e
 
 Por otro lado, el Bounding Box Disparity es una métrica muy útil para identificar si las posiciones de los cuboides son adecuadas o no y permite identificar de forma sencilla posibles malas detecciones. Por ejemplo, podemos observar la evolución del BBD durantes los frames de la escena para el caso de la furgoneta en la Figura X. En esta gráfica, la linea horizontal representa el límite entre IoU y V2V propio de la métrica BBD. Por ejemplo, la primera detección de la furgoneta en el frame 2 presenta un BBD mayor que 1, lo que indica que la detección no tiene intersección con el bounding box del ground truth como se muestra en la Figura X. Esto en general puede indicar una detección errónea como son los casos de los frames 12 y 13.
 
+Sin embargo, este hecho también puede ser un síntoma de una estimación de profundidad errónea como es el caso de la furgoneta en el frame 2 (ver Figura X) en el que la estimación de profundidad es inferior a la real, pero las dimensiones relativas de la furgoneta se mantienen.
+
+De esta manera, el BBD se constituye como una métrica adecuada para identificar posibles outliers de detecciones en el caso que se supere BBD > 1 o, si se mantiene por debajo de 1 se puede considerar como un valor inverso de confianza de la predicción: cuanto menor sea el BBD mejor estimación del Bounding Box. Así, se puede observar que la mayor parte de las detecciones hechas para la furgoneta presentan un BBD inferior a 1, rondando un valor medio de X, con lo que se puede decir que a pesar de que los bounding boxes predecidos no se ajusten exactamente al ground truth su posicionamiento es relativamente aceptable a lo largo de toda la escena. 
+
+
+
