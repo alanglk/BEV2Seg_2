@@ -443,7 +443,7 @@ Finally, a filtering process is performed to ensure there are no noisy, redundan
 \end{figure}
 
 
-\subsubsection{Instance BEV mask}
+\subsubsection{Instance BEV mask} \label{sec:instance_bev_mask_methodology}
 Once the 3D instance detection is performed and the panoptic point cloud is generated, the final occupancy and occlusion masks can be estimated using the semantic \aclink{BEV} masks.
 
 To associate the \aclink{BEV} semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is related to one polygon but a polygon may have multiple masks. This is represented in Algorithm~\ref{algorithm:occ_masks} and results in a final representation of occupancy, defined by the base of the 3D bounding box, and occlusion, which is captured by the distorded shape of the semantic mask from the \aclink{BEV} perspective.
@@ -451,6 +451,8 @@ To associate the \aclink{BEV} semantic masks with the detected 3D instances, the
 A single cuboid base can be associated with multiple \aclink{BEV} masks because a 3D instance may appear fragmented in the \aclink{BEV} semantic view. When connected components labeling is applied to these masks, each fragment is identified as a separate region. However, since all fragments originate from the same 3D object, they are associated with the same cuboid base.
 
 \hl{Complete this algorithm.}
+\hl{De esta manera, se pueden obtener máscaras de oclusión acordes al área ocluida en BEV por el objeto semántico utilizando el propio proceso de reproyección BEV; y se limita la acumulación de errores que podría darse al emplear las máscaras de ocupación de la detección 3D como input para generar las máscaras de oclusión.}
+
 \begin{algorithm}
     \caption{Occupancy Occlusion masks}
     \label{algorithm:occ_masks}
@@ -581,7 +583,7 @@ Finally, the following metrics are calculated:
 \end{itemize}
 
 
-\subsubsubsection{BEV masks evaluation}
+\subsubsubsection{BEV masks evaluation} \label{sec:bev_masks_evaluation_methodology}
 To evaluate the occupancy, occlusion, and drivable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
 
 This algorithm calculates camera viewing angles along the $\mathbf{\hat{x}_c}$ axis to define $N$ rays. A step length $h$ is also defined, which determines the intervals at which each ray will sample points to classify them as visible, occluded, or belonging to an occupied area. All rays originate from the camera coordinate frame and are subsequently transformed to the vehicle's coordinate frame as it is the coordinate system in which the \aclink{BEV} masks are generated (see Section~\ref{sec:BEVDataset}).
