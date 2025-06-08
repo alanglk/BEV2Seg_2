@@ -342,7 +342,7 @@ Using these parameters, the confusion matrix presented in Table~\ref{tab:scene_c
 The accumulated confusion matrix reveals that out of $107$ ground truth objects within the camera's \aclink{FOV}, the system successfully estimated $92$. This leaves $15$ ground truth objects either undetected or with highly noisy predictions. Notably, the system also generated $23$ FPs, corresponding to noisy predictions (often due to poorly filtered object point clouds) for objects not present in the ground truth.
 Overall, the Precision of the pipeline is approximately $80\%$. This indicates that when the system predicts an object, it is correct $80\%$ of the time, suggesting a relatively low rate of false positives. The Recall is approximately $86\%$. This means the pipeline successfully detected $86\%$ of all actual 3D objects present in the scene, demonstrating its ability to find most of the relevant objects.
 
-\subsubsection{Dimension estimation accuracy}
+\subsubsection{Dimension estimation accuracy} \label{sec:dimension_estimation_accuracy}
 Among all TPs, an evaluation of dimension estimation accuracy was performed, with the results summarized in Table~\ref{tab:combined_ded_metrics}. This table also includes metrics for objects in frames grouped by their alignment with the vehicle's front camera. This grouping is determined by the yaw angle difference between the annotated ground truth objects and the vehicle's orientation. An object is considered not aligned if this angular difference exceeds $15$ degrees.
 
 \begin{table}[h!]
@@ -470,16 +470,12 @@ Figure~\ref{fig:scene_iou_occ2_masks} shows the \aclink{IoU} scores for each sem
 
 Although the occlusion and occupancy masks appear to be correlated, as occlusion occurs where there is occupancy, the occlusion masks consistently achieve higher \aclink{IoU} values. A common assumption is that occlusion masks are generated directly from occupancy masks, which implies that inaccuracies in occupancy would propagate to occlusion, leading to a similar degradation in performance for both. Furthermore, since occlusion depends on the presence of objects, it might be considered a secondary effect, which suggests that occupancy would likely perform at least as well, if not better. However, in this case, the occlusion masks are generated independently from the occupancy masks, relying instead on semantic segmentation projections. This independence could make occlusion masks less sensitive to errors that mainly affect occupancy masks (which often arise from the 3D detection process), potentially explaining the observed divergence in their performance and the higher \aclink{IoU} values of occlusion masks.
 
+Regarding the drivable area, the evolution of the \aclink{IoU} over time appears to reflect a direct relationship between scene complexity and the pipeline's performance. In the initial frames (0–10), the \aclink{IoU} remains consistently high, corresponding to a relatively simple driving scenario: an open road with just a few obstacles (see Figure \hl{X}). Starting from frame 11, however, and especially between frames 11 and 23 (a segment involving a curve), a gradual decline in \aclink{IoU} is observed. This drop appears to result not only from the turning maneuver itself, but also from the increased complexity of the environment during this part of the scene. Specifically, the curve matches a busy intersection, where the presence of additional vehicles, pedestrians, and surrounding objects results in greater occlusion and more irregular, fragmented drivable area boundaries (see Figure \hl{X}).
+
+Also, there are some particular cases at frames 30 and 31 were the driveable area clearly drops to a very low value. However, this cases are more related with a bad annotation or generation of the ground truth masks, as the vehicle footprint is clearly overestimated (see Figure \hl{X}), rather than a poor detection.
+
+All this exposes two main limitations. First, the occupancy masks are highly correlated to the 3D detection errors exposed previously in Section~\ref{sec:dimension_estimation_accuracy}. Second, the scene's complexity amplifies the noise in the semantic segmentation output, as the model struggles to accurately delineate drivable regions when they are fragmented by multiple obstacles. However, despite this, the generated occupancy, occlusion and driveable masks are subjectively accepctable in this scene's case as it can be seen in Figure \hl{X}.
 
 
-
-
-
-
-
-
-Regarding the drivable area, the behavior of the \aclink{IoU} over time reflects a direct relationship between scene complexity and pipeline performance. During the initial frames (0–10), a consistently high \aclink{IoU} is observed, which corresponds to a simple driving environment: an open road with few obstacles. However, starting from frame 11, and particularly between frames 11 and 23—a section corresponding to a curve—a progressive degradation of the \aclink{IoU} occurs. This decrease is not attributed solely to the turning maneuver itself, but rather to the fact that this curve coincides with a complex intersection, where the presence of more vehicles, pedestrians, and nearby objects generates more numerous occlusions and far more irregular contours for the drivable area.
-
-This increased complexity exposes the pipeline's limitations on two levels. First, it amplifies the noise in the semantic segmentation output, as the model struggles to accurately delineate drivable regions when they are fragmented by multiple obstacles. Second, it highlights the inherent divergence between the model's prediction—which is based on the visual appearance of the scene—and the ground truth, which defines drivable areas using idealized, geometrically perfect polygons. The combination of these factors—high scene density and the discrepancy between a visual representation and a structured reference—explains the observed decline in performance and aligns with the results from the 3D accuracy evaluation presented in Section X.
 
 

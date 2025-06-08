@@ -1,4 +1,4 @@
-from vcd import core, scl, types
+from vcd import core, scl, types, draw
 from vcd import utils as vcd_utils
 
 from scipy.optimize import linear_sum_assignment
@@ -291,23 +291,71 @@ def get_camera_fov_polygon(scene:scl.Scene, camera_depth:float, fov_coord_sys:st
     fov_poly_4xN_t = scene.transform_points3d_4xN(fov_poly_4xN, cs_src=fov_coord_sys, cs_dst='odom', frame_num=frame_num)
     fov_poly_3d_t = fov_poly_4xN_t[:3].T  # X, Y, Z
     return fov_poly_3d_t[:, :2]
-def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, bbox:List[float]) -> np.ndarray:
-    #bbox: [ x, y, z, rx, ry, rz, sx, sy, sz ]
-    center      = bbox[:3]
-    rotation    = bbox[3:6]
-    size        = bbox[6:9]
-    corners_3d  = bbox_3d_corners(center, size, rotation)
-    bbox_footprint = Polygon(project_to_xy(corners_3d)).buffer(0)
-    assert bbox_footprint.contains(bbox_footprint.centroid)
+def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, bbox_footprint:Polygon) -> np.ndarray:
+    # assert bbox_footprint.contains(bbox_footprint.centroid)
 
+    does_it_intersects = False
     _, num_rays, num_steps = rays_points.shape
+
     for j in range(num_rays):
+        current_bbox_hits_k = []
         for k in range(num_steps):
+            if intersections[j, k] == 2.0:
+                if len(current_bbox_hits_k) > 0: 
+                    for occl_k in range(current_bbox_hits_k[-1] + 1, num_steps):
+                        if intersections[j, occl_k] == 0.0: # Solo si está libre
+                            intersections[j, occl_k] = 2.0
+                        elif intersections[j, occl_k] == 1.0: # Si era una intersección anterior, ahora es oclusión
+                             intersections[j, occl_k] = 2.0
+                        elif intersections[j, occl_k] == 2.0: # Si ya estaba ocluida, paramos
+                            break
+                break # Este rayo ya está ocluido, no hay necesidad de seguir para esta bbox
+
             point_2d = Point(rays_points[0, j, k], rays_points[1, j, k])
-            intersections[j, k] = 1.0 if bbox_footprint.contains(point_2d) else intersections[j, k]
-        ks = np.where(intersections[j] == 1.0)[0]
-        if len(ks) > 0 and len(intersections[j, ks[-1]:]) > 1: 
-            intersections[j, ks[-1]:] = 2.0 # Occlusion
+            if bbox_footprint.contains(point_2d):
+                does_it_intersects = True 
+                if intersections[j, k] == 0.0:
+                    intersections[j, k] = 1.0
+                current_bbox_hits_k.append(k) 
+            else: 
+                # Si ya habíamos detectado una intersección con *esta* bbox en pasos anteriores
+                # y este punto ya no está en ella, entonces la bbox actual termina aquí
+                # y comienza a ocluir lo que hay detrás de ella.
+                if current_bbox_hits_k:
+                    # Marcar como ocluido desde el punto siguiente al último hit de *esta* bbox.
+                    # Solo marcamos si el punto actual no está ya ocupado por una intersección (1.0)
+                    # o ocluido (2.0) por otra cosa.
+                    for occl_k in range(current_bbox_hits_k[-1] + 1, num_steps):
+                        if intersections[j, occl_k] == 0.0: # Solo si está libre
+                            intersections[j, occl_k] = 2.0
+                        elif intersections[j, occl_k] == 1.0: # Si era una intersección anterior, ahora es oclusión
+                            intersections[j, occl_k] = 2.0
+                        elif intersections[j, occl_k] == 2.0: # Si ya estaba ocluida, paramos
+                            break # No hay necesidad de seguir, el rayo ya está bloqueado
+                    # Una vez que hemos aplicado la oclusión de esta bbox, no necesitamos seguir
+                    # procesando este rayo para esta bbox, porque ya hemos pasado por ella.
+                    break # Salir del bucle 'k' y pasar al siguiente rayo 'j'
+
+        # Lógica de oclusión final para el rayo si el bucle 'k' terminó sin un 'break'
+        # (Es decir, si la bbox se extendía hasta el final del rayo o si el rayo no intersectó nada)
+        if current_bbox_hits_k: # Si esta bbox tuvo al menos un hit en este rayo
+            for occl_k in range(current_bbox_hits_k[-1] + 1, num_steps):
+                if intersections[j, occl_k] == 0.0:
+                    intersections[j, occl_k] = 2.0
+                elif intersections[j, occl_k] == 1.0:
+                    intersections[j, occl_k] = 2.0
+                elif intersections[j, occl_k] == 2.0:
+                    break
+    
+    # for j in range(num_rays):
+    #     for k in range(num_steps):
+    #         point_2d = Point(rays_points[0, j, k], rays_points[1, j, k])
+    #         if bbox_footprint.contains(point_2d):
+    #             intersections[j, k] = 1.0 
+    #             does_it_intersects = True
+    #     ks = np.where(intersections[j] == 1.0)[0]
+    #     if len(ks) > 0 and len(intersections[j, ks[-1]:]) > 1: 
+    #         intersections[j, ks[-1]:] = 2.0 # Occlusion
     
     # Debug plotting
     # plt.tight_layout()
@@ -320,7 +368,7 @@ def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, 
     # plt.scatter(rays_points[0, js, ks], rays_points[1, js, ks], s=0.5, color="black", label="occlusion")
     # plt.legend()
     # plt.show()
-    return intersections
+    return intersections, does_it_intersects
 
 def find_border_indices(js_cluster:np.ndarray, ks_cluster:np.ndarray) -> Tuple[List[int], List[int]]:
     visited_idx = set()
@@ -412,21 +460,19 @@ def plot_ray_polys(multipolygon: MultiPolygon, color: str, ax: plt.Axes = None):
         fx, fy = poly.exterior.xy
         ax.plot(fx, fy, color=color, linewidth=1, zorder=0) # Plot boundary line
         ax.fill(fx, fy, color=color, alpha=0.3, zorder=0) # Fill area
-def rasterize_shapely(geometry:int, width:int, height:int, x_range:Tuple[float], y_range:Tuple[float]):
+def rasterize_shapely(geometry:Polygon, bev_params:draw.TopView.Params):
     """
     Rasteriza una geometría de Shapely (Polygon o MultiPolygon) en un array numpy.
     Args:
         geometry (Polygon or MultiPolygon): La geometría a rasterizar.
-        width (int): El ancho del ráster de salida.
-        height (int): La altura del ráster de salida.
-        x_range (tuple): El rango (min_x, max_x) de las coordenadas x.
-        y_range (tuple): El rango (min_y, max_y) de las coordenadas y.
-
+        params: Los parámetros del TopView
     Returns:
         numpy.ndarray: bool np.uint8 array
     """
-    min_x, max_x = x_range
-    min_y, max_y = y_range
+    min_x, max_x = bev_params.range_x
+    min_y, max_y = bev_params.range_y
+    width       = bev_params.topview_size[0]
+    height      = bev_params.topview_size[1]
 
     # Crear una transformación afín para mapear las coordenadas del ráster al espacio real
     transform = rasterio.transform.from_bounds(min_x, min_y, max_x, max_y, width, height)
@@ -485,12 +531,22 @@ def get_occlusion_polys(objs_data:dict,
     intersections   = np.zeros((num_rays, steps)) # (ray index, step index)
 
     # Point intersection?
+    intersection_footprints = []
     for i in range(len(objs_data)):
         bbox = objs_data[i]['val']
         if objs_data[i]['coordinate_system'] != bev_coord_sys:
             bbox = scene.transform_cuboid(bbox, cs_src=objs_data[i]['coordinate_system'], cs_dst=bev_coord_sys, frame_num=frame_num)
-        intersections = bbox_intersects_with_rays(rays_points, intersections, bbox)
-    
+        obx     = get_oriented_bbox_from_vals(bbox)
+        aux     = np.asarray(obx.get_box_points())
+        assert len(aux) == 8, f"Invalid cuboid input. It has not 8 points: {aux}"
+        aux     = aux[[0, 1, 2, 7], :2] # 0, 1, 2, 7 -> Footprint indices
+        aux     = np.array([aux[0], aux[1], aux[3], aux[2]])
+        bbox_footprint = Polygon(aux)
+        intersections, does_it_intersects = bbox_intersects_with_rays(rays_points, intersections, bbox_footprint)
+        if does_it_intersects:
+            intersection_footprints.append(bbox_footprint)
+    intersection_footprints = MultiPolygon(intersection_footprints)
+
     # Build a Graph -> Identify connected components -> Create Multipolygons
     js, ks = np.where(intersections == 0.0) # visible
     visible_points  = rays_points[:, js, ks]
@@ -510,6 +566,15 @@ def get_occlusion_polys(objs_data:dict,
     bev_x_range = (-1.0, BEV2SEG_2_Interface.BEV_MAX_DISTANCE)
     bev_y_range = (-((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2,
                     ((bev_x_range[1] - bev_x_range[0]) / bev_aspect_ratio) / 2)
+    bev_params = draw.TopView.Params(
+        topview_size        =   (bev_width, bev_height),
+        background_color    =   0,
+        range_x             =   bev_x_range,
+        range_y             =   bev_y_range,
+        step_x              =   1.0,
+        step_y              =   1.0
+        )
+    
     bev_mask = np.ones((bev_height, bev_width)) * occ2name2id['background']
 
     # Rasterize driveable area
@@ -537,14 +602,15 @@ def get_occlusion_polys(objs_data:dict,
         lane_poly       = Polygon(poly3d_vals)
         lane_multipoly.append(lane_poly)
         if visible_polys.intersects(lane_poly):
-            mask = rasterize_shapely(lane_poly, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
+            mask = rasterize_shapely(lane_poly, bev_params=bev_params)
             bev_mask[mask == True] = occ2name2id['driveable']
 
     # Rasterize other polys
-    mask = rasterize_shapely(occluded_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
+    mask = rasterize_shapely(occluded_polys, bev_params=bev_params)
     bev_mask[mask == True] = occ2name2id['occluded']
-    mask = rasterize_shapely(occuped_polys, width=bev_width, height=bev_height, x_range=bev_x_range, y_range=bev_y_range)
-    bev_mask[mask == True] = occ2name2id['occuped']
+    # mask = rasterize_shapely(occuped_polys, bev_params=bev_params)
+    mask = rasterize_shapely(intersection_footprints, bev_params=bev_params)
+    bev_mask[(mask == True) & (bev_mask != occ2name2id['occluded'])] = occ2name2id['occuped']
 
     # Apply BEV visible mask
     visible_mask = np.ones((camera.height, camera.width, 3), dtype=np.uint8) * 255
@@ -1994,10 +2060,10 @@ def main(
         vcd.save(save_openlabel_path)
     
     # Save evaluation data
-    if not _debug:
-        print(f"Saving data in {save_data_path}...")
-        with open(save_data_path, "wb") as f:
-            pickle.dump(data, f)
+    # if not _debug:
+    #     print(f"Saving data in {save_data_path}...")
+    #     with open(save_data_path, "wb") as f:
+    #         pickle.dump(data, f)
     
 
 if __name__ == "__main__":   
