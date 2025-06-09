@@ -532,7 +532,7 @@ Nevertheless, the use case addressed in this work diverges significantly from th
 
 In this scenario, employing centroid distance as the criterion for evaluating position predictions with ground truth poses a significant challenge. Therefore, a more suitable metric, the volume-to-volume distance (v2v), has been adopted. This metric is defined as the minimum distance between the convex hulls of the considered volumes (Figure~\ref{fig:bbox_disparity_b}).
 
-However, the v2v metric has a notable limitation: it yields a value of zero whenever there is any intersection between the volumes, regardless of the degree of overlap. To overcome this, we utilize the Bounding Box Disparity (BBD) metric \cite{bounding_box_disparity}, which combines IoU and v2v into a single, continuous, and non-negative measure. This metric allows for the quantification of dissimilarity between two cuboids, whether they overlap or not. As stated in its original definition, while IoU can only compare intersecting cuboids, BBD provides a disparity measure even in the absence of overlap. Its interpretation is as follows:
+However, the v2v metric has a notable limitation: it yields a value of zero whenever there is any intersection between the volumes, regardless of the degree of overlap. To overcome this, we utilize the \aclink{BBD} metric \cite{bounding_box_disparity}, which combines IoU and v2v into a single, continuous, and non-negative measure. This metric allows for the quantification of dissimilarity between two cuboids, whether they overlap or not. As stated in its original definition, while IoU can only compare intersecting cuboids, \aclink{BBD} provides a disparity measure even in the absence of overlap. Its interpretation is as follows:
 
 \begin{equation}
     \begin{aligned}
@@ -584,6 +584,7 @@ Finally, the following metrics are calculated:
 
 
 \subsubsubsection{BEV masks evaluation} \label{sec:bev_masks_evaluation_methodology}
+\hl{New BEV masks generation!!!!}
 To evaluate the occupancy, occlusion, and drivable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
 
 This algorithm calculates camera viewing angles along the $\mathbf{\hat{x}_c}$ axis to define $N$ rays. A step length $h$ is also defined, which determines the intervals at which each ray will sample points to classify them as visible, occluded, or belonging to an occupied area. All rays originate from the camera coordinate frame and are subsequently transformed to the vehicle's coordinate frame as it is the coordinate system in which the \aclink{BEV} masks are generated (see Section~\ref{sec:BEVDataset}).

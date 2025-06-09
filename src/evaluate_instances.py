@@ -29,6 +29,7 @@ from shapely.geometry import MultiPolygon, Polygon, MultiPoint, Point
 from sklearn.cluster import DBSCAN
 from scipy.spatial.distance import pdist, squareform
 from scipy.spatial import Delaunay
+from scipy.ndimage import label as connected_components_label
 import rasterio
 from rasterio import features
 
@@ -36,7 +37,7 @@ from collections import deque
 import copy
 
 from tqdm import tqdm
-from typing import TypedDict, Dict, List, Tuple, Optional, Any
+from typing import TypedDict, Dict, List, Tuple, Optional, Any, Literal
 import argparse
 import pickle
 import json
@@ -291,9 +292,8 @@ def get_camera_fov_polygon(scene:scl.Scene, camera_depth:float, fov_coord_sys:st
     fov_poly_4xN_t = scene.transform_points3d_4xN(fov_poly_4xN, cs_src=fov_coord_sys, cs_dst='odom', frame_num=frame_num)
     fov_poly_3d_t = fov_poly_4xN_t[:3].T  # X, Y, Z
     return fov_poly_3d_t[:, :2]
-def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, bbox_footprint:Polygon) -> np.ndarray:
-    # assert bbox_footprint.contains(bbox_footprint.centroid)
 
+def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, bbox_footprint:Polygon) -> np.ndarray:
     does_it_intersects = False
     _, num_rays, num_steps = rays_points.shape
 
@@ -318,13 +318,8 @@ def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, 
                     intersections[j, k] = 1.0
                 current_bbox_hits_k.append(k) 
             else: 
-                # Si ya habíamos detectado una intersección con *esta* bbox en pasos anteriores
-                # y este punto ya no está en ella, entonces la bbox actual termina aquí
-                # y comienza a ocluir lo que hay detrás de ella.
                 if current_bbox_hits_k:
                     # Marcar como ocluido desde el punto siguiente al último hit de *esta* bbox.
-                    # Solo marcamos si el punto actual no está ya ocupado por una intersección (1.0)
-                    # o ocluido (2.0) por otra cosa.
                     for occl_k in range(current_bbox_hits_k[-1] + 1, num_steps):
                         if intersections[j, occl_k] == 0.0: # Solo si está libre
                             intersections[j, occl_k] = 2.0
@@ -332,12 +327,9 @@ def bbox_intersects_with_rays(rays_points:np.ndarray, intersections:np.ndarray, 
                             intersections[j, occl_k] = 2.0
                         elif intersections[j, occl_k] == 2.0: # Si ya estaba ocluida, paramos
                             break # No hay necesidad de seguir, el rayo ya está bloqueado
-                    # Una vez que hemos aplicado la oclusión de esta bbox, no necesitamos seguir
-                    # procesando este rayo para esta bbox, porque ya hemos pasado por ella.
                     break # Salir del bucle 'k' y pasar al siguiente rayo 'j'
 
         # Lógica de oclusión final para el rayo si el bucle 'k' terminó sin un 'break'
-        # (Es decir, si la bbox se extendía hasta el final del rayo o si el rayo no intersectó nada)
         if current_bbox_hits_k: # Si esta bbox tuvo al menos un hit en este rayo
             for occl_k in range(current_bbox_hits_k[-1] + 1, num_steps):
                 if intersections[j, occl_k] == 0.0:
@@ -401,45 +393,98 @@ def find_border_indices(js_cluster:np.ndarray, ks_cluster:np.ndarray) -> Tuple[L
     js_border = js_border_right         + js_border_bottom + js_border_left + js_border_top[::-1]
     ks_border = ks_border_right[::-1]   + ks_border_bottom + ks_border_left + ks_border_top[::-1]
     return js_border, ks_border
-def create_multipolygon(rays_points:np.ndarray, js, ks, eps:float=0.5, label="", gt_occ_bev_masks_path:str="trash") -> MultiPolygon:
+
+def create_multipolygon(rays_points:np.ndarray, 
+                        js, ks, 
+                        poly_type:Literal["visible", "occuped", "occluded"], 
+                        frame_num:int,
+                        gen_method:Literal["clustering", "connected_comp"] = "connected_comp",
+                        use_clustering:bool = False,
+                        clustering_eps:float=0.5, 
+                        clustering_jobs:int=2, 
+                        gt_occ_bev_masks_path:str="trash") -> MultiPolygon:
     # rays_points[(x, y, z), num_ray, num_step]
     xy_points = rays_points[:2, js, ks].T 
 
     if len(xy_points) == 0:
         return MultiPolygon()
 
-    cluster_path = os.path.join(gt_occ_bev_masks_path, f"{label}.pkl")
-    if os.path.exists(cluster_path):
-        with open(cluster_path, "rb") as f:
-            db = pickle.load(f)
+    grouped_points = {} # Diccionario que almacena los índices de los puntos de cada agrupación
+    if gen_method == "clustering":
+        cluster_path = os.path.join(gt_occ_bev_masks_path, f"{poly_type}_{frame_num}.pkl")
+        if os.path.exists(cluster_path):
+            with open(cluster_path, "rb") as f:
+                db = pickle.load(f)
+        else:
+            db = DBSCAN(eps=clustering_eps, n_jobs=clustering_jobs).fit(xy_points)
+            with open(cluster_path, "wb") as f:
+                pickle.dump(db, f)
+
+        # Find connected components
+        n_clusters_ = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
+        n_noise_ = list(db.labels_).count(-1)
+        original_indices = list(zip(js, ks))  # Emparejar los índices js y ks con las etiquetas
+        print(f"n_clusters: {n_clusters_} | n_noise: {n_noise_}")
+
+        # Crear un diccionario para almacenar los índices de los puntos que pertenecen a cada cluster
+        for idx, label in zip(original_indices, db.labels_):
+            if label == -1:  # Ignorar ruido (-1)
+                continue
+            if label not in grouped_points:
+                grouped_points[label] = []
+            grouped_points[label].append(idx)
+    
+    elif gen_method == "connected_comp":
+        # --- START OF CONNECTED COMPONENTS IMPLEMENTATION ---
+        # 1. Determine the overall grid size from js and ks to create a 2D mask
+        #    We need the maximum j and k values to define the dimensions of our grid.
+        #    js and ks are 1D arrays of indices.
+        max_j = np.max(js)
+        max_k = np.max(ks)
+
+        # Create an empty 2D boolean mask.
+        # Dimensions should be (max_j + 1, max_k + 1) because indices are 0-based.
+        # Initialize with False
+        mask_2d = np.zeros((max_j + 1, max_k + 1), dtype=bool)
+
+        # 2. Populate the mask: set True at the (j, k) positions where rays_points match the poly_type
+        #    The `js` and `ks` arrays already represent the points for the current `poly_type`
+        #    (filtered implicitly before calling this function).
+        mask_2d[js, ks] = True
+
+        # 3. Use scipy.ndimage.label to find connected components
+        #    The 'structure' argument defines connectivity (e.g., 8-connectivity for diagonal and cardinal)
+        #    [[1,1,1], [1,1,1], [1,1,1]] for 8-connectivity (including center itself, which is fine)
+        #    [[0,1,0], [1,1,1], [0,1,0]] for 4-connectivity (cardinal directions only)
+        #    Let's use 8-connectivity for a more robust "connected" definition.
+        labeled_array, num_features = connected_components_label(mask_2d, structure=np.ones((3,3)))
+
+        print(f"Found {num_features} {poly_type} connected components in frame {frame_num}")
+
+        # 4. Group the original (j, k) indices based on their component label
+        #    Iterate through the original js, ks which were already filtered for poly_type.
+        for i in range(len(js)):
+            j_idx = js[i]
+            k_idx = ks[i]
+            label = labeled_array[j_idx, k_idx] # Get the label for this (j, k) point
+
+            if label == 0: # Label 0 typically means background/unlabeled, or isolated noise in some contexts
+                continue   # Should not happen if js,ks only contain points that are True in mask_2d
+
+            if label not in grouped_points:
+                grouped_points[label] = []
+            grouped_points[label].append((j_idx, k_idx))
+    
     else:
-        db = DBSCAN(eps=0.5, n_jobs=2).fit(xy_points)
-        with open(cluster_path, "wb") as f:
-            pickle.dump(db, f)
-
-    # Find connected components
-    n_clusters_ = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
-    n_noise_ = list(db.labels_).count(-1)
-    original_indices = list(zip(js, ks))  # Emparejar los índices js y ks con las etiquetas
-    print(f"n_clusters: {n_clusters_} | n_noise: {n_noise_}")
-
-    # Crear un diccionario para almacenar los índices de los puntos que pertenecen a cada cluster
-    clustered_points = {}
-    for idx, label in zip(original_indices, db.labels_):
-        if label == -1:  # Ignorar ruido (-1)
-            continue
-        if label not in clustered_points:
-            clustered_points[label] = []
-        clustered_points[label].append(idx)
-
-    # Crear un poligono por cada cluster de puntos
+        raise Exception(f"Unknown gen_method: {gen_method}")
+    # Crear un poligono por cada grupo de puntos
     polygons = []
-    for _, indices in clustered_points.items():
-        js_cluster, ks_cluster = zip(*indices)
-        js_cluster, ks_cluster = np.array(js_cluster), np.array(ks_cluster)
+    for _, indices in grouped_points.items():
+        js_group, ks_group = zip(*indices)
+        js_group, ks_group = np.array(js_group), np.array(ks_group)
         
         # Find border indices
-        js_border, ks_border = find_border_indices(js_cluster, ks_cluster)
+        js_border, ks_border = find_border_indices(js_group, ks_group)
         border_pts = np.array([rays_points[:2, j, k] for j, k in zip(js_border, ks_border)]) # Para mantener el orden
         poly = Polygon(border_pts)
 
@@ -550,17 +595,17 @@ def get_occlusion_polys(objs_data:dict,
     # Build a Graph -> Identify connected components -> Create Multipolygons
     js, ks = np.where(intersections == 0.0) # visible
     visible_points  = rays_points[:, js, ks]
-    visible_polys   = create_multipolygon(rays_points, js, ks, label=f"visible_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path)
+    visible_polys   = create_multipolygon(rays_points, js, ks, poly_type="visible", frame_num=frame_num, gen_method='connected_comp', gt_occ_bev_masks_path=gt_occ_bev_masks_path)
 
     js, ks = np.where(intersections == 1.0) # occuped
     occuped_points  = rays_points[:, js, ks]
-    occuped_polys   = create_multipolygon(rays_points, js, ks, label=f"occuped_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path, eps=0.01)
+    occuped_polys   = create_multipolygon(rays_points, js, ks, poly_type="occuped", frame_num=frame_num, gen_method='connected_comp', gt_occ_bev_masks_path=gt_occ_bev_masks_path)
 
     js, ks = np.where(intersections == 2.0) # occluded
     occluded_points = rays_points[:, js, ks]
-    occluded_polys  = create_multipolygon(rays_points, js, ks, label=f"occluded_{frame_num}", gt_occ_bev_masks_path=gt_occ_bev_masks_path)
+    occluded_polys  = create_multipolygon(rays_points, js, ks, poly_type="occluded", frame_num=frame_num, gen_method='connected_comp', gt_occ_bev_masks_path=gt_occ_bev_masks_path)
     
-    # TODO: Add lane polys and rasterize on the BEV common space
+    # Rasterize using the BEV params
     bev_height, bev_width = BEV2SEG_2_Interface.BEV_HEIGH, BEV2SEG_2_Interface.BEV_WIDTH 
     bev_aspect_ratio = bev_width / bev_height
     bev_x_range = (-1.0, BEV2SEG_2_Interface.BEV_MAX_DISTANCE)
