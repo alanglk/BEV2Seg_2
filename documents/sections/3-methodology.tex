@@ -1,27 +1,63 @@
 % ================================================
 % =                 METHODOLOGY                  =
 % ================================================ 
-This section details the methodology and implementations undertaken to address the objectives described in Section~\ref{sec:objectives}. On the first hand, the pipeline design for addressing \textit{"wich is the best approach for segmenting planar elements"} is introduced, tackling the model and dataset selection and the training and validation processes. Afterward, the implementation of the occupancy, occlusion, and drivable area pre-annotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
+% This section details the methodology and implementations undertaken to address the objectives described in Section~\ref{sec:objectives}. On the first hand, the pipeline design for addressing \textit{"wich is the best approach for segmenting planar elements"} is introduced, tackling the model and dataset selection and the training and validation processes. Afterward, the implementation of the occupancy, occlusion, and drivable area pre-annotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
+% Thus, this project can be divided into two main blocks: \aclink{BEV} semantic segmentation experimentation and the design and implementation of the pre-annotation pipeline. Finally, all experiments for evaluating the models and the resulting framework are presented in Section~\ref{sec:experiments_and_results}.
 
-Thus, this project can be divided into two main blocks: \aclink{BEV} semantic segmentation experimentation and the design and implementation of the pre-annotation pipeline. Finally, all experiments for evaluating the models and the resulting framework are presented.  
 
-\subsection{Segmentation experiment design: BEV2Seg\_2} \label{sec:bev2seg_2}
+This section details the methodology and implementations undertaken to address the objectives described in Section~\ref{sec:objectives}. To address the first objective (\objref{O1}), a comparative framework named BEV2Seg\_2 is established to analyze two distinct \aclink{BEV} semantic segmentation approaches: the traditional strategy of perspective image segmentation followed by an \aclink{IPM} reprojection, and the proposed alternative of direct segmentation in the \aclink{BEV} space. The methodology for this comparison includes the development of a common \aclink{BEV} reprojection module (\objref{T1}) to ensure consistency, the training of a shared semantic segmentation model architecture on both perspective images (\objref{T2}) and \aclink{BEV} images (\objref{T3}) resulting in two different models, and finally, the definition of a fair evaluation process on an identical validation set (\objref{T4}).
 
-To address the hypotesis that \textit{A semantic segmentation model trained with \aclink{BEV} images better segments planar elements} the process represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. It follows two main approaches: first, performing image segmentation on regular RGB images and then reprojecting them to \aclink{BEV}; second, applying \aclink{IPM} to the original images and then segmenting them with the model.
+Subsequently, the section addresses the second objective (\objref{O2}), which focuses on the practical application of these techniques. It details the implementation of an automated annotation pipeline (\objref{T5}) designed to generate \aclink{BEV} semantic masks for occupancy, occlusion, and drivable areas from vehicular scene data. To conclude, the methodology for the critical analysis of this annotation pipeline is outlined, assessing its overall effectiveness, strengths, and limitations (\objref{T6}).
+
+
+\subsection{[O1] BEV2Seg\_2} \label{sec:bev2seg_2}
+To address the hypotesis that \textit{"A semantic segmentation model trained with \aclink{BEV} images better segments planar elements than a traditional image-space segmentation followed by IPM"} the framework represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. This framework performs a direct comparison between two approaches: \textit{Segmenting-Then-IPM} strategy and an \textit{IPM-Then-Segmenting} strategy. Both approaches recieve perspective images as input, share a common BEV Reprojection Module, have the same model's architecture for obtaining semantic masks and they converge at a final comparison task where the quality of the output BEV semantic masks are evaluated.
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=\linewidth]{./images/methodology/bev2seg_2_flow.png}
-    \caption{bev2seg\_2 flow diagram.}
+    \includegraphics[width=\linewidth]{./images/methodology/BEV2Seg_2.png}
+    \caption{BEV2Seg\_2 diagram.}
     \label{fig:beg2seg_2_flow}
 \end{figure}
 
-Considering this flowchart, three main questions arises: (1) which segmentation model to use, (2) which dataset to train the models with, and (3) how to compare the train models and select the optimal output of the pipeline. 
+The following sections detail the main parts of this flowchart. First, the BEV reprojection module is described, explaining how it converts standard images into a unified \acl{BEV} and the selected \aclink{BEV} parameters. Next, the training process of both strategies is covered, including the selection of the semantic segmentation model and the dataset that is used. Finally, the evaluation method and metrics are presented to measure and compare both approaches, which help to confirm the initial hypothesis.
 
-\subsubsection{Segformer}
+\subsubsection{[T1] BEV reprojection module} \label{sec:bev_reprojection_module}
+The \aclink{BEV} reprojection module is a critical component responsible for transforming standar 2D perspective images and semantic masks into the \aclink{BEV} domain. This transformation is essential for creating the top-down views during inference of the BEV2Seg\_2 strategies but also for generating the necessary training and evaluation data of the framework.
+
+The core of this module leverages the \aclink{VCD} library \cite{VCD} to handle the complex geometric transformations required for reprojection. In order to generate a top-down view from either an input image or a semantic mask, it is necessary to provide the camera parameters to the module. This parameters are provided in the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format from which a lookup table is computed for appliying the \aclink{IPM} reprojection.
+
+Since this reprojection involves image warping, the interpolation method must be carefully chosen:
+\begin{itemize}
+    \item Linear interpolation is applied to images to ensure smooth transitions and maintain visual quality during the transformation.
+    \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
+\end{itemize}
+
+Despite this module is capable of generating \aclink{BEV} images from any camera mounted on the ego-vehicle, the virtual \aclink{BEV} camera parameters are fixed for generating top-down views were the front camera gets the best representative view. The origin of the reprojected coordinate system is precisely set as the midpoint of the rear wheel's axle, adhering strictly to the internationally recognized ISO 8855 standard \cite{ISO8855}, which provides a consistent reference point relative to the vehicle. The reprojection establishes a regular grid with a 1-meter cell spacing, effectively spanning 30 meters in front of the vehicle and 1 meter behind it. This precise spatial definition results in standardized BEV images with a consistent resolution of $1024 \times 1024$ pixels, providing a clear, top-down perspective of the vehicle's immediate surroundings.
+
+Despite this module's capability to generate \aclink{BEV} images from any camera mounted on the ego-vehicle, the virtual \aclink{BEV} camera parameters are fixed. This ensures consistent top-down views, especially optimized for the front camera's perspective which is the main imaging source used in this work. The reprojected coordinate system's origin is set at the midpoint of the rear wheel's axle, following the internationally recognized ISO 8855 standard \cite{ISO8855}. This provides a consistent reference point relative to the vehicle. The reprojection establishes a regular grid with a 1-meter cell spacing, effectively spanning 30 meters in front of the vehicle and 1 meter behind it. This spatial definition results in standardized BEV images with a consistent resolution of $1024 \times 1024$ pixels, offering a clear, top-down perspective of the vehicle's immediate surroundings as it can be seen in in Figure~\ref{fig:bev_reprojection}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{./images/shared/no_signal.jpg}
+    \caption{BEV Reprojection module example}
+    \label{fig:bev_reprojection}
+\end{figure}
+
+
+\subsubsection{[T2][T3] BEV segmentation strategies}
+The \aclink{BEV} semantic mask generation strategies proposed in this work share several common aspects: both perform semantic segmentation of images using a traditional semantic segmentation model, and both apply the \aclink{BEV} reprojection module at inference time. However, these approaches mainly differ in the order in which semantic mask acquisition and reprojection are performed, which leads to two different cases:
+
+In the case of the \textit{Segmenting-Then-IPM} strategy, semantic masks are first obtained from perspective images, and then these semantic masks are reprojected to the \aclink{BEV} domain, generating the final \aclink{BEV} semantic masks. Therefore, the semantic segmentation model must be trained and validated with perspective images and masks.
+
+On the other hand, for the \textit{IPM-Then-Segmenting} strategy, perspective images are first projected into the \aclink{BEV} domain and then semantic masks are obtained directly from these \aclink{BEV} images, resulting in the final \aclink{BEV} semantic masks. For this reason, the semantic segmentation model must be trained and validated with \aclink{BEV} images and masks.
+
+Consequently, it is necessary to select a traditional semantic segmentation model architecture to be shared by both strategies. Additionally, a dataset that contains both perspective and \aclink{BEV} images and masks is required to train and validate both approaches. Furthermore, it is crucial that this dataset also includes a test subset with \aclink{BEV} images and masks to enable a final comparison between the two strategies.
+
+\subsubsubsection{Model selection}
 There are multiple techniques and strategies for tackling semantic segmentation in both regular and \aclink{BEV} images (see Section~\ref{sec:sota}).  
 
-Several models could be chosen to address the proposed hypothesis. The current state of the art includes both \aclink{CNN} and \aclink{ViT}-based models that achieve competitive results. As shown in Figure~\ref{tab:segformer_model_comparison}, there is no significant difference in accuracy and inference speed among the top-performing models. Moreover, many of these models have already been applied in the context of \aclink{ADS}. In this work, Segformer~\cite{segformer} has been selected as the semantic segmentation model due to its balance between performance and efficiency. Additionally, it is integrated into the Huggingface~\cite{huggingface} ecosystem, which provides an optimized, parallelized implementation, facilitating distributed training.  
+Several models could be chosen to address the proposed hypothesis. The current state of the art includes both \aclink{CNN} and \aclink{ViT}-based models that achieve competitive results. As shown in Table~\ref{tab:segformer_model_comparison}, there is no significant difference in accuracy and inference speed among some of the top-performing models. Moreover, many of these models have already been applied in the context of \aclink{ADS}. In this work, Segformer~\cite{segformer} has been selected as the semantic segmentation model due to its balance between performance and efficiency. Additionally, it is integrated into the Huggingface~\cite{huggingface} ecosystem, which provides an optimized, parallelized implementation, facilitating distributed training.  
 
 \begin{table}[h]
     \centering
@@ -52,29 +88,20 @@ The Segformer model consists on an hierarchical Transformer  encoder, which extr
     \label{fig:segformer_architecture}
 \end{figure}
 
-The training strategy involves using pretrained encoders from ImageNet-1K, attaching an untrained segmentation head decoder, and fine-tuning the entire model for semantic segmentation of vehicular scenes. Since the objective is to train the models directly on \aclink{BEV} images, which differ significantly from standard perspective images, the encoder layers will remain trainable rather than being frozen.
+The training strategy involves using pretrained encoders from ImageNet-1K, attaching an untrained segmentation head decoder, and fine-tuning the entire model for semantic segmentation of vehicular scenes. Since the objective includes training the model directly on \aclink{BEV} images, which differ significantly from standard perspective images, the encoder layers will remain trainable rather than being frozen.
 
+\subsubsubsection{BEVDataset} \label{sec:BEVDataset}
+In order to train the models on the segmentation task, a valid dataset must be selected. There are several semantic segmentation datasets for the \aclink{ADS} context such as Cityscapes \cite{Cityscapes}, that defines $30$ semantic classes and provides $5,000$ frames with pixel-level high-quality annotations and $20,000$ weakly annotated images; KITTI \cite{KITTI}, which provides $400$ annotated images with a $0.5$ split for training and validation following the Cityscapes annotation format; ApolloScape \cite{ApolloScape}, that provides $146,997$ frames with corresponding pixel-level annonations and pose information for $25$ labels; or NuImages, a subset of NuScenes \cite{nuscenes}, that contains annotated images on $26$ different labels. For all of them, the ego pose and camera parameters metadata are provided. 
 
-\subsubsection{BEVDataset} \label{sec:BEVDataset}
-In order to train the model on the segmentation task, a valid dataset must be selected. There are several semantic segmentation datasets for the \aclink{ADS} context such as Cityscapes \cite{Cityscapes}, that defines $30$ semantic classes and provides $5.000$ frames with pixel-level high-quality annotations and $20.000$ weakly annotated images; KITTI \cite{KITTI}, which provices $400$ annotated images with a $0.5$ split for training and validation following the Cityscapes annotation format; ApolloScape \cite{ApolloScape}, that provides $146.997$ frames with corresponding pixel-level annonations and pose information for $25$ labels; or NuImages, a subset of NuScenes \cite{nuscenes}, that contains annotated images on $26$ different labels. For all of them, the ego pose and camera parameters metadata are provided. 
+While other benchmarks like WildDash \cite{WildDash} and CamVid \cite{CamVid} exist, a rich dataset is essential for training these models. Despite Cityscapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it provides very accurate ego poses and camera parameters, it has 3D annotations and it has a very good documentation.
 
-There are other benchmarks \cite{WildDash} \cite{CamVid} but in orther to train the models a rich dataset is needed. Despite Cityscapes and ApolloScape being good options for this task, NuImages has been selected as it is one of the most used datasets for \aclink{ADS} tasks, it provides very accurate ego poses and camera parameters, it has 3D annotations and it has a very good documentation.
+NuImages contains around $93,000$ samples with approximately $80\%$ reserved for the training set and $20\%$ for validation. Additionally, NuImages includes a private test set reserved for benchmark evaluations, whose annotations are not publicly available.
 
-NuImages contains around $93.000$ samples with aproximately $80\%$ reserved for the training set and $20\%$ for validation. Additionally, NuImages includes a private test set reserved for benchmark evaluations, whose annotations are not publicly available.
+To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset named BEVDataset. This dataset has all front-camera images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further divided to ensure fair comparisons between models from different pipelines.
 
-To train the models in the pipeline, a parser has been developed to convert NuImages into a sub-dataset named BEVDataset. This dataset has all front-camera images with NuImages annotations. Since the test annotations in NuImages are private, the validation set has been further splitted to ensure fair comparisons between models from different pipelines.
+The conversion process is performed using a custom parser named 'OLDatasets', which transforms NuImages samples into the structured ASAM OpenLABEL format, where metadata for each frame is stored. Additionally, all front-images and semantic annotated masks are reprojected into the \aclink{BEV} domain using the \aclink{BEV} reprojection module (see Section~\ref{sec:bev_reprojection_module}).
 
-The conversion process is performed using a custom parser named 'OLDatasets', which transforms NuImages samples into the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format, where metadata for each frame is stored. In the case of BEVDataset, images are reprojected into the \aclink{BEV} domain using the \aclink{VCD} library \cite{VCD}. This library provides tools to handle OpenLABEL annotations and manage both 2D and 3D data efficiently.
-
-The OLDatasets parser extracts the camera parameters for each sample and computes a lookup table to apply \aclink{IPM} reprojection. Using this data, semantic pixel masks are generated and reprojected along with the original images into the \aclink{BEV} space. Since this reprojection involves image warping, the interpolation method must be carefully chosen:
-\begin{itemize}
-    \item Linear interpolation is applied to images.
-    \item Nearest neighbor interpolation is used for semantic masks to preserve pixel class integrity. 
-\end{itemize}
-
-The virtual \aclink{BEV} camera parameters are fixed. The reprojection's coordinate system origin is set as the midpoint of the rear wheel's axle, according to the ISO 8855 standard~\cite{ISO8855}. This setup projects a regular grid with a 1-meter cell spacing, spanning 30 meters in front of the vehicle and 1 meter behind it. The resulting images have a resolution of $1024 \times 1024$ pixels.
-
-Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in Figure~\ref{fig:bev_dataset}. More details about the dataset conversion and especifications can be fount at Appendix~\ref{appendix:OLDatasets}.
+As a result, BEVDataset contains a total of $16,427$ samples. Each sample includes a metadata file, the original perspective image and its semantic mask alongside its corresponding \aclink{BEV} reprojected image and mask. The dataset's distribution is shown in Figure~\ref{fig:bev_dataset}, and more details about the dataset conversion and especifications can be found at Appendix~\ref{appendix:OLDatasets}.
 
 \begin{figure}[h!]
     \centering
@@ -83,8 +110,8 @@ Finally, BEVDataset contains a total of $16.427$ images, distributed as shown in
     \label{fig:bev_dataset}
 \end{figure}
 
-\subsubsection{Validation and comparison}
-When validating and comparing different segmentation models, it is essential to use a common dataset and apply appropriate metrics that allow for a quantitative and objective evaluation of model performance. The first requirement is met by using the test set of the dataset, which has not been previously exposed to the models being compared. Regarding evaluation metrics, as shown in Figure~\ref{fig:semantic_masks}, where a semantic mask predicted by a segmentation model is displayed alongside the corresponding annotated ground truth mask, it is intuitive to assume that an accurate prediction is one that maximizes the overlap between the predicted mask and the ground truth while also avoiding excessive overflow beyond the boundaries of the ground truth regions.
+\subsubsection{[T4] Validation and comparison methodology}
+When validating and comparing different segmentation models, it is essential to use a common dataset and apply appropriate metrics that allow for a quantitative and objective evaluation of model performance. The first requirement is met by using the \aclink{BEV} images and semantic masks from the test set of the BEVDataset, which has not been previously exposed to the models being compared. Regarding evaluation metrics, as shown in Figure~\ref{fig:semantic_masks}, where a semantic mask predicted by a segmentation model is displayed alongside the corresponding annotated ground truth mask, it is intuitive to assume that an accurate prediction is one that maximizes the overlap between the predicted mask and the ground truth while also avoiding excessive overflow beyond the boundaries of the ground truth regions.
 
 \begin{figure}[htbp]
     \centering
@@ -106,7 +133,7 @@ When validating and comparing different segmentation models, it is essential to 
         \label{fig:semantic_masks_c}
     \end{subfigure}
 
-    \caption{Semantic masks example: (a) original image, (b) colored semantic ground truth, (c) colored inferenced semantic mask.}
+    \caption{Semantic masks example: (a) original image, (b) colored semantic ground truth, (c) colored predicted semantic mask.}
     \label{fig:semantic_masks}
 \end{figure}
 
@@ -120,22 +147,19 @@ To quantify this, two distinct but related metrics are commonly used: the Dice c
     \label{eq:semantic_metrics}
 \end{equation}
 
-Suppose we start from an image with resolution $H \times W$ and aim to predict $N$ different classes. The model output will be a tensor of dimensions $H \times W \times N$, representing $N$ masks of size $H \times W$, where each element encodes a class-specific confidence value. However, in semantic segmentation, only the best prediction per pixel is retained, resulting in $N$ binary masks that represent the final semantic classifications of the original image. In this context, the described metrics are computed independently for each of the $N$ classes.
+Suppose starting from an image with resolution $H \times W$ and aim to predict $N$ different classes. The model's output will be a tensor of dimensions $H \times W \times N$, representing $N$ masks of size $H \times W$, where each element encodes a class-specific confidence value. However, in semantic segmentation, only the best prediction per pixel is retained, resulting in $N$ binary masks that represent the final semantic classifications of the original image. In this context, the described metrics are computed independently for each of the $N$ classes.
 
-For a fixed ground truth, both metrics are positively correlated: if classifier A outperforms classifier B according to one metric, it will also outperform it according to the other (see Appendix~\ref{appendix:f1_iou}). This might suggest that the choice between the two metrics is arbitrary; however, differences become apparent when averaging scores over a set of predictions. At this stage, although both metrics may agree that model A performs better than model B, they differ in how much better one model is compared to the other.
+For a fixed ground truth, both metrics are positively correlated: if classifier A outperforms classifier B according to one metric, it will also outperform it according to the other (see Appendix~\ref{appendix:f1_iou}). This might suggest that the choice between the two metrics is arbitrary; however, differences become apparent when averaging scores over a set of predictions. While both metrics may agree that model A performs better than model B, they differ in how much better one model is compared to the other.
 
 In general, the \aclink{IoU} metric tends to penalize poorly classified instances more severely than the F1-score, thereby offering a performance measure that reflects worst-case behavior. In contrast, the F1-score is more representative of average-case performance. As a result, when computing averages across multiple predictions, \aclink{IoU} is more sensitive to significant outliers, while F1-score tends to be more forgiving in such cases.
 
-Taking all this into account, \aclink{mIoU} has been chosen as the primary metric for evaluating and comparing models in this work.
+Taking all this into account, the methodology for comparing the \aclink{BEV} semantic segmentation strategies in this thesis is to evaluate them on the test set of the BEVDataset and use \aclink{mIoU} as the primary metric for comparison, as this metric is more sensitive to poor predictions.
 
-\subsection{Driveable area automatic annotation}
-\label{sec:aplication}
 
-This section details the selected approach used to automatically annotate occupancy and occlusion masks in vehicular scenes. The method employs a 2D-to-3D approach, using estimated depth maps from monocular images to approximate object dimensions and compute the corresponding masks.
+\subsection{[O2] Automatic Annotation of Vehicular Scenes} \label{sec:aplication}
+This section details the selected approach for automatically annotating occupancy, occlusion, and driveable masks within vehicular scenes. The implemented solution employs a 2D-to-3D approach, which involves estimating point clouds from monocular images, which are then used to approximate object dimensions and compute the necessary semantic masks.
 
-As shown in Figure~\ref{fig:application_flow_diagram}, the method can be divided into four main stages: depth estimation, where a depth map is generated from monocular front images; frame point cloud estimation, which creates a 3D representation of the current scene; projection of the perspective semantic mask onto the 3D point cloud to infer object instances for each selected semantic class; and the final computation of occupancy, occluded, and drivable areas by combining 3D object information with \aclink{BEV} semantic masks.
-
-The system's output is annotated in the OpenLABEL format and integrated with the WebLABEL~\cite{weblabel} ecosystem, enabling further fine annotations by the user. Additionally, a visualization tool has been developed using the Open3D~\cite{open3d} library to facilitate the rendering process of vehicular scenes.
+To measure the quality, strengths, and limitations of this design's performance, an evaluation methodology is essential. This methodology specifically focuses on two key aspects: the accuracy of the 3D detections and the quality of the resulting occupancy, occlusion, and driveable masks as illustrated in Figure~\ref{fig:application_flow_diagram}.
 
 \begin{figure}[h!]
     \centering
@@ -144,7 +168,14 @@ The system's output is annotated in the OpenLABEL format and integrated with the
     \label{fig:application_flow_diagram}
 \end{figure}
 
-\subsubsection{Depth estimation}
+\subsubsection{[T5] Annotation pipeline design}
+As shown in Figure~\ref{fig:application_flow_diagram}, the pre-annotation method can be divided into four main stages: depth estimation, where a depth map is generated from monocular front images; frame point cloud estimation, which creates a 3D representation of the current scene; projection of the perspective semantic mask onto the 3D point cloud to infer object instances for each selected semantic class; and the final computation of occupancy, occluded, and driveable areas by combining 3D object information with \aclink{BEV} semantic masks.  Thus, this process relies on both perspective and \aclink{BEV} semantic segmentation, specifically carried out by the \textit{Segmenting-Then-IPM} module.
+
+While this pre-annotation pipeline could also work using only \aclink{BEV} semantic masks, the current design is optimized for perspective semantic masks. This is because perspective masks are directly projected onto the generated 3D point clouds to obtain semantic point clouds. Although it's possible to achieve this with just \aclink{BEV} masks, doing so would require developing a mechanism to associate \aclink{BEV} pixels with corresponding 3D points. In contrast, using perspective images for this task is more straightforward, as each pixel is already directly associated to a corresponding 3D point in the point cloud. Consequently, the \textit{Segmenting-Then-IPM} approach is more suitable for this specific annotation application.
+
+The system's output is annotated in the OpenLABEL format and integrated with the WebLABEL~\cite{weblabel} ecosystem, enabling further fine annotations by the user. Additionally, a visualization tool has been developed using the Open3D~\cite{open3d} library to facilitate the rendering process of vehicular scenes.
+
+\subsubsubsection{Depth estimation}
 \label{sec:depth_estimation}
 
 Traditional depth estimation techniques \cite{computer_vision_depth_estimation} rely on geometric and photometric marks to infer depth from images. For example, stereo vision (\ref{fig:depth_estimation_a}) uses two or more cameras to capture the same scene from slightly different viewpoints, allowing depth to be estimated through disparity between the images. Similarly, structure from motion (SfM) (\ref{fig:depth_estimation_b}) relies on multiple images taken at different times or positions to compute motion parallax and infer scene's depth. Other multi-view techniques include shape from defocus (\ref{fig:depth_estimation_c}), which estimates depth based on the amount of blur in the images, and photometric stereo (\ref{fig:depth_estimation_d}), which uses multiple images captured from the same viewpoint but under different lighting directions to recover surface orientation and depth.
@@ -189,7 +220,7 @@ In the case of single-image depth estimation, traditional methods like shape fro
 
 With the continuous development of deep learning technologies, depth estimation and 3D reconstruction methods based on these approaches are constantly updated. They have become a powerful choice for monocular depth estimation as they offer high reconstruction accuracy and computational efficiency. However, a common limitation of such models is their dependency on training data as performance tends to decrease if the target image is not consistent with the learning database.
 
-This is where Depth-Pro \cite{depth-pro} comes into as it is 'a foundation model for zero-shot metric monocular depth estimation'. Trained on a large and diverse dataset, Depth-Pro generalizes well across multiple real-world scenarios and achieves state-of-the-art performance without requiring fine-tuning. For this thesis, Depth-Pro has been chosen as the monocular depth estimation model to generate depth maps for annotation purposes.
+This is where Depth-Pro \cite{depth-pro} comes into as it is "a foundation model for zero-shot metric monocular depth estimation". Trained on a large and diverse dataset, Depth-Pro generalizes well across multiple real-world scenarios and achieves state-of-the-art performance without requiring fine-tuning. For this thesis, Depth-Pro has been chosen as the monocular depth estimation model to generate depth maps for pre-annotation purposes.
 
 \begin{figure}[h!]
     \centering
@@ -215,11 +246,11 @@ This is where Depth-Pro \cite{depth-pro} comes into as it is 'a foundation model
         \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/colored_depth_map_6.png} &
         \includegraphics[width=0.12\textwidth]{images/methodology/depth_images/colored_depth_map_7.png} \\
     \end{tabular}    
-    \caption{Depth maps of BEVDataset 'mini' estimated with Depth-Pro model.}
+    \caption{Depth maps of BEVDataset "mini" estimated with Depth-Pro model.}
     \label{fig:depth_images}
 \end{figure}
 
-\subsubsection{Scene PCD}
+\subsubsubsection{Scene PCD}
 When an image is captured, the 3D geometry of the scene is projected onto a 2D representation, which is then rasterized into the pixel space of the image. This transformation from 3D world coordinates to 2D image coordinates is known as the \emph{camera projection process}. In its simplest form, this is described by the \emph{pinhole camera model}, illustrated in Figure~\ref{fig:pinhole_model}. In this setup, $\mathbf{O}_w$ represents the world coordinate frame, $\mathbf{F}_c$ denotes the camera coordinate frame (typically located at the camera's optical center or pinhole), and $\mathbf{F}_i$ defines the 2D image plane.
 
 \begin{figure}[h!]
@@ -323,9 +354,8 @@ The approach employed for this task is detailed in Algorithm~\ref{algorithm:scen
     \label{fig:raw_pointcloud}
 \end{figure}
 
-\subsubsection{Instance scene PCD}
-
-The objective of this module is to compute instance-level point clouds from the previously reconstructed scene point cloud using the corresponding semantic mask of the input perspective image (obtained as one of the BEV2Seg\_2 module's output). The semantic and geometric information is fed into this module, where instance differentiation is performed for specific object classes as shown in Figure~\ref{fig:instance_scene_diagram}. This enables the isolation of individual instance point clouds and the computation of their enclosing cuboids. The resulting panoptic point cloud provides a 3D object-level representation of the scene, which can be used as input for subsequent modules. It is also interesting to point out this is achieved from a single monocular image, demonstrating the system's capability for 3D object detection without requiring multi-view or stereo data.
+\subsubsubsection{Instance scene PCD}
+The objective of this module is to compute instance-level point clouds from the previously reconstructed scene point cloud using the corresponding semantic mask of the input perspective image (obtained from the \textit{Segmenting-Then-IPM} module of the BEV2Seg\_2 framework). The semantic and geometric information is fed into this module, where instance differentiation is performed for specific object classes as shown in Figure~\ref{fig:instance_scene_diagram}. This enables the isolation of individual instance point clouds and the computation of their enclosing cuboids. The resulting panoptic point cloud provides a 3D object-level representation of the scene, which can be used as input for subsequent modules. It is also interesting to point out this is achieved from a single monocular image, demonstrating the system's capability for 3D object detection without requiring multi-view or stereo data.
 
 \begin{figure}[h!]
     \centering
@@ -388,7 +418,7 @@ Once the semantic mask has been preprocessed and the point cloud computed, a pre
     \label{fig:semantic_pointcloud}
 \end{figure}
 
-The instance detection process (Algorithm~\ref{algorithm:instance_pointcloud}) faces two key challenges: extracting individual instances from dynamic semantic point clouds and mitigating the inherent noise and artifacts that result from the depth estimation process. To address this, the DBSCAN clustering algorithm is employed. It effectively extracts distinct instances from each dynamic semantic point cloud, removes noisy outlier points and minimizes the "trail" artifacts commonly left by depth estimation along object edges, as illustrated in Figure~\ref{fig:semantic_pointcloud_b}. Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\mathbf{\hat{x}_c}$, $\mathbf{\hat{y}_c}$, and $\mathbf{\hat{z}_c}$. Oriented bounding boxes were not used in this work.
+The instance detection process faces two key challenges: extracting individual instances from dynamic semantic point clouds and mitigating the inherent noise and artifacts that result from the depth estimation process. To address this, the DBSCAN clustering algorithm is employed. It effectively extracts distinct instances from each dynamic semantic point cloud, removes noisy outlier points and minimizes the "trail" artifacts commonly left by depth estimation along object edges, as illustrated in Figure~\ref{fig:semantic_pointcloud_b}. Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\mathbf{\hat{x}_c}$, $\mathbf{\hat{y}_c}$, and $\mathbf{\hat{z}_c}$. Oriented bounding boxes were not used in this work.
 
 Estimating the correct orientation of a bounding box is a challenging task, especially when only a partial view of the object is available (see Figure~\ref{fig:oriented_bounding_box_problems}). Depending on the viewpoint and the amount of visible surface, traditional methods are very likely to produce inaccurate orientation estimates. Modern 3D object detection models typically address this issue by learning the statistical distribution of common object shapes and orientations. Datasets like NuScenes even provide metrics such as Average Scale Error and Average Orientation Error to evaluate the accuracy of these predictions.
 
@@ -401,26 +431,7 @@ However, the main goal in this thesis is to estimate the physical space occupied
     \label{fig:oriented_bounding_box_problems}
 \end{figure}
 
-\hl{Change oriented bounding box problems figure. Complete this algorithm.}
-\begin{algorithm}
-    \caption{Instance Pointcloud Computation}
-    \label{algorithm:instance_pointcloud}
-    \footnotesize
-
-    \begin{algorithmic}[1]
-        \State \textbf{Input:} $P^{inst}$ panoptic pointcloud
-        \State \textbf{Output:} $P^{inst}$ filtered panoptic pointcloud
-        
-        \For{$label \text{ in } P^{inst}$}
-            \For{$i \text{ in } P^{inst}\left[label\right]$}
-                \State $B \gets $
-            
-            \EndFor
-        \EndFor
-        
-        \State \Return $P$
-    \end{algorithmic}
-\end{algorithm}
+\hl{Change oriented bounding box problems figure.}
 
 Finally, a filtering process is performed to ensure there are no noisy, redundant, too far away or floating instances. Also, it ensures there are no overlapping bounding boxes by checking each new instance's 3D bounding box against those already accepted. If an overlap is detected, the function compares their sizes: the larger box is kept, and the smaller one is removed or ignored. This helps avoid redundant or conflicting instances that may represent the same object or spatial region, improving the clarity and consistency of the data. The final results of this module are shown in Figure~\ref{fig:instance_scene_images}.
 
@@ -443,29 +454,14 @@ Finally, a filtering process is performed to ensure there are no noisy, redundan
 \end{figure}
 
 
-\subsubsection{Instance BEV mask} \label{sec:instance_bev_mask_methodology}
-Once the 3D instance detection is performed and the panoptic point cloud is generated, the final occupancy and occlusion masks can be estimated using the semantic \aclink{BEV} masks.
+\subsubsubsection{BEV masks generation} \label{sec:instance_bev_mask_methodology}
+Once the panoptic point cloud is generated and the 3D instance detection is computed, the final occupancy, occlusion and driveable masks can be estimated using the \aclink{BEV} semantic masks.
 
-To associate the \aclink{BEV} semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is related to one polygon but a polygon may have multiple masks. This is represented in Algorithm~\ref{algorithm:occ_masks} and results in a final representation of occupancy, defined by the base of the 3D bounding box, and occlusion, which is captured by the distorded shape of the semantic mask from the \aclink{BEV} perspective.
+To associate the \aclink{BEV} semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is related to one polygon but a polygon may have multiple masks. This scenario arises because the occlusion mask of the object may appear fragmented in the \aclink{BEV} semantic view; while connected components labeling identifies each fragment as a separate region, all fragments originating from the same 3D object are correctly associated with the same cuboid base. This association process is further described in Appendix~\ref{appendix:bev_masks_generation}.
 
-A single cuboid base can be associated with multiple \aclink{BEV} masks because a 3D instance may appear fragmented in the \aclink{BEV} semantic view. When connected components labeling is applied to these masks, each fragment is identified as a separate region. However, since all fragments originate from the same 3D object, they are associated with the same cuboid base.
+This methodology results in a final representation of occupancy, defined by the base of the 3D bounding box; and occlusion, which is captured by the distorted shape of the semantic mask from the \aclink{BEV} perspective. This approach, using distorted areas as occlusion masks, both accurately reflects the occluded area and limits the accumulation of errors that could arise if 3D detection occupancy masks were used as an intermediate input for their generation.
 
-\hl{Complete this algorithm.}
-\hl{De esta manera, se pueden obtener máscaras de oclusión acordes al área ocluida en BEV por el objeto semántico utilizando el propio proceso de reproyección BEV; y se limita la acumulación de errores que podría darse al emplear las máscaras de ocupación de la detección 3D como input para generar las máscaras de oclusión.}
-
-\begin{algorithm}
-    \caption{Occupancy Occlusion masks}
-    \label{algorithm:occ_masks}
-    \footnotesize
-
-    \begin{algorithmic}[1]
-        \State \textbf{Input:} 
-        \State \textbf{Output:} 
-        \State \Return $x$
-    \end{algorithmic}
-\end{algorithm}
-
-This method allows for estimating the vehicle’s extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
+Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
 
 \begin{figure}[h!]
     \centering
@@ -498,7 +494,7 @@ This method allows for estimating the vehicle’s extent while handling certain 
 \end{figure}
 
 
-Finally, these estimated occupancy and occlusion masks are rasterized onto the \aclink{BEV} drivable area mask, which is obtained from the initial semantic segmentation step. This final overlay adheres to the specific labeling scheme detailed in Table~\ref{tab:occ2_labels}. The entire process, from initial detections to the final composite BEV mask, is visually summarized in Figure~\ref{fig:bev_occupancy_occlusion}.
+Finally, these estimated occupancy and occlusion masks are combined with the \aclink{BEV} drivable area mask, which is obtained from the initial semantic segmentation step. This final overlay adheres to the specific labeling scheme detailed in Table~\ref{tab:occ2_labels}. The entire process, from initial detections to the final composite BEV mask, is visually summarized in Figure~\ref{fig:bev_occupancy_occlusion}.
 
 \begin{table}[h]
     \centering
@@ -517,7 +513,7 @@ Finally, these estimated occupancy and occlusion masks are rasterized onto the \
     \label{tab:occ2_labels}
 \end{table}
 
-\subsubsection{Evaluation strategy}
+\subsubsection{[T6] Evaluation strategy}
 As early mentioned, the final objective of the annotation pipeline is to provide occupancy, occlusion and driveable area masks. To achieve this, the process starts from semantic masks of the environment, both in the camera and \aclink{BEV} domains. A crucial intermediate step in this pipeline is the 3D object detection from monocular images in the camera view to estimate the dimensions and positions of obstacles. As this detection is performed using pointcloud clustering algorithms it is particularly important to assess its performance using appropriate evaluation metrics.
 
 Another key aspect of the evaluation involves assessing the quality of the generated \aclink{BEV} masks. Therefore, the evaluation methodology must address two distinct components: the accuracy of the monocular 3D object detection, and the fidelity of the resulting \aclink{BEV} masks when compared to a defined ground truth. This evaluation uses the pipeline's output OpenLabel file for a vehicular scene, alongside the corresponding ground truth OpenLabel file which contains annotated elements. A 'vehicular scene' is defined here as a sequence of frames with annotations that include not only the environment, but also vehicle position and odometry.
@@ -584,15 +580,13 @@ Finally, the following metrics are calculated:
 
 
 \subsubsubsection{BEV masks evaluation} \label{sec:bev_masks_evaluation_methodology}
-\hl{New BEV masks generation!!!!}
-To evaluate the occupancy, occlusion, and drivable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
+To evaluate the occupancy, occlusion, and driveable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
 
 This algorithm calculates camera viewing angles along the $\mathbf{\hat{x}_c}$ axis to define $N$ rays. A step length $h$ is also defined, which determines the intervals at which each ray will sample points to classify them as visible, occluded, or belonging to an occupied area. All rays originate from the camera coordinate frame and are subsequently transformed to the vehicle's coordinate frame as it is the coordinate system in which the \aclink{BEV} masks are generated (see Section~\ref{sec:BEVDataset}).
 
-Once these rays and their corresponding check points are established in the \aclink{BEV} mask coordinate frame, the point classification process begins. An iteration process goes through camera-visible objects (also transformed to the vehicle coordinate frame) and check if the base of the object's bounding box contains each ray's point. Here, three outcomes are possible: no intersection, indicating a visible point; intersection, classifying the point as occupied; or no current intersection but a previous intersection along the same ray, resulting in occlusion classification.
+Once these rays and their corresponding check points are established in the \aclink{BEV} mask coordinate frame, the point classification process begins. An iteration process goes through camera-visible objects (also transformed to the vehicle coordinate frame) and check if the base of the object's bounding box contains each ray's point. Here, three outcomes are possible: no intersection, indicating a visible point; intersection on a visible point, classifying the point as occupied; or no current intersection but a previous intersection along the same ray, resulting in occlusion classification.
 
-
-Following ray point evaluation, closed polygon sets are constructed to represent all points within each of the three classes. A clustering algorithm groups points of the same class to distinguish connected areas and generate individual sub-polygons. These sub-polygons are formed using only the edge points of each cluster and finally, the ground truth drivable area, which is directly annotated as polygons, undergoes a simpler process of identifying camera-visible polygons. All polygon sets are then rasterized into semantic masks, adhering to the used \aclink{BEV} parameters and considering the semantic classes described in Table~\ref{tab:occ2_labels}. This whole process is represented in Figure~\ref{fig:gt_occ2_masks}.  
+Following ray point evaluation, closed polygon sets are constructed to represent all points within each of the three classes. A connected components algorithm groups points of the same class to distinguish connected areas and generate individual sub-polygons. These sub-polygons are formed using only the edge points of each connected component and finally, the ground truth drivable area, which is directly annotated as polygons, undergoes a simpler process of identifying camera-visible polygons. All polygon sets are then rasterized into semantic masks, adhering to the used \aclink{BEV} parameters and considering the semantic classes described in Table~\ref{tab:occ2_labels}. This whole process is represented in Figure~\ref{fig:gt_occ2_masks}.  
 
 \begin{figure}[htbp]
     \centering

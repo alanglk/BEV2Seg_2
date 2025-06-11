@@ -246,7 +246,7 @@ Overall, the findings from the validation set suggest that the custom data augme
     \label{fig:bev_before_after_data_aug_test}
 \end{figure}
 
-\subsubsection{raw2segbev vs raw2bevseg}
+\subsubsection{Segmenting-Then-IPM vs IPM-Then-Segmenting}
 The Table~\ref{tab:model_comparison} shows a comparative analysis of semantic segmentation performance across different models, categorized into two distinct \aclink{BEV} mask generation pipelines: "\aclink{IPM} Then Segmenting" and "Segmenting Then \aclink{IPM}". Values represent the \aclink{mIoU} for the merged semantic classes (Section~\ref{sec:merging_labels}), with "Mean" indicating the average \aclink{mIoU} across all displayed classes for each model. Also, models are categorized by their architecture (MiT-B0, MiT-B2, MiT-B4) and the used data augmentation technique (O: No data augmentation, overfitted model; N: Normal data augmentation; E: Camera's extrinsic parameters modification)
 
 \begin{table}[h]

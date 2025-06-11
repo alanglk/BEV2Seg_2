@@ -117,6 +117,81 @@ Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
 \end{equation}
 
 
+\section{Annotation BEV masks generation} \label{appendix:bev_masks_generation}
+\begin{algorithm}
+    \caption{Occupancy, occlusion and driveable mask generation}
+    \label{algorithm:occ_masks}
+    \footnotesize
+
+    \begin{algorithmic}[1]
+        % Input-Output
+        \State \textbf{Input:} Initial BEV semantic mask $\mathcal{M}^{BEV}_{\left[h \times w\right]}$, panoptic data with 3D instance detections  $\mathcal{D}_{panoptic}$ and the set of selected labels for computing the semantic masks $\mathcal{L}_{sel}$
+        \State \textbf{Output:} Final composite BEV mask $\mathcal{M}^{final}_{\left[h \times w\right]}$
+        
+        % Initialization
+        \State \textbf{Initialize:}
+        \State $\mathcal{M}^{final}_{\left[h \times w\right]}, \mathcal{M}^{occupancy}_{\left[h \times w\right]}, \mathcal{M}^{occlusion}_{\left[h \times w\right]} \gets \mathbf{0}$
+        \State $\text{IntersectionFactors} \gets \text{empty dictionary}$ \Comment{Initialize structure to store intersection factors}
+        
+        % Main
+        \State \textbf{Main:}        
+        \For{each $\mathcal{I}_{sem}$ in $\mathcal{D}_{panoptic}$}
+            \If{$\mathcal{I}_{sem}[\text{'dynamic'}]$ is \textbf{False} or $\mathcal{I}_{sem}[\text{'label'}] \notin \mathcal{L}_{sel}$}
+                \State \textbf{continue}
+                \Comment{Skip if it is not dynamic or has not been selected.}
+            \EndIf
+        
+            \State $M_{ccomps} \gets \text{connectedComponents}(\mathcal{M}^{BEV}_{\left[h \times w\right]} == \mathcal{I}_{sem}[\text{'label\_id'}])$
+
+
+
+            % Compute intersection factors:
+            \For{each $B_{3D}$ in $\mathcal{I}_{sem}[\text{'instance\_3dboxes'}]$} \Comment{Compute intersection factors}
+                \State $\text{Factors}_{B_{3D}} \gets \text{empty list}$
+                \State $B_{mask} \gets \text{create\_binary\_mask\_of\_cuboid\_base}(B_{3D}, h, w)$
+                
+                \State $\mathcal{M}^{occupancy}_{\left[h \times w\right]} \lor = B_{mask}$
+
+                \For{each $M_{c}$ in $M_{ccomps}$}
+                    \State $\text{Factors}_{B_{3D}}.\text{append}(\text{compute\_IoU}(M_{c}, B_{mask}))$
+                \EndFor
+                \State $\text{IntersectionFactors}[B_{3D}] \gets \text{Factors}_{B_{3D}}$
+            \EndFor
+
+
+            % Assign connected components to cuboids and draw them in the M_occupancy and M_occlusion
+            \For{$j \gets 0 \text{ to } \text{len}(M_{ccomps})$} \Comment{Assign connected components to cuboids}
+                \State $\text{max\_val} \gets 0$
+                \State $\text{best\_bbox\_id} \gets -1$
+                \For{$i \gets 0 \text{ to } \text{len}(\mathcal{I}_{sem}[\text{'instance\_3dboxes'}])-1$}
+                    \State $B_{inst\_id} \gets \mathcal{I}_{sem}[\text{'instance\_3dboxes'}][i][\text{'inst\_id'}]$
+                    \State $f \gets \text{IntersectionFactors}[B_{inst\_id}][j]$
+                    \If{$f > \text{max\_val}$}
+                        \State $\text{max\_val} \gets f$
+                        \State $\text{best\_bbox\_id} \gets B_{inst\_id}$
+                    \EndIf
+                \EndFor
+
+                \If{$\text{max\_val} > 0$}
+                    \State $\mathcal{M}^{occlusion}_{\left[h \times w\right]} \lor = M_{ccomps}[j]$
+                \EndIf
+            \EndFor
+
+        \EndFor
+        
+        % Combine all masks into final output
+        \State $\mathcal{M}^{final}_{\left[h \times w\right]}[\mathcal{M}^{BEV}_{\left[h \times w\right]}[\text{'driveable'}]] \gets \text{label\_driveable\_id}$
+        \Comment{Assign drivable area}
+        \State $\mathcal{M}^{final}_{\left[h \times w\right]}[\mathcal{M}^{occlusion}_{\left[h \times w\right]} == 1] \gets \text{label\_occluded\_id}$
+        \Comment{Assign occluded area}
+        \State $\mathcal{M}^{final}_{\left[h \times w\right]}[\mathcal{M}^{occupancy}_{\left[h \times w\right]} == 1] \gets \text{label\_occuped\_id}$
+        \Comment{Assign occuped area}
+        
+        % Return
+        \State \Return $\mathcal{M}^{final}_{\left[h \times w\right]}$
+    \end{algorithmic}
+\end{algorithm}
+
 \section{Merging comparison}
 
 \begin{table}[h]

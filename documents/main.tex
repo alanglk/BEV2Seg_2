@@ -66,6 +66,7 @@
 
 % Definición de Macros
 \newcommand*{\fullref}[1]{\hyperref[{#1}]{\autoref*{#1} \nameref*{#1}}} % One single link
+\newcommand{\objref}[1]{\hyperref[fig:objectives]{\textbf{#1}}}
 
 \newcommand{\aclink}[1]{% Crear links a acronimos
   \ifcsdef{ac@#1}{%
