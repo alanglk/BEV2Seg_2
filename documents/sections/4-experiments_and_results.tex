@@ -1,10 +1,11 @@
 % ================================================
 % =                 EXPERIMENTS                  = 
 % ================================================ 
+\hl{Review this.}
 
 This section includes all experiments carried out for evaluating the difference between the two approaches considered in the BEV2Seg\_2 pipeline, experiments to study what is the influence of extrinsic parameters modification as data augmentation technique for semantic segmentation of BEV images and the final evaluation of the proposed annotation pipeline of occupancy, occlusion and driveable areas.
 
-\subsection{BEV2Seg\_2}
+\subsection{[T4] BEV2Seg\_2 experimentation}
 
 Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions. During fine-tuning for the segmentation task, encoder layers were left unfrozen, allowing the entire model to adapt to the training data. Input images were preprocessed using the \textit{SegformerImageProcessor}, which includes resizing to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing with ImageNet mean and standard deviation values~\cite{imagenet}. This preprocessing step ensures the input format is consistent with what the pretrained encoders expect.
 
@@ -304,7 +305,7 @@ Regarding model architecture, a subtle trend of increasing performance is observ
 This comprehensive analysis underscores the critical influence of the BEV transformation strategy on semantic segmentation accuracy, highlighting that segmenting in the native image space prior to reprojection is a more effective approach for achieving robust results across a diverse range of semantic classes.
 
 
-\subsection{Annotation evaluation}
+\subsection{[T6] Annotation evaluation}
 For the pipeline's evaluation, NuScenes scene "scene-0061" \footnote{\url{https://youtu.be/4gkyUWSZUkg?si=y5D9iybgzkv37Bko}} was used. This scene, captured in Singapore, includes object annotations, map data, and odometry at 2Hz for a total of 39 frames. The scene features a parked truck, a construction area, an intersection requiring a left turn, and the ego-vehicle following a van. The ego-vehicle's path is shown in Figure~\ref{fig:scene_ego_path}.
 
 \begin{figure}[h!]

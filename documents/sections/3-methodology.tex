@@ -156,7 +156,7 @@ In general, the \aclink{IoU} metric tends to penalize poorly classified instance
 Taking all this into account, the methodology for comparing the \aclink{BEV} semantic segmentation strategies in this thesis is to evaluate them on the test set of the BEVDataset and use \aclink{mIoU} as the primary metric for comparison, as this metric is more sensitive to poor predictions.
 
 
-\subsection{[O2] Automatic Annotation of Vehicular Scenes} \label{sec:aplication}
+\subsection{[O2] Automatic annotation of vehicular scenes} \label{sec:aplication}
 This section details the selected approach for automatically annotating occupancy, occlusion, and driveable masks within vehicular scenes. The implemented solution employs a 2D-to-3D approach, which involves estimating point clouds from monocular images, which are then used to approximate object dimensions and compute the necessary semantic masks.
 
 To measure the quality, strengths, and limitations of this design's performance, an evaluation methodology is essential. This methodology specifically focuses on two key aspects: the accuracy of the 3D detections and the quality of the resulting occupancy, occlusion, and driveable masks as illustrated in Figure~\ref{fig:application_flow_diagram}.
