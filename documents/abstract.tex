@@ -1,6 +1,12 @@
 \begin{itshape}
     \textbf{Abstract:} \\
 
-    \textbf{Keywords: }
+Automated Driving Systems (ADS) critically depend on robust perception systems capable of generating reliable environmental representations. Bird's-Eye View (BEV) maps are fundamental for this, as they offer a unified, top-down 2D representation of the vehicle's immediate surroundings. While traditional methods for generating BEV semantic segmentation maps from camera data rely on a previous semantic segmentation of the perspective camera-image followed by Inverse Perspective Mapping (IPM), this approach is limited by assumptions of flat ground and distortion for taller objects. Recent data-driven techniques address these limitations, yet the specific impact of directly training semantic segmentation models on BEV images to see if it better segments planar elements remains underexplored.
+
+This master's thesis investigates whether training a semantic segmentation model directly on BEV images outperforms the traditional image-space segmentation followed by IPM reprojection, particularly for planar elements, as they get a metric representation in the BEV domain. To address this, a novel BEV2Seg\_2 framework is developed, enabling a direct comparison between these two strategies by training a shared model architecture on both conventional perspective images and BEV reprojected images. 
+
+Additionally, this work explores a practical application by developing an automated pre-annotation pipeline to generate BEV masks for occupancy, occlusion, and drivable areas, which are valuable for multiple downstream tasks in autonomous driving, including scene reconstruction or path planning.
+
+    \textbf{Keywords: Automated Driving Systems (ADS), BEV Semantic Segmentation, Automated Annotation, Computer Vision, Occupancy Mapping, Occlusion Estimation}
 \end{itshape}
 \newpage

@@ -6,8 +6,9 @@
 
 Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages format to OpenLABEL format developed in order to integrate it with the \aclink{VCD} library ecosystem developed and maintained by Vicomtech \footnote{\url{https://www.vicomtech.org/en/}}.
 
-\begin{table}[h]
+\begin{table}[h!]
     \centering
+    \scriptsize
     \begin{tabular}{l c c c c}
         \toprule
         \textbf{Name} & \textbf{ID} & \textbf{trainId} & \textbf{Dynamic} & \textbf{Color (RGB)} \\
@@ -60,6 +61,7 @@ Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages for
     \label{fig:dataset_class_balance_ratio}
 \end{figure}
 
+\newpage
 % ==========================================================
 
 
@@ -115,13 +117,16 @@ Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
     }
     \label{eq:conversion}
 \end{equation}
+\newpage
+% ==========================================================
 
 
+% ==========================================================
 \section{Annotation BEV masks generation} \label{appendix:bev_masks_generation}
 \begin{algorithm}
     \caption{Occupancy, occlusion and driveable mask generation}
     \label{algorithm:occ_masks}
-    \footnotesize
+    \scriptsize
 
     \begin{algorithmic}[1]
         % Input-Output
@@ -191,10 +196,75 @@ Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
         \State \Return $\mathcal{M}^{final}_{\left[h \times w\right]}$
     \end{algorithmic}
 \end{algorithm}
+\newpage
+% ==========================================================
 
-\section{Merging comparison}
 
-\begin{table}[h]
+% ==========================================================
+\section{Trained model's hyperparameters} \label{appendix:models_hyperparameters}
+For clarity and to maintain the flow of discussion, the primary text of this thesis refers to models conceptually rather than by their specific internal names. This section, however, establishes the mapping between the experimental results presented in the multiple experimental sections and their corresponding model configurations listed in Table~\ref{tab:models_hyperparameters}, ensuring full reproducibility.
+
+The models that follow the \textit{Segmenting-Then-IPM} pipeline to obtain BEV semantic masks are referred to as \texttt{raw2segbev}, while those that first apply IPM and then perform segmentation are named \texttt{raw2bevseg}.
+
+The initial training configurations for both the \textit{Segmenting-Then-IPM} and \textit{IPM-Then-Segmenting} strategies, discussed in Section~\ref{sec:bev2seg_2_experimentation} where models exhibit overfitting, correspond to models \texttt{raw2segbev\_mit-b0\_v0.2} and \texttt{raw2bevseg\_mit-b0\_v0.3}. Subsequently, model \texttt{raw2segbev\_mit-b0\_v0.2} is employed for the semantic merging comparison detailed in Section~\ref{sec:merging_labels}. In this comparison, model \texttt{raw2segbev\_mit-b0\_v0.4} incorporates the semantic merging strategy. The data augmentation techniques comparison, presented in Section~\ref{sec:data_augmentation}, employ the MiT-B0 models from Table~\ref{tab:models_hyperparameters} that implement the semantic merging strategy. Finally, Section~\ref{sec:bev2seg_2_comparison} encompasses all models with the exception of \texttt{raw2segbev\_mit-b0\_v0.2} and \texttt{raw2bevseg\_mit-b0\_v0.3}.
+
+\begin{table}[h!]
+    \centering
+    \begin{threeparttable} % Start threeparttable environment
+        \tiny
+        \begin{tabular}{l l | c c c c c c c c}
+            \toprule
+            \textbf{Model} & \textbf{MiT Type} & \textbf{Batch Size} & \textbf{Max Epochs} & \textbf{LR} & \textbf{WD} & \textbf{GA} & \textbf{ML} & \textbf{DA} & \textbf{CS} \\
+            \midrule
+
+            \multicolumn{10}{l}{\textbf{IPM Then Segmenting}} \\
+            \midrule
+            % Ejemplo de fila para un modelo
+            raw2bevseg\_mit-b0\_v0.3 & MiT-B0 & 16 & 200 & 6e-5 & 0.0 & - & False & None & - \\
+            
+            raw2bevseg\_mit-b0\_v0.4 & MiT-B0 & 16 & 200 & 6e-5 & 0.0 & - & True & None & 14000 \\
+
+            raw2bevseg\_mit-b0\_v0.5 & MiT-B0 & 16 & 200 & 6e-5 & 0.01 & - & True & Extrinsic & 40200 \\
+            raw2bevseg\_mit-b0\_v0.6 & MiT-B0 & 16 & 200 & 6e-5 & 0.01 & - & True & Normal & 66000 \\
+            
+
+            raw2bevseg\_mit-b2\_v0.3 & MiT-B2 & 16 & 200 & 6e-5 & 0.01 & - & True & Extrinsic & 24800 \\
+            raw2bevseg\_mit-b2\_v0.4 & MiT-B2 & 16 & 200 & 6e-5 & 0.01 & - & True & Normal & 26200 \\
+            
+            raw2bevseg\_mit-b4\_v0.1 & MiT-B4 & 8 & 200 & 6e-5 & 0.01 & 2 & True & Extrinsic & 16600 \\
+            raw2bevseg\_mit-b4\_v0.2 & MiT-B4 & 8 & 200 & 6e-5 & 0.01 & 2 & True & Normal & 15800 \\
+            
+            \midrule[1pt]
+            \multicolumn{10}{l}{\textbf{Segmenting Then IPM}} \\
+            \midrule
+            raw2segbev\_mit-b0\_v0.2 & MiT-B0 & 16 & 200 & 6e-5 & 0.0 & - & False & None & 11800 \\
+            
+            raw2segbev\_mit-b0\_v0.4 & MiT-B0 & 16 & 200 & 6e-5 & 0.0 & - & True & None & 9000 \\
+            raw2segbev\_mit-b0\_v0.5 & MiT-B0 & 16 & 200 & 6e-5 & 0.01 & - & True & Normal & 7800 \\
+            
+            raw2segbev\_mit-b2\_v0.4 & MiT-B2 & 16 & 200 & 6e-5 & 0.01 & - & True & Normal & 40800 \\
+
+            raw2segbev\_mit-b2\_v0.4 & MiT-B4 & 8 & 200 & 6e-5 & 0.01 & 2 & True & Normal & 20200 \\
+
+            \bottomrule
+        \end{tabular}
+        \begin{tablenotes} % Table notes start here
+            \item[] \textbf{LR}: Learning Rate; \textbf{WD}: Weight Decay; \textbf{GA}: Gradient Accumulation; \textbf{ML}: Merging Labels; \textbf{DA}: Data Augmentations; \textbf{CS}: Checkpoint Step.
+        \end{tablenotes} % Table notes end here
+    \end{threeparttable} % End threeparttable environment
+
+    \caption{Used hyperparameters}
+    \label{tab:models_hyperparameters}
+\end{table}
+\newpage
+% ==========================================================
+
+
+% ==========================================================
+\section{Semantic merging with perspective masks}
+This appendix presents an additional evaluation of the semantic merging comparison focusing on models \texttt{raw2segbev\_mit-b0\_v0.2} and \texttt{raw2segbev\_mit-b0\_v0.4}. Unlike the main discussion, this evaluation is performed using perspective semantic masks instead of BEV semantic masks. The results are summarized in Table~\ref{tab:merging_comparison_nor}. Despite the change in evaluation data, the conclusions remain consistent with those presented in Section~\ref{sec:merging_labels}.
+
+\begin{table}[h!]
     \centering
     \tiny
     \begin{tabular}{llcccc}
@@ -241,8 +311,9 @@ Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
     \caption{Per-class metric comparison between Model A and merged Model B evaluated with normal images}
     \label{tab:merging_comparison_nor}
 \end{table}
-    
-    
+
+\newpage
+% ==========================================================
 
 
 % ==========================================================

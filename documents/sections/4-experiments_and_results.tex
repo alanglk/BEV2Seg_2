@@ -1,15 +1,13 @@
 % ================================================
 % =                 EXPERIMENTS                  = 
 % ================================================ 
-\hl{Review this.}
+This section presents the experimental validation of the BEV2Seg\_2 framework (\objref{T4}) and the proposed annotation pipeline for occupancy, occlusion, and driveable areas (\objref{T6}). For the BEV2Seg\_2 framework, the experiments comparing the \textit{Segmenting-Then-IPM} and \textit{IPM-Then-Segmenting} approaches are detailed, including analyses of semantic label merging and the impact of multiple data augmentation techniques, leading to a final comparison designed to address the thesis's main hypothesis.
 
-This section includes all experiments carried out for evaluating the difference between the two approaches considered in the BEV2Seg\_2 pipeline, experiments to study what is the influence of extrinsic parameters modification as data augmentation technique for semantic segmentation of BEV images and the final evaluation of the proposed annotation pipeline of occupancy, occlusion and driveable areas.
 
-\subsection{[T4] BEV2Seg\_2 experimentation}
+\subsection{[T4] BEV2Seg\_2 experimentation} \label{sec:bev2seg_2_experimentation}
+The segformer models from both approaches, \textit{Segmenting-Then-IPM} and \textit{IPM-Then-Segmenting}, were trained under the same conditions. During fine-tuning for the segmentation task, encoder layers were left unfrozen, allowing the entire model to adapt to the training data. Input images were preprocessed using the \textit{SegformerImageProcessor}, which includes resizing to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing with ImageNet mean and standard deviation values~\cite{imagenet}. This preprocessing step ensures the input format is consistent with what the pretrained encoders expect.
 
-Both approaches, segmenting-then-IPM and IPM-then-segmenting, were trained under the same conditions. During fine-tuning for the segmentation task, encoder layers were left unfrozen, allowing the entire model to adapt to the training data. Input images were preprocessed using the \textit{SegformerImageProcessor}, which includes resizing to $512 \times 512$ pixels, rescaling pixel values by a factor of $1/255$, and normalizing with ImageNet mean and standard deviation values~\cite{imagenet}. This preprocessing step ensures the input format is consistent with what the pretrained encoders expect.
-
-Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mean intersection over union is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training and the loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way following the Segformer implementation.
+Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mean intersection over union is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training and the loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way following the Segformer implementation. All model configurations and their associated hyperparameters used in this work are detailed in Appendix~\ref{appendix:models_hyperparameters}.
 
 \begin{table}[h]
     \centering
@@ -27,14 +25,12 @@ Semantic masks were provided during training with the \texttt{reduce\_labels} pa
     \label{tab:hardware}
 \end{table}
 
-Regarding to the used notation, the models that follow the segment-then-IPM pipeline to obtain BEV semantic masks are referred to as \texttt{raw2segbev}, while those that first apply IPM and then perform segmentation are named \texttt{raw2bevseg}.
-
 The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for $20.7K$ steps without applying any regularization technique. This initial experiment was performed to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.7\linewidth]{./images/experiments/overfitting_bev_nu.png}
-    \caption{Training and evaluation loss of raw2segbev and raw2bevseg MiT-b0 models without any regularization technique}
+    \caption{Training and evaluation loss of segformer's Segmenting-Then-IPM and IPM-Then-Segmenting MiT-b0 models without any regularization technique}
     \label{fig:overfitting_mit-b0}
 \end{figure}
 
@@ -44,18 +40,18 @@ Two main approaches were selected to tackle the overfitting problem: weight deca
 
 It is also important to highlight the difference in metrics between the two models. Even though the backbone and training hyperparameters remain the same, there is a noticeable difference in both the loss values and the \aclink{mIoU} between the models. This difference is primarily due to the fact that the evaluation datasets differ. Specifically, the approach that segments the image first and then reprojects it is evaluated using semantic masks in the camera view, while the approach that first reprojects images into \aclink{BEV} and then performs segmentation is evaluated using masks directly in the \aclink{BEV} domain.
 
-This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_evaluation}, where the model \texttt{raw2segbev\_mit-b0\_v0.3} is evaluated on the test set twice: once using semantic masks in the camera domain and once using \aclink{BEV} masks. The figure displays the per-class \aclink{mIoU} for all the semantic categories the model was trained on, and two main observations emerge.
+This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_evaluation}, where the \textit{Segmenting-Then-IPM} model is evaluated on the test set twice: once using semantic masks in the camera domain and once using \aclink{BEV} masks. The figure displays the per-class \aclink{mIoU} for all the semantic categories the model was trained on, and two main observations emerge.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.8\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.2_new_test_evaluation.png}
-    \caption{Model evaluated with normal and BEV images}
+    \caption{Segformer's Segmenting-Then-IPM MiT-B0 model evaluated with normal and BEV images}
     \label{fig:normal_vs_bev_evaluation}
 \end{figure}
 
 First, there's a clear imbalance in performance between dominant classes such as \texttt{background} and \texttt{flat.driveable\_area}, and the remaining, less frequent classes. Many of the minority classes show extremely low or even zero \aclink{IoU} scores. This is partly due to the inherent class imbalance in the dataset: some semantic classes have no annotated pixels at all (see Appendix~\ref{appendix:OLDatasets} for more details).
 
-Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to $30$ meters (see reprojection parameters in Section~\ref{sec:bev2seg_2}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
+Second, all metrics are significantly higher when the model is evaluated using standard camera-domain masks. Reprojecting the masks to BEV introduces several effects: (1) a fixed background area appears in the BEV space that lies outside the camera's field of view; (2) the maximum scene distance is reduced to $30$ meters (see reprojection parameters in Section~\ref{sec:bev_reprojection_module}), which limits the presence of distant objects: minority classes like pedestrians are often excluded unless they are very close to the vehicle, while driveable areas and vehicles dominate the scene; and (3) the resolution is reduced to $1024 \times 1024$ pixels.
 
 All these factors lead to a lower total number of pixels in the BEV dataset. As a result, each misclassified pixel has a greater impact on the overall evaluation, making errors more costly and consequently lowering the average performance metrics.
 
@@ -69,10 +65,8 @@ With all of this in place, the training strategy is designed to support experime
     \item \textit{Which of the two approaches performs better for BEV driveable area segmentation?}
 \end{itemize}
 
-\hl{Mention the used hyperparameters for training the models.}
-
 \subsubsection{Merging labels} \label{sec:merging_labels}
-As previously discussed, to improve model performance on the dataset’s minority classes, a semantic label merging strategy was applied. This approach combines less represented semantic classes into more general, representative categories. Notably, this same merging strategy was already used in the annotation pipeline, so it was incorporated during training using the same look-up table of merging rules described in Table 3. The training and evaluation scripts were adapted accordingly to apply the merging rules consistently.
+As previously discussed, to improve model performance on the dataset's minority classes, a semantic label merging strategy was applied. This approach combines less represented semantic classes into more general, representative categories. Notably, this same merging strategy was already used in the annotation pipeline, so it was incorporated during training using the same look-up table of merging rules described in Table 3. The training and evaluation scripts were adapted accordingly to apply the merging rules consistently.
 
 Table~\ref{tab:merging_comparison_bev} shows the results of two models trained with camera-perspective images and evaluated on the same test set using \aclink{BEV} masks. Model A was trained using the full set of original semantic classes, while Model B was trained using the merged classes, thereby reducing the total number of labels. 
 
@@ -247,7 +241,7 @@ Overall, the findings from the validation set suggest that the custom data augme
     \label{fig:bev_before_after_data_aug_test}
 \end{figure}
 
-\subsubsection{Segmenting-Then-IPM vs IPM-Then-Segmenting}
+\subsubsection{Segmenting-Then-IPM vs IPM-Then-Segmenting} \label{sec:bev2seg_2_comparison}
 The Table~\ref{tab:model_comparison} shows a comparative analysis of semantic segmentation performance across different models, categorized into two distinct \aclink{BEV} mask generation pipelines: "\aclink{IPM} Then Segmenting" and "Segmenting Then \aclink{IPM}". Values represent the \aclink{mIoU} for the merged semantic classes (Section~\ref{sec:merging_labels}), with "Mean" indicating the average \aclink{mIoU} across all displayed classes for each model. Also, models are categorized by their architecture (MiT-B0, MiT-B2, MiT-B4) and the used data augmentation technique (O: No data augmentation, overfitted model; N: Normal data augmentation; E: Camera's extrinsic parameters modification)
 
 \begin{table}[h]

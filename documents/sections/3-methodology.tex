@@ -457,7 +457,7 @@ Finally, a filtering process is performed to ensure there are no noisy, redundan
 \subsubsubsection{BEV masks generation} \label{sec:instance_bev_mask_methodology}
 Once the panoptic point cloud is generated and the 3D instance detection is computed, the final occupancy, occlusion and driveable masks can be estimated using the \aclink{BEV} semantic masks.
 
-To associate the \aclink{BEV} semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is related to one polygon but a polygon may have multiple masks. This scenario arises because the occlusion mask of the object may appear fragmented in the \aclink{BEV} semantic view; while connected components labeling identifies each fragment as a separate region, all fragments originating from the same 3D object are correctly associated with the same cuboid base. This association process is further described in Appendix~\ref{appendix:bev_masks_generation}.
+To associate the \aclink{BEV} semantic masks with the detected 3D instances, the semantic masks are first processed using a connected components labeling algorithm, which extracts the individual, non-connected regions for each semantic class. Then, for each instance in the panoptic point cloud, the base of its 3D bounding box is obtained and an intersection factor is calculated between each pair of base bounding boxes and connected mask regions. Using this intersection measure, the base polygons and connected masks are associated accordingly so each mask is related to one polygon but a polygon may have multiple masks. This scenario arises because the occlusion mask of the object may appear fragmented in the \aclink{BEV} semantic view; while connected components labeling identifies each fragment as a separate region, all fragments originating from the same 3D object are correctly associated with the same cuboid base. This process is further described in the algorithm provided in Appendix~\ref{appendix:bev_masks_generation}.
 
 This methodology results in a final representation of occupancy, defined by the base of the 3D bounding box; and occlusion, which is captured by the distorted shape of the semantic mask from the \aclink{BEV} perspective. This approach, using distorted areas as occlusion masks, both accurately reflects the occluded area and limits the accumulation of errors that could arise if 3D detection occupancy masks were used as an intermediate input for their generation.
 
@@ -566,18 +566,16 @@ On the other hand, to evaluate the error in the estimation of the detected objec
 The evaluation process begins by defining the spatial region in which the detections produced by the pipeline will be considered. Since the system is capable of generating predictions at distances greater than those actually used for producing the \aclink{BEV} occupancy and occlusion masks, the evaluation range is restricted to the same area used for generating those masks. Specifically, this involves projecting the camera's \aclink{FOV} onto the ground plane and limiting the maximum detection distance to $30$ meters. As a result, only the predictions and ground truth elements that fall within this projected polygon at a given time frame are included in the evaluation.
 
 Then, the matching between predictions and ground truth is performed, formalized as a Linear Sum Assignment Problem (LSAP) and solved using the Hungarian algorithm. Because of this, the cost matrix is initially calculated as the v2v distance between all ground truth and prediction instances.  However, unlike a standard LSAP, this implementation incorporates a maximum distance threshold for valid assignments. Detections with no sufficiently close ground truth counterparts are removed before solving the LSAP, and the cost matrix is padded to a square shape. Finally, assignments exceeding the distance threshold are discarded after the LSAP solution, ensuring only meaningful matches are retained. 
-\hl{Maybe it is interesting to add an Appendix about this}
 
-Finally, the following metrics are calculated:
+In summary, the following metrics are calculated:
 \begin{itemize}
-    \item \textbf{TP/FP/FN}: Computed from prediction-ground truth associations.
-    \item \textbf{DD}: Volume difference between associated cuboids. % Diference in Dimensions
-    \item \textbf{DED}: Absolute difference per axis (length, width, height). % Difference in Each Dimension 
-    \item \textbf{v2v}: Minimum distance between convex hulls. % Volume-Volume Distance
-    \item \textbf{IoU}: 3D intersection-over-union. % Volumetric IoU
-    \item \textbf{BBD}: Dissimilarity metric for overlapping/non-overlapping boxes. % Bounding Box Disparity
+    \item \textbf{Confusion matrix:} True Positives (TP), False Positives (FP) and False Negatives (FN) computed from prediction-ground truth associations.
+    \item \textbf{Difference in Dimensions (DD):} Volume difference between associated cuboids.
+    \item \textbf{Difference in each Dimension (DED):} Absolute difference per axis (length, width, height).  
+    \item \textbf{Volume-to-Volume distance (v2v):} Minimum distance between convex hulls.
+    \item \textbf{Intersection over Union (IoU):} Volumetric intersection-over-union.
+    \item \textbf{Bounding Box Disparity (BBD):} Dissimilarity metric for overlapping/non-overlapping boxes.
 \end{itemize}
-
 
 \subsubsubsection{BEV masks evaluation} \label{sec:bev_masks_evaluation_methodology}
 To evaluate the occupancy, occlusion, and driveable area masks, it is necessary to generate corresponding ground truth masks. These masks are computed from the OpenLABEL annotated vehicular scene data as follows. For each frame, only the elements visible to the camera are considered (as detailed in Section~\ref{sec:3d_det_evaluation}) and a custom algorithm is applied to process this visible information.
