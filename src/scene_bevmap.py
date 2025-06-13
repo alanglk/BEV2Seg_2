@@ -192,9 +192,7 @@ def main(scene_path:str):
     config = load_config(config_path)
 
     # Params   
-    assert scene_path == config['scene']['scene_path'], f"Scene path in 'config.toml' ({config['scene']['scene_path']}) doesnt match actual scene_path ({scene_path})"
-    assert scene_name == metadata['scene_name'], f"Scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
-    
+    assert scene_path == config['scene']['scene_path'], f"Scene path in 'config.toml' ({config['scene']['scene_path']}) doesnt match actual scene_path ({scene_path})"    
     camera_name                 = config['scene']['camera_name']
 
     raw2segmodel_path           = config['semantic']['raw2segmodel_path']
@@ -228,6 +226,8 @@ def main(scene_path:str):
     frame_keys = vcd.data['openlabel']['frames'].keys()
     metadata = vcd.get_metadata()
 
+    assert scene_name == metadata['scene_name'], f"Scene folder name: {scene_name} does not match with metadata scene name: {metadata['scene_name']}"
+
     # Save model_config in metadata:
     vcd.add_metadata_properties({'model_config': config})
 
@@ -245,11 +245,11 @@ def main(scene_path:str):
     raw_seg2bev.set_openlabel(vcd)
     
     BMM = BEVMapManager(scene_path=scene_path, gen_flags={
-            'all': True, 
-            'pointcloud': True, 
-            'instances': True, 
-            'occ_bev_mask': True,
-            'dt_occ_bev_mask':True,
+            'all': False, 
+            'pointcloud': False, 
+            'instances': False, 
+            'occ_bev_mask': False,
+            'dt_occ_bev_mask':False,
             'tracking': False
         })
     DE  = DepthEstimation(model_path=depth_pro_path, device=device)

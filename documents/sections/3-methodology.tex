@@ -37,10 +37,27 @@ Despite this module is capable of generating \aclink{BEV} images from any camera
 
 Despite this module's capability to generate \aclink{BEV} images from any camera mounted on the ego-vehicle, the virtual \aclink{BEV} camera parameters are fixed. This ensures consistent top-down views, especially optimized for the front camera's perspective which is the main imaging source used in this work. The reprojected coordinate system's origin is set at the midpoint of the rear wheel's axle, following the internationally recognized ISO 8855 standard \cite{ISO8855}. This provides a consistent reference point relative to the vehicle. The reprojection establishes a regular grid with a 1-meter cell spacing, effectively spanning 30 meters in front of the vehicle and 1 meter behind it. This spatial definition results in standardized BEV images with a consistent resolution of $1024 \times 1024$ pixels, offering a clear, top-down perspective of the vehicle's immediate surroundings as it can be seen in in Figure~\ref{fig:bev_reprojection}.
 
-\begin{figure}[!ht]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{./images/shared/no_signal.jpg}
-    \caption{BEV Reprojection module example}
+    % First Subfigure
+    \begin{subfigure}[b]{\textwidth} 
+        \centering 
+        \begin{minipage}[b]{0.75\textwidth} 
+            \includegraphics[width=\linewidth]{images/methodology/image_bev_reprojection.png}
+        \end{minipage}
+    \end{subfigure}
+    
+    \vspace{0.5cm} 
+
+    % Second Subfigure
+    \begin{subfigure}[b]{\textwidth} 
+        \centering
+        \begin{minipage}[b]{0.75\textwidth}
+            \includegraphics[width=\linewidth]{images/methodology/mask_bev_reprojection.png}
+        \end{minipage}
+    \end{subfigure}
+    
+    \caption{BEV Reprojection module example on an image and a semantic mask.}
     \label{fig:bev_reprojection}
 \end{figure}
 
