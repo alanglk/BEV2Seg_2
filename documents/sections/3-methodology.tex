@@ -59,7 +59,7 @@ There are multiple techniques and strategies for tackling semantic segmentation 
 
 Several models could be chosen to address the proposed hypothesis. The current state of the art includes both \aclink{CNN} and \aclink{ViT}-based models that achieve competitive results. As shown in Table~\ref{tab:segformer_model_comparison}, there is no significant difference in accuracy and inference speed among some of the top-performing models. Moreover, many of these models have already been applied in the context of \aclink{ADS}. In this work, Segformer~\cite{segformer} has been selected as the semantic segmentation model due to its balance between performance and efficiency. Additionally, it is integrated into the Huggingface~\cite{huggingface} ecosystem, which provides an optimized, parallelized implementation, facilitating distributed training.  
 
-\begin{table}[h]
+\begin{table}[ht]
     \centering
     \resizebox{\linewidth}{!}{%
     \begin{tabular}{l l c c c}
@@ -494,7 +494,7 @@ Furthermore, this method allows for estimating the vehicle's extent while handli
 
 Finally, these estimated occupancy and occlusion masks are combined with the \aclink{BEV} drivable area mask, which is obtained from the initial semantic segmentation step. This final overlay adheres to the specific labeling scheme detailed in Table~\ref{tab:occ2_labels}. The entire process, from initial detections to the final composite BEV mask, is visually summarized in Figure~\ref{fig:bev_occupancy_occlusion}.
 
-\begin{table}[h]
+\begin{table}[ht]
     \centering
     \begin{tabular}{l c c c c}
         \toprule

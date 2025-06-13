@@ -389,19 +389,25 @@ def main(scene_path:str):
         print(f"# Writing debug files {'#'*43}")
         vechicles_pcd = get_pcds_of_semantic_label(instance_pcds, semantic_labels=["vehicle.car"])[0]
         debug_file_paths = [
+            os.path.join(scene_path, "debug", "raw_image", f"{fk+1}.png"),
+            os.path.join(scene_path, "debug", "bev_image", f"{fk+1}.png"),
             os.path.join(scene_path, "debug", "bev_cuboids", f"bev_cuboid_{fk+1}.png"),
             os.path.join(scene_path, "debug", "bev_occupancy_oclusion", f"bev_occ_{fk+1}.png"),
             os.path.join(scene_path, "debug", "raw_cuboids", f"raw_cuboid_{fk+1}.png"),
             os.path.join(scene_path, "debug", "bev_reproj_cuboids", f"bev_reproj_cuboid_{fk+1}.png"),
             os.path.join(scene_path, "debug", "semantic_colored_raw_mask", f"{fk+1}.png"),
+            os.path.join(scene_path, "debug", "semantic_colored_bev_mask", f"{fk+1}.png"),
             os.path.join(scene_path, "debug", "vehicle_pcd", f"pointcloud_{fk+1}.pcd")
         ]
         debug_files = [
+            (raw_image, "image"),
+            (bev_image, "image"),
             (bev_image_cuboids, "image"),
             (bev_image_occ_ocl, "image"),
             (raw_image_cuboids, "image"),
             (bev_repoj_cuboids, "image"),
             (raw2seg_bev.mask2image(raw_mask), "image"),
+            (raw2seg_bev.mask2image(bev_mask_sb), "image"),
             (vechicles_pcd, "pcd")
         ]
         for file_path, (file, file_type) in zip(debug_file_paths, debug_files):

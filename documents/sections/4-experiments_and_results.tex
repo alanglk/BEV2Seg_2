@@ -72,7 +72,7 @@ Table~\ref{tab:merging_comparison_bev} shows the results of two models trained w
 
 In general, the results indicate that both models achieve comparable performance on the majority classes, specifically \texttt{background} and \texttt{flat.driveable\_surface}. However, a significant difference is observed in the minority classes, where Model B outperforms Model A across all evaluation metrics. This suggests that simplifying the semantic space does not decrease the model's ability to identify important instances and, instead, it reduces the penalty from underrepresented classes. Additionally, by reducing the number of classes, the overall average of the metrics improves as it avoids dilution from irrelevant or sparsely populated classes. This makes label merging especially useful in cases where fine-grained segmentation isn't necessary and consistency across the whole model is more important.
 
-\begin{table}[h]
+\begin{table}[ht]
     \centering
     \tiny
     \begin{tabular}{llcccc}
@@ -130,7 +130,7 @@ Filtering operations can be applied to both standard and \aclink{BEV} images but
 
 Regarding \aclink{BEV} data augmentations, some multi-view methods implement strategies such as random flipping and random scaling, while others operate in the frequency domain \cite{HSDA}. However, these approaches apply augmentations to perspective images before the BEV transformation. Performing random cropping on a \aclink{BEV} image may lead to significant information loss, as large portions of the image may consist of unlabeled background data, potentially resulting in crops with insufficient information for effective training (Figure~\ref{fig:bev_cropping}). 
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     % Row labels
     \setlength{\tabcolsep}{1pt}  % Reduce column padding
@@ -172,7 +172,7 @@ Regarding \aclink{BEV} data augmentations, some multi-view methods implement str
 
 In this context, a different approach was also considered: applying geometric transformations by modifying the camera's extrinsic parameters before reprojecting to \aclink{BEV} space. The objective is to introduce random transformations along one of the camera’s rotation axes, generating diverse \aclink{BEV} reprojections with varying degrees of distortion. This technique may enable the model to adapt to different extrinsic camera configurations, improving its robustness to variations in camera placement and orientation (Figure~\ref{fig:bev_data_aug}).
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     % Row labels
     \setlength{\tabcolsep}{1pt}  % Reduce column padding
