@@ -2,38 +2,36 @@
 % =                 CONCLUSIONS                  =
 % ================================================ 
 
-\hl{Write the conclusions and future work.}
+This master's thesis explores and develops multiple technologies to address key challenges in Bird's-Eye View (\aclink{BEV}) semantic segmentation. To test the main hypothesis, a comprehensive methodology has been designed and implemented. This involves overcoming several technical difficulties, including the creation of a custom parsing system to generate a \aclink{BEV} dataset from an existing state-of-the-art dataset; the training and validation of multiple semantic segmentation models; the application of semantic class grouping to improve segmentation of key elements; and an exploration of data augmentation strategies to reduce model overfitting in both perspective and \aclink{BEV} domains.
 
-This master's thesis explores and developes multiple technologies to address key challenges in Bird's-Eye View (BEV) semantic segmentation. To rigorously test the central hypothesis, a comprehensive methodology has being designed and implemented. This involves overcoming several technical hurdles, including the creation of a custom parsing system to generate a BEV dataset from an existing state-of-the-art dataset, the training and validation of multiple semantic segmentation models, the application of semantic class grouping to improve segmentation of key elements, and an exploration of data augmentation strategies to reduce model overfitting in both perspective and BEV domains.
-
-Furthermore, this work successfully deliveres a practical application: an automated pre-annotation pipeline. This system generates occupancy, occlusion, and drivable area masks for vehicular scenes. Despite its limitations, the pipeline produces masks reliable enough for application in downstream autonomous driving tasks, such as scene reconstruction and path planning.
+Furthermore, this work successfully presents a practical application: an automated pre-annotation pipeline. This system generates occupancy, occlusion, and driveable area masks for vehicular scenes. Despite its limitations, the pipeline produces masks reliable enough for application in downstream autonomous driving tasks, such as scene reconstruction and path planning.
 
 Several key conclusions emerged from the performed experimentation:
 \begin{itemize}
-    \item \textbf{Hypothesis on Segmentation Strategy Not Supported by Evidenc:} Contrary to the initial hypothesis, this work did not find sufficient experimental evidence to support the claim that "training a semantic segmentation model directly on BEV images outperforms the traditional image-space segmentation followed by IPM reprojection." In fact, all results suggest that the traditional \textit{Segmenting-Then-IPM} strategy yields superior segmentation performance for both obstacles and planar elements.
-    \item \textbf{BEV Data Augmentation:} Applying traditional geometric augmentations (e.g., random crops, rescales, flips) to perspective images before BEV reprojection often results in significant information loss. In contrast, modifying the camera's extrinsic parameters prior to BEV reprojection proved far more effective, notably reducing model overfitting by simulating multiple viewpoints.
-    \item \textbf{Performance and Limitations of the Pre-Annotation Pipeline:} The implemented pre-annotation pipeline demonstrated strong quantitative performance. The 3D detection component, which forms the basis for the generated masks, achieved a \textbf{precision of 80\%} and a \textbf{recall of 86\%}. The selected metrics, namely Difference in Each Dimension (DED) and Bounding Box Disparity (BBD), proved effective in identifying the system's strengths and weaknesses.
-    The primary limitation identified is that the system produces consistent and accurate 3D bounding boxes when objects are fully visible, but the estimation error increases substantially for partially occluded vehicles. Consequently, the quality of the final occupancy and occlusion masks is directly correlated with the accuracy of the 3D detections and the complexity of the scene.
+
+    \item \textbf{Hypothesis on segmentation strategy not supported by evidence:} Contrary to the initial hypothesis, this work did not find sufficient experimental evidence to support the idea that \textit{"training a semantic segmentation model directly on \aclink{BEV} images outperforms the traditional image-space segmentation followed by IPM reprojection"}. In fact, all results suggest that the traditional \textit{Segmenting-Then-IPM} strategy yields superior segmentation performance for both obstacles and planar elements.
+
+    \item \textbf{Extrinsic \aclink{BEV} data augmentation:} Applying traditional geometric augmentations (e.g., random crops, rescales, flips) to perspective images before \aclink{BEV} reprojection often results in significant information loss. In contrast, modifying the camera's extrinsic parameters prior to \aclink{BEV} reprojection proved to be more effective, reducing model overfitting by simulating multiple viewpoints.
+
+    \item \textbf{Performance and limitations of the pre-annotation pipeline:} With its 3D detection component achieving $80\%$ precision and $86\%$ recall, the pre-annotation pipeline delivered robust quantitative results. Metrics like Difference in Each Dimension (DED) and Bounding Box Disparity (\aclink{BBD}) effectively pinpointed the system's strengths and weaknesses. The primary limitation identified is that while 3D bounding boxes are consistently accurate for fully visible objects, their estimation error significantly increases for partially occluded vehicles. Consequently, the quality of the final occupancy and occlusion masks directly correlates with the accuracy of the 3D detections and the scene's complexity.
+
 \end{itemize}
 
 Based on these findings, several directions for future research are proposed:
 \begin{itemize}
-    \item \textbf{Unbiased Hypothesis Re-evaluation:} Retraining models from scratch, without ImageNet pre-training, is essential for an unbiased comparison of BEV segmentation strategies.
-    \item \textbf{Deep Learning-Based 3D Detector Integration:} Replacing the current clustering-based 3D detector with a state-of-the-art deep learning model is expected to significantly improve 3D estimates and, consequently, the quality of generated masks, especially for occluded objects.
-    \item \textbf{Real-World Pipeline Validation:} Deploying and testing the annotation pipeline within a genuine annotation workflow is crucial to assess its practical utility and gather real-world user feedback.
-    \item \textbf{In-Depth Extrinsic Parameter Augmentation Study:} Further research into systematically studying the influence of specific camera extrinsic parameters on BEV semantic segmentation performance could lead to optimized, automated augmentation policies.
+
+    \item \textbf{Re-evaluate the main hypothesis without pre-trained models:} 
+    Retraining models from scratch, without ImageNet pre-training, might reveal more significant differences between the two approaches. However, it's unclear if this retraining would highlight a potential benefit of \textit{IPM-Then-Segmenting}.
+
+    \item \textbf{In-Depth extrinsic parameter augmentation study:} Further research could be made to study the influence of modifying specific camera extrinsic parameters (e.g., pitch, yaw, camera height) on final \aclink{BEV} semantic segmentation performance, with the aim of creating an optimized and automated augmentation policy.
+
+    \item \textbf{Deep learning-based 3D detector integration:} Replacing the current clustering-based 3D detector with a state-of-the-art deep learning model is expected to significantly improve 3D estimates and, consequently, the quality of generated masks, especially for occuped objects.
+    
+    \item \textbf{Real-world pipeline validation:} Although the system has been integrated with annotation tools like WebLABEL, its effectiveness has only been validated on the NuScenes dataset. A crucial future step is to deploy and test the annotation pipeline in a real-world annotation workflow to assess its practical utility and gather user feedback.
+    
 \end{itemize}
 
-In summary, this thesis provides a robust experimental foundation that challenges assumptions in BEV semantic segmentation and delivers a functional pre-annotation system applicable to autonomous driving. This work lays crucial groundwork for developing more resilient and precise perception systems for autonomous vehicles.
-
-
-
-
-
-
-
-
-
+In summary, this thesis makes a dual contribution to the field of \aclink{BEV} perception: it has provided a solid experimental foundation that provides new insights into a common assumption about \aclink{BEV} segmentation strategies, and it offers a functional pre-annotation system that, despite its defined limitations, produces masks applicable to other critical fields of automated driving.
 
 
 

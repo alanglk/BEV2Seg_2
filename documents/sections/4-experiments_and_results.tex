@@ -244,7 +244,7 @@ Overall, the findings from the validation set suggest that the custom data augme
 \subsubsection{Segmenting-Then-IPM vs IPM-Then-Segmenting} \label{sec:bev2seg_2_comparison}
 The Table~\ref{tab:model_comparison} shows a comparative analysis of semantic segmentation performance across different models, categorized into two distinct \aclink{BEV} mask generation pipelines: "\aclink{IPM} Then Segmenting" and "Segmenting Then \aclink{IPM}". Values represent the \aclink{mIoU} for the merged semantic classes (Section~\ref{sec:merging_labels}), with "Mean" indicating the average \aclink{mIoU} across all displayed classes for each model. Also, models are categorized by their architecture (MiT-B0, MiT-B2, MiT-B4) and the used data augmentation technique (O: No data augmentation, overfitted model; N: Normal data augmentation; E: Camera's extrinsic parameters modification)
 
-\begin{table}[h]
+\begin{table}[!ht]
     \centering
 
     \begin{threeparttable}
@@ -313,7 +313,7 @@ The ego-vehicle starts next to a truck, visible by the front camera for the firs
 
 
 \subsubsection{Overall performance}
-Every object in the scene, including those from ground truth and pipeline outputs, is assigned a unique identifier. As detailed in Section~\ref{sec:3d_det_evaluation}, the evaluation process associates detections with annotated objects. This results in a variable number of metrics per frame, with each metric derived from a ground-truth annotation and pipeline detection pair. This evaluation was conducted with a \aclink{FOV} maximum range of $30$ meters. The volume-to-volume (v2v) distance was employed as the association metric, with the maximum association distance established at $3.0$ meters.
+Every object in the scene, including those from ground truth and pipeline outputs, is assigned a unique identifier. As detailed in Section~\ref{sec:3d_det_evaluation}, the evaluation process associates detections with annotated objects. This results in a variable number of metrics per frame, with each metric derived from a ground-truth annotation and pipeline detection pair. This evaluation was conducted with a \aclink{FOV} maximum range of $30$ meters. The \aclink{V2V} distance was employed as the association metric, with the maximum association distance established at $3.0$ meters.
 
 Using these parameters, the confusion matrix presented in Table~\ref{tab:scene_confusion_matrix} was generated. This table aggregates all instances between detections and the visible ground truth across all frames of the scene. In this context, a True Positive (TP) signifies a detection correctly associated with a ground truth object; a False Positive (FP) indicates a detection that was not associated with any ground truth object, and a False Negative (FN) represents a ground truth object that the pipeline failed to detect.
 
@@ -412,14 +412,7 @@ The evolution of dimensional errors for the van illustrates the system's typical
 The case of the parked excavator is notable due to an unusually high height estimation error, consistently exceeding 2 meters in almost all frames where it is visible. This is closely linked to occlusion: as shown in Figure~\ref{fig:scene_open3d_cases_c}, which visualizes the ground truth and detection in frame 12, the van interposes itself between the ego-vehicle and the excavator. Consequently, only the upper part of the excavator is visible, significantly impacting the accuracy of its height estimation.
 
 \subsubsection{Position estimation accuracy}
-The Bounding Box Disparity (\aclink{BBD}) serves as a valuable metric for assessing the positional accuracy of cuboids and for readily identifying potential incorrect detections. For instance, Figure~\ref{fig:van_bbd_through_frames_a} illustrates the \aclink{BBD} evolution for the van throughout the scene. The horizontal line in this graph denotes the \aclink{BBD} metric's intrinsic threshold separating Intersection over Union (IoU) based calculations from Volume-to-Volume (V2V) based ones. An example is the initial detection of the van in frame 2, which exhibits a \aclink{BBD} greater than 1. This signifies that the detection does not intersect with the ground truth bounding box. 
-
-% \begin{figure}[!ht]
-%     \centering
-%     \includegraphics[width=0.6\linewidth]{images/experiments/bbd_followed_van.png}
-%     \caption{Followed van BBD evolution through frames.}
-%     \label{fig:van_bbd_through_frames}
-% \end{figure}
+The Bounding Box Disparity (\aclink{BBD}) serves as a valuable metric for assessing the positional accuracy of cuboids and for readily identifying potential incorrect detections. For instance, Figure~\ref{fig:van_bbd_through_frames_a} illustrates the \aclink{BBD} evolution for the van throughout the scene. The horizontal line in this graph denotes the \aclink{BBD} metric's intrinsic threshold separating Intersection over Union (IoU) based calculations from \aclink{V2V} based ones. An example is the initial detection of the van in frame 2, which exhibits a \aclink{BBD} greater than 1. This signifies that the detection does not intersect with the ground truth bounding box. 
 
 \begin{figure}[!ht]
     \centering

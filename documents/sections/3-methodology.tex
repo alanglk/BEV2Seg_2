@@ -13,7 +13,7 @@ Subsequently, the section addresses the second objective (\objref{O2}), which fo
 \subsection{[O1] BEV2Seg\_2} \label{sec:bev2seg_2}
 To address the hypotesis that \textit{"A semantic segmentation model trained with \aclink{BEV} images better segments planar elements than a traditional image-space segmentation followed by IPM"} the framework represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. This framework performs a direct comparison between two approaches: \textit{Segmenting-Then-IPM} strategy and an \textit{IPM-Then-Segmenting} strategy. Both approaches recieve perspective images as input, share a common BEV Reprojection Module, have the same model's architecture for obtaining semantic masks and they converge at a final comparison task where the quality of the output BEV semantic masks are evaluated.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{./images/methodology/BEV2Seg_2.png}
     \caption{BEV2Seg\_2 diagram.}
@@ -37,7 +37,7 @@ Despite this module is capable of generating \aclink{BEV} images from any camera
 
 Despite this module's capability to generate \aclink{BEV} images from any camera mounted on the ego-vehicle, the virtual \aclink{BEV} camera parameters are fixed. This ensures consistent top-down views, especially optimized for the front camera's perspective which is the main imaging source used in this work. The reprojected coordinate system's origin is set at the midpoint of the rear wheel's axle, following the internationally recognized ISO 8855 standard \cite{ISO8855}. This provides a consistent reference point relative to the vehicle. The reprojection establishes a regular grid with a 1-meter cell spacing, effectively spanning 30 meters in front of the vehicle and 1 meter behind it. This spatial definition results in standardized BEV images with a consistent resolution of $1024 \times 1024$ pixels, offering a clear, top-down perspective of the vehicle's immediate surroundings as it can be seen in in Figure~\ref{fig:bev_reprojection}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{./images/shared/no_signal.jpg}
     \caption{BEV Reprojection module example}
@@ -81,7 +81,7 @@ Several models could be chosen to address the proposed hypothesis. The current s
 
 The Segformer model consists on an hierarchical Transformer  encoder, which extract coarse and fine features, and a lightweight \aclink{MLP} decoder to directly fuse these multiscale features and predict the segmentation mask (Figure~\ref{fig:segformer_architecture}). Segformer comes with a series of Mix Transformer encoders (MiT) that share the same architecture but have different sizes: from MiT-B0 as the lightweigtest encoder for realtime inference, to MiT-B5 for best performance.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{images/methodology/segformer_architecture.png}
     \caption{Segformer architecture}
@@ -103,7 +103,7 @@ The conversion process is performed using a custom parser named 'OLDatasets', wh
 
 As a result, BEVDataset contains a total of $16,427$ samples. Each sample includes a metadata file, the original perspective image and its semantic mask alongside its corresponding \aclink{BEV} reprojected image and mask. The dataset's distribution is shown in Figure~\ref{fig:bev_dataset}, and more details about the dataset conversion and especifications can be found at Appendix~\ref{appendix:OLDatasets}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{images/methodology/BEVDataset.png}
     \caption{BEVDataset structure and mini set samples}
@@ -161,7 +161,7 @@ This section details the selected approach for automatically annotating occupanc
 
 To measure the quality, strengths, and limitations of this design's performance, an evaluation methodology is essential. This methodology specifically focuses on two key aspects: the accuracy of the 3D detections and the quality of the resulting occupancy, occlusion, and driveable masks as illustrated in Figure~\ref{fig:application_flow_diagram}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{images/methodology/Application_flow_diagram.png}
     \caption{Annotation flow diagram.}
@@ -222,7 +222,7 @@ With the continuous development of deep learning technologies, depth estimation 
 
 This is where Depth-Pro \cite{depth-pro} comes into as it is "a foundation model for zero-shot metric monocular depth estimation". Trained on a large and diverse dataset, Depth-Pro generalizes well across multiple real-world scenarios and achieves state-of-the-art performance without requiring fine-tuning. For this thesis, Depth-Pro has been chosen as the monocular depth estimation model to generate depth maps for pre-annotation purposes.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     % Row labels
     \setlength{\tabcolsep}{1pt}  % Reduce column padding
@@ -253,7 +253,7 @@ This is where Depth-Pro \cite{depth-pro} comes into as it is "a foundation model
 \subsubsubsection{Scene PCD}
 When an image is captured, the 3D geometry of the scene is projected onto a 2D representation, which is then rasterized into the pixel space of the image. This transformation from 3D world coordinates to 2D image coordinates is known as the \emph{camera projection process}. In its simplest form, this is described by the \emph{pinhole camera model}, illustrated in Figure~\ref{fig:pinhole_model}. In this setup, $\mathbf{O}_w$ represents the world coordinate frame, $\mathbf{F}_c$ denotes the camera coordinate frame (typically located at the camera's optical center or pinhole), and $\mathbf{F}_i$ defines the 2D image plane.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.5\linewidth]{images/methodology/pinhole_model/pinhole_model_2.png}
     \caption{Ideal perspective camera model.}
@@ -336,7 +336,7 @@ The approach employed for this task is detailed in Algorithm~\ref{algorithm:scen
         \State \Return $P^{raw}$
     \end{algorithmic}
 \end{algorithm}
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
         \includegraphics[width=\textwidth]{images/methodology/raw_image_0.jpg}
@@ -357,7 +357,7 @@ The approach employed for this task is detailed in Algorithm~\ref{algorithm:scen
 \subsubsubsection{Instance scene PCD}
 The objective of this module is to compute instance-level point clouds from the previously reconstructed scene point cloud using the corresponding semantic mask of the input perspective image (obtained from the \textit{Segmenting-Then-IPM} module of the BEV2Seg\_2 framework). The semantic and geometric information is fed into this module, where instance differentiation is performed for specific object classes as shown in Figure~\ref{fig:instance_scene_diagram}. This enables the isolation of individual instance point clouds and the computation of their enclosing cuboids. The resulting panoptic point cloud provides a 3D object-level representation of the scene, which can be used as input for subsequent modules. It is also interesting to point out this is achieved from a single monocular image, demonstrating the system's capability for 3D object detection without requiring multi-view or stereo data.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.6\linewidth]{images/methodology/instance_scene_flow_diagram.png}
     \caption{Instance scene computation diagram.}
@@ -366,7 +366,7 @@ The objective of this module is to compute instance-level point clouds from the 
 
 Firstly, the input semantic mask is preprocessed with a label merging step in which semantically similar labels are unified under a single target class. This step helps mitigate noise and inconsistencies in the model's predictions, which could negatively impact the subsequent instance estimation process. The merging policy is defined by default as shown in Table~\ref{tab:merge_dict}. For example, the target class \texttt{vehicle.car} gathers all NuScenes vehicle categories that seem like cars, such as buses, trucks, trailers, and emergency vehicles.
 
-\begin{table}[h!]
+\begin{table}[!ht]
     \centering
     \footnotesize
     \begin{tabular}{|l|p{10cm}|}
@@ -400,7 +400,7 @@ Firstly, the input semantic mask is preprocessed with a label merging step in wh
 
 Once the semantic mask has been preprocessed and the point cloud computed, a pre-filtering step is applied to remove points that fall outside predefined bounds (by default, $\left[10, 5, 30\right]$ meters in the $\mathbf{\hat{x}_c}$, $\mathbf{\hat{y}_c}$, and $\mathbf{\hat{z}_c}$ axes). Then, the semantic mask is projected onto the point cloud to create a semantic point cloud. This process is straightforward, as each 3D point is associated with the corresponding semantic label based on the pixel indices. As a result, each 3D point is labeled with its appropriate semantic class (see Figure~\ref{fig:semantic_pointcloud_a}). Additionally, each semantic point cloud is tagged with a "dynamic" flag, which indicates whether the associated object is likely to move. Only 3D semantic points with this flag set are passed through the instance detection process. This helps avoid unnecessary processing of labels such as background, road barriers, or driveable areas.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
         \includegraphics[width=\linewidth]{images/methodology/pcd_semantic.png}
@@ -424,9 +424,16 @@ Estimating the correct orientation of a bounding box is a challenging task, espe
 
 However, the main goal in this thesis is to estimate the physical space occupied by a vehicle in the scene for pre-annotation purposes, not precise orientation or object alignment. In this context, using an \aclink{AABB} may slightly overestimate the occupied space when objects are not aligned with the camera's reference frame, for example during turns or when vehicles are parked at an angle. Nevertheless, this estimation does not pose a significant problem since these overestimated regions are not of special interest in the annotation process.
 
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/methodology/oriendet_bbox_problem_aux.jpeg}
+    \caption{Oriented bounding box problems.}
+    \label{fig:oriented_bounding_box_problems}
+\end{figure}
+
 Finally, a filtering process is performed to ensure there are no noisy, redundant, too far away or floating instances. Also, it ensures there are no overlapping bounding boxes by checking each new instance's 3D bounding box against those already accepted. If an overlap is detected, the function compares their sizes: the larger box is kept, and the smaller one is removed or ignored. This helps avoid redundant or conflicting instances that may represent the same object or spatial region, improving the clarity and consistency of the data. The final results of this module are shown in Figure~\ref{fig:instance_scene_images}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
         \includegraphics[width=\textwidth]{images/methodology/3d_cuboids_1.png}
@@ -452,9 +459,9 @@ To associate the \aclink{BEV} semantic masks with the detected 3D instances, the
 
 This methodology results in a final representation of occupancy, defined by the base of the 3D bounding box; and occlusion, which is captured by the distorted shape of the semantic mask from the \aclink{BEV} perspective. This approach, using distorted areas as occlusion masks, both accurately reflects the occluded area and limits the accumulation of errors that could arise if 3D detection occupancy masks were used as an intermediate input for their generation.
 
-Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible, making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
+Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \acp{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.22\textwidth}
         \includegraphics[width=\textwidth]{images/methodology/bev_occupancy_oclusion/bev_cuboid_9.png}
@@ -511,15 +518,15 @@ Another key aspect of the evaluation involves assessing the quality of the gener
 
 \subsubsubsection{3D detections evaluation} \label{sec:3d_det_evaluation}
 
-The NuScenes metrics~\cite{nuscenes} were considered as a starting point as this dataset was specifically developed to facilitate the training and evaluation of 3D perception strategies. A central component of its evaluation policy is the matching between predictions and ground truth, which is performed using the 2D distance between the centers of the predicted and ground truth bounding boxes projected onto the ground plane. A prediction is considered a true positive if this distance falls below a predefined threshold. Then, \aclink{AP} is computed across several distance thresholds ($\{0.5, 1, 2, 4\}$ meters), and the final \aclink{mAP} score is obtained by averaging \aclink{AP} values over all object classes.
+The NuScenes metrics~\cite{nuscenes} were considered as a starting point as this dataset was specifically developed to facilitate the training and evaluation of 3D perception strategies. A central component of its evaluation policy is the matching between predictions and ground truth, which is performed using the 2D distance between the centers of the predicted and ground truth bounding boxes projected onto the ground plane. A prediction is considered a true positive if this distance falls below a predefined threshold. Then, Average Precision (AP) is computed across several distance thresholds ($\{0.5, 1, 2, 4\}$ meters), and the final mean Average Precision (mAP) score is obtained by averaging AP values over all object classes.
 
-Beyond the \aclink{mAP}, NuScenes includes additional metrics to evaluate key attributes of correctly detected objects, using a fixed association threshold of $2$ meters. These include translation, scale, orientation, velocity, and attribute classification errors. Each of these metrics targets a specific aspect of detection performance, such as localization accuracy or motion estimation. To provide a unified performance score, the NuScenes Detection Score aggregates all these metrics into a single weighted average, offering a comprehensive view of system performance.
+Beyond the mAP, NuScenes includes additional metrics to evaluate key attributes of correctly detected objects, using a fixed association threshold of $2$ meters. These include translation, scale, orientation, velocity, and attribute classification errors. Each of these metrics targets a specific aspect of detection performance, such as localization accuracy or motion estimation. To provide a unified performance score, the NuScenes Detection Score aggregates all these metrics into a single weighted average, offering a comprehensive view of system performance.
 
 Nevertheless, the use case addressed in this work diverges significantly from the standard NuScenes benchmark. Since 3D detections are performed from monocular images via clustering, the resulting cuboids inherently represent only the visible portion of objects from the camera's perspective. This makes centroid-based 3D box evaluation less meaningful due to an expected displacement between prediction and ground truth. Additionally, the camera-aligned nature of these cuboids makes the orientation error metric impractical. Consequently, the evaluation strategy of this 3D detections is focused on the precision of the estimated cuboid dimensions and positions, which directly assesses the pipeline's ability to achieve reasonable detection accuracy.
 
-In this scenario, employing centroid distance as the criterion for evaluating position predictions with ground truth poses a significant challenge. Therefore, a more suitable metric, the volume-to-volume distance (v2v), has been adopted. This metric is defined as the minimum distance between the convex hulls of the considered volumes (Figure~\ref{fig:bbox_disparity_b}).
+In this scenario, employing centroid distance as the criterion for evaluating position predictions with ground truth poses a significant challenge. Therefore, a more suitable metric, the \aclink{V2V}, has been adopted. This metric is defined as the minimum distance between the convex hulls of the considered volumes (Figure~\ref{fig:bbox_disparity_b}).
 
-However, the v2v metric has a notable limitation: it yields a value of zero whenever there is any intersection between the volumes, regardless of the degree of overlap. To overcome this, we utilize the \aclink{BBD} metric \cite{bounding_box_disparity}, which combines IoU and v2v into a single, continuous, and non-negative measure. This metric allows for the quantification of dissimilarity between two cuboids, whether they overlap or not. As stated in its original definition, while IoU can only compare intersecting cuboids, \aclink{BBD} provides a disparity measure even in the absence of overlap. Its interpretation is as follows:
+However, the \aclink{V2V} metric has a notable limitation: it yields a value of zero whenever there is any intersection between the volumes, regardless of the degree of overlap. To overcome this, we utilize the \aclink{BBD} metric \cite{bounding_box_disparity}, which combines IoU and \aclink{V2V} into a single, continuous, and non-negative measure. This metric allows for the quantification of dissimilarity between two cuboids, whether they overlap or not. As stated in its original definition, while IoU can only compare intersecting cuboids, \aclink{BBD} provides a disparity measure even in the absence of overlap. Its interpretation is as follows:
 
 \begin{equation}
     \begin{aligned}
@@ -536,7 +543,7 @@ However, the v2v metric has a notable limitation: it yields a value of zero when
 
 These distinct cases are illustrated in Figure~\ref{fig:bbox_disparity}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
         \includegraphics[width=\textwidth]{images/methodology/frame_0_3d_bb.png}
@@ -556,16 +563,16 @@ On the other hand, to evaluate the error in the estimation of the detected objec
 
 The evaluation process begins by defining the spatial region in which the detections produced by the pipeline will be considered. Since the system is capable of generating predictions at distances greater than those actually used for producing the \aclink{BEV} occupancy and occlusion masks, the evaluation range is restricted to the same area used for generating those masks. Specifically, this involves projecting the camera's \aclink{FOV} onto the ground plane and limiting the maximum detection distance to $30$ meters. As a result, only the predictions and ground truth elements that fall within this projected polygon at a given time frame are included in the evaluation.
 
-Then, the matching between predictions and ground truth is performed, formalized as a Linear Sum Assignment Problem (LSAP) and solved using the Hungarian algorithm. Because of this, the cost matrix is initially calculated as the v2v distance between all ground truth and prediction instances.  However, unlike a standard LSAP, this implementation incorporates a maximum distance threshold for valid assignments. Detections with no sufficiently close ground truth counterparts are removed before solving the LSAP, and the cost matrix is padded to a square shape. Finally, assignments exceeding the distance threshold are discarded after the LSAP solution, ensuring only meaningful matches are retained. 
+Then, the matching between predictions and ground truth is performed, formalized as a Linear Sum Assignment Problem (LSAP) and solved using the Hungarian algorithm. Because of this, the cost matrix is initially calculated as the \aclink{V2V} distance between all ground truth and prediction instances.  However, unlike a standard LSAP, this implementation incorporates a maximum distance threshold for valid assignments. Detections with no sufficiently close ground truth counterparts are removed before solving the LSAP, and the cost matrix is padded to a square shape. Finally, assignments exceeding the distance threshold are discarded after the LSAP solution, ensuring only meaningful matches are retained. 
 
 In summary, the following metrics are calculated:
 \begin{itemize}
     \item \textbf{Confusion matrix:} True Positives (TP), False Positives (FP) and False Negatives (FN) computed from prediction-ground truth associations.
     \item \textbf{Difference in Dimensions (DD):} Volume difference between associated cuboids.
     \item \textbf{Difference in each Dimension (DED):} Absolute difference per axis (length, width, height).  
-    \item \textbf{Volume-to-Volume distance (v2v):} Minimum distance between convex hulls.
-    \item \textbf{Intersection over Union (IoU):} Volumetric intersection-over-union.
-    \item \textbf{Bounding Box Disparity (BBD):} Dissimilarity metric for overlapping/non-overlapping boxes.
+    \item \textbf{Volume-to-Volume distance (\aclink{V2V}):} Minimum distance between convex hulls.
+    \item \textbf{Intersection over Union (\aclink{IoU}):} Volumetric intersection-over-union.
+    \item \textbf{Bounding Box Disparity (\aclink{BBD}):} Dissimilarity metric for overlapping/non-overlapping boxes.
 \end{itemize}
 
 \subsubsubsection{BEV masks evaluation} \label{sec:bev_masks_evaluation_methodology}
