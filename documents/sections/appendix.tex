@@ -4,11 +4,19 @@
 %\phantomsection
 \section{OLDatasets} \label{appendix:OLDatasets}
 
-Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages format to OpenLABEL format developed in order to integrate it with the \aclink{VCD} library ecosystem developed and maintained by Vicomtech \footnote{\url{https://www.vicomtech.org/en/}}.
+Standing for OpenLABEL Datasets, OLDatasets is a custom parser to convert any Dataset format to OpenLABEL format in order to integrate it with the \aclink{VCD} library ecosystem. Despite OLDatasets has been implemented as a custom Python module and it provides tools for developing parsers from any dataset into OpenLABEL for creating \aclink{BEV} reprojections of them, the parser currently only supports parsers for the NuImages dataset. Thus, the module currently provides three main features: common functionalities, which can be used for developing any dataset's parser; \aclink{BEV} functionalities, making use of the \aclink{BEV} reprojection module described in Section~\ref{sec:bev_reprojection_module}; and the NuImages parser.
 
-\begin{table}[h!]
+The generation of the BEVDataset from the NuImages dataset takes the data structure shown in Figure~\ref{fig:nuimages_scheme} as input. This parser loops for each \texttt{sample\_data} of the NuImages dataset taking the front-camera images alongside the camera parametes and semantic annotations, resulting in the semantic class distribution defined in Table~\ref{tab:semantic_labels}.
+
+\begin{figure}[!ht]
     \centering
-    \scriptsize
+    \includegraphics[width=0.6\linewidth]{images/appendix/NuImages_scheme.png}
+    \caption{NuImages metadata scheme}
+    \label{fig:nuimages_scheme}
+\end{figure}
+\begin{table}[!ht]
+    \centering
+    \tiny
     \begin{tabular}{l c c c c}
         \toprule
         \textbf{Name} & \textbf{ID} & \textbf{trainId} & \textbf{Dynamic} & \textbf{Color (RGB)} \\
@@ -47,18 +55,25 @@ Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages for
     \label{tab:semantic_labels}
 \end{table}
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=\linewidth]{images/appendix/dataset_class_balance_pixels.png}
-    \caption{Number of pixels per class in datasets}
-    \label{fig:dataset_class_balance_pixels}
-\end{figure}
+Once the BEVDataset is generated it is splitted into the "train", "val" and "test" sets using the postprocesing package of OLDatasets. The final class distribution of the BEVDataset is shown in Figure~\ref{fig:dataset_class_balance_combined}, where the absolute and relative pixel distribution per class is presented for perspective and \aclink{BEV} images. 
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
-    \includegraphics[width=\linewidth]{images/appendix/dataset_class_balance_ratio.png}
-    \caption{Relative distribution of classes in dataset}
-    \label{fig:dataset_class_balance_ratio}
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/appendix/dataset_class_balance_pixels.png}
+        \caption{Number of pixels per class}
+        \label{fig:dataset_class_balance_pixels}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/appendix/dataset_class_balance_ratio.png}
+        \caption{Relative distribution of classes}
+        \label{fig:dataset_class_balance_ratio}
+    \end{subfigure}
+    \caption{Class Balance in Datasets: (a) Pixel count per class and (b) Relative class distribution.}
+    \label{fig:dataset_class_balance_combined}
 \end{figure}
 
 \newpage
@@ -66,7 +81,9 @@ Standing for OpenLABEL Datasets, OLDatasets is a custom parser from NuImages for
 
 
 % ==========================================================
-\section{F1-Score in terms of Intersection Over Union} \label{appendix:f1_iou}
+\section{F1-Score vs Intersection Over Union} \label{appendix:f1_iou}
+The objective of this appendix is to prove that Intersection over Union (\aclink{IoU}) and F1-Score are positive correlated and that \aclink{IoU} represents the worst case scenenario performance while F1-Score represents the average performance.
+
 \begin{equation}
     \begin{aligned}
     \text{F1} &= \frac{2TP}{2TP + FP + FN} \\
@@ -117,6 +134,9 @@ Now solve for \(\text{IoU}\) in terms of \(\text{F1}\):
     }
     \label{eq:conversion}
 \end{equation}
+
+\aclink{IoU} is generally considered a "worst-case scenario" metric because its denominator, representing the union of predicted and true areas, heavily penalizes any mismatch. This makes it very sensitive to precise boundary alignment. In contrast, F1-Score provides a more "average performance" view by balancing precision and recall. 
+
 \newpage
 % ==========================================================
 
@@ -208,7 +228,7 @@ The models that follow the \textit{Segmenting-Then-IPM} pipeline to obtain BEV s
 
 The initial training configurations for both the \textit{Segmenting-Then-IPM} and \textit{IPM-Then-Segmenting} strategies, discussed in Section~\ref{sec:bev2seg_2_experimentation} where models exhibit overfitting, correspond to models \texttt{raw2segbev\_mit-b0\_v0.2} and \texttt{raw2bevseg\_mit-b0\_v0.3}. Subsequently, model \texttt{raw2segbev\_mit-b0\_v0.2} is employed for the semantic merging comparison detailed in Section~\ref{sec:merging_labels}. In this comparison, model \texttt{raw2segbev\_mit-b0\_v0.4} incorporates the semantic merging strategy. The data augmentation techniques comparison, presented in Section~\ref{sec:data_augmentation}, employ the MiT-B0 models from Table~\ref{tab:models_hyperparameters} that implement the semantic merging strategy. Finally, Section~\ref{sec:bev2seg_2_comparison} encompasses all models with the exception of \texttt{raw2segbev\_mit-b0\_v0.2} and \texttt{raw2bevseg\_mit-b0\_v0.3}.
 
-\begin{table}[h!]
+\begin{table}[!ht]
     \centering
     \begin{threeparttable} % Start threeparttable environment
         \tiny
@@ -264,7 +284,7 @@ The initial training configurations for both the \textit{Segmenting-Then-IPM} an
 \section{Semantic merging with perspective masks}
 This appendix presents an additional evaluation of the semantic merging comparison focusing on models \texttt{raw2segbev\_mit-b0\_v0.2} and \texttt{raw2segbev\_mit-b0\_v0.4}. Unlike the main discussion, this evaluation is performed using perspective semantic masks instead of BEV semantic masks. The results are summarized in Table~\ref{tab:merging_comparison_nor}. Despite the change in evaluation data, the conclusions remain consistent with those presented in Section~\ref{sec:merging_labels}.
 
-\begin{table}[h!]
+\begin{table}[!ht]
     \centering
     \tiny
     \begin{tabular}{llcccc}
@@ -317,53 +337,31 @@ This appendix presents an additional evaluation of the semantic merging comparis
 
 
 % ==========================================================
-\section{Color palette}
-\begin{table}[h]
-    \centering
-    \renewcommand{\arraystretch}{1.5} % Increase row height
-    \setlength{\tabcolsep}{12pt} % Increase column spacing
-    \begin{tabular}{c c}
-        \toprule
-        \textbf{Hex Code} & \textbf{Color Sample} \\
-        \midrule
-
-
-        \#FF0064 & \cellcolor[HTML]{FF0064} \hspace{2cm} \\
-        \#FF62A0 & \cellcolor[HTML]{FF62A0} \hspace{2cm} \\
-        \#0277BD & \cellcolor[HTML]{0277BD} \hspace{2cm} \\
-        \#2AB0D2 & \cellcolor[HTML]{2AB0D2} \hspace{2cm} \\
-        \#7700A0 & \cellcolor[HTML]{7700A0} \hspace{2cm} \\
-        \#B200EF & \cellcolor[HTML]{B200EF} \hspace{2cm} \\
-        \#00A032 & \cellcolor[HTML]{00A032} \hspace{2cm} \\
-        \#03FF52 & \cellcolor[HTML]{03FF52} \hspace{2cm} \\
-        \#FF9800 & \cellcolor[HTML]{FF9800} \hspace{2cm} \\
-        \#FFB03B & \cellcolor[HTML]{FFB03B} \hspace{2cm} \\
-        \#C00071 & \cellcolor[HTML]{C00071} \hspace{2cm} \\
-        \#FF37AD & \cellcolor[HTML]{FF37AD} \hspace{2cm} \\
-        \#00A697 & \cellcolor[HTML]{00A697} \hspace{2cm} \\
-        \#44FFEE & \cellcolor[HTML]{44FFEE} \hspace{2cm} \\
-        
-
-
-
-
-        % \#F44336 & \cellcolor[HTML]{F44336} \hspace{2cm} \\
-        % \#EF5350 & \cellcolor[HTML]{EF5350} \hspace{2cm} \\
-        % \#F1464E & \cellcolor[HTML]{F1464E} \hspace{2cm} \\
-        % \#FF9800 & \cellcolor[HTML]{FF9800} \hspace{2cm} \\
-        % \#FF0064 & \cellcolor[HTML]{FF0064} \hspace{2cm} \\
-        % \midrule
-        % \#4CAF50 & \cellcolor[HTML]{4CAF50} \hspace{2cm} \\
-        % \#86BB48 & \cellcolor[HTML]{86BB48} \hspace{2cm} \\
-        % \#39C39E & \cellcolor[HTML]{39C39E} \hspace{2cm} \\
-        % \midrule
-        % \#0277BD & \cellcolor[HTML]{0277BD} \hspace{2cm} \\
-        % \#0097A7 & \cellcolor[HTML]{0097A7} \hspace{2cm} \\
-        % \#2AB0D2 & \cellcolor[HTML]{2AB0D2} \hspace{2cm} \\
-        % \#01A1FF & \cellcolor[HTML]{01A1FF} \hspace{2cm} \\
-        % \#0073B7 & \cellcolor[HTML]{0073B7} \hspace{2cm} \\
-        \bottomrule
-    \end{tabular}
-    \caption{Color Palette}
-    \label{tab:color_palette}
-\end{table}
+% \section{Color palette}
+% \begin{table}[!ht]
+%     \centering
+%     \renewcommand{\arraystretch}{1.5} % Increase row height
+%     \setlength{\tabcolsep}{12pt} % Increase column spacing
+%     \begin{tabular}{c c}
+%         \toprule
+%         \textbf{Hex Code} & \textbf{Color Sample} \\
+%         \midrule
+%         \#FF0064 & \cellcolor[HTML]{FF0064} \hspace{2cm} \\
+%         \#FF62A0 & \cellcolor[HTML]{FF62A0} \hspace{2cm} \\
+%         \#0277BD & \cellcolor[HTML]{0277BD} \hspace{2cm} \\
+%         \#2AB0D2 & \cellcolor[HTML]{2AB0D2} \hspace{2cm} \\
+%         \#7700A0 & \cellcolor[HTML]{7700A0} \hspace{2cm} \\
+%         \#B200EF & \cellcolor[HTML]{B200EF} \hspace{2cm} \\
+%         \#00A032 & \cellcolor[HTML]{00A032} \hspace{2cm} \\
+%         \#03FF52 & \cellcolor[HTML]{03FF52} \hspace{2cm} \\
+%         \#FF9800 & \cellcolor[HTML]{FF9800} \hspace{2cm} \\
+%         \#FFB03B & \cellcolor[HTML]{FFB03B} \hspace{2cm} \\
+%         \#C00071 & \cellcolor[HTML]{C00071} \hspace{2cm} \\
+%         \#FF37AD & \cellcolor[HTML]{FF37AD} \hspace{2cm} \\
+%         \#00A697 & \cellcolor[HTML]{00A697} \hspace{2cm} \\
+%         \#44FFEE & \cellcolor[HTML]{44FFEE} \hspace{2cm} \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Color Palette}
+%     \label{tab:color_palette}
+% \end{table}
