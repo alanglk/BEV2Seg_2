@@ -9,7 +9,7 @@ The segformer models from both approaches, \textit{Segmenting-Then-IPM} and \tex
 
 Semantic masks were provided during training with the \texttt{reduce\_labels} parameter set to \texttt{False}, as the dataset includes a "background" class. This configuration ensures that all pixel classes, including background, contribute to gradient computation during optimization. All experiments were executed on the hardware setup described in Table~\ref{tab:hardware}. From the six available Segformer encoder variants, three were selected for evaluation: MiT-b0, MiT-b2, and MiT-b4. Due to its larger size, the MiT-b4 model required two gradient accumulation steps to fit within the GPU's memory constraints. Checkpoints were saved based on evaluation loss, a design decision made despite ongoing discussions about whether loss or mean intersection over union is the better metric for model selection. A basic linear learning rate scheduler was applied throughout training and the loss function employed was \texttt{BCEWithLogitsLoss}, which is well-suited for multi-label semantic segmentation tasks, as it combines sigmoid activation and binary cross-entropy in a numerically stable way following the Segformer implementation. All model configurations and their associated hyperparameters used in this work are detailed in Appendix~\ref{appendix:models_hyperparameters}.
 
-\begin{table}[h]
+\begin{table}[!ht]
     \centering
     \begin{tabular}{c l c}
         \toprule
@@ -27,7 +27,7 @@ Semantic masks were provided during training with the \texttt{reduce\_labels} pa
 
 The two approaches were firstly trained using the smallest Segformer model variant, MiT-b0, for $20.7K$ steps without applying any regularization technique. This initial experiment was performed to observe whether the models were able to learn and predict on the dataset and see if them suffered from overfitting. Also, for this purpose, the choice of MiT-b0 was intentional as it trains faster and, due to its limited capacity, is less prone to extreme overfitting compared to larger models. This made it a suitable candidate for testing different hyperparameter configurations in a lightweight environment.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.7\linewidth]{./images/experiments/overfitting_bev_nu.png}
     \caption{Training and evaluation loss of segformer's Segmenting-Then-IPM and IPM-Then-Segmenting MiT-b0 models without any regularization technique}
@@ -42,7 +42,7 @@ It is also important to highlight the difference in metrics between the two mode
 
 This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_evaluation}, where the \textit{Segmenting-Then-IPM} model is evaluated on the test set twice: once using semantic masks in the camera domain and once using \aclink{BEV} masks. The figure displays the per-class \aclink{mIoU} for all the semantic categories the model was trained on, and two main observations emerge.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.8\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.2_new_test_evaluation.png}
     \caption{Segformer's Segmenting-Then-IPM MiT-B0 model evaluated with normal and BEV images}
@@ -212,7 +212,7 @@ This section has a dual purpose. First, the effect of applying geometric transfo
 
 Therefore, the introduction of data augmentation strategies such as random cropping, horizontal flipping, and rescaling on regular images significantly reduces overfitting, as shown in Figure~\ref{fig:normal_before_after_data_aug_logs}. This reduction in overfitting allows for longer training periods and improves model performance on the evaluation set, leading to convergence at higher \aclink{mIoU} values. This effect is also reflected in the evaluation of the models on the test set, where the model with data augmentation presents higher \aclink{mIoU} than the model affected by overfitting.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.7\linewidth]{./images/experiments/nor_before_after_data_aug_logs.png}
     \caption{Before and after regularization techniques on models trained with camera-domain images}
@@ -221,7 +221,7 @@ Therefore, the introduction of data augmentation strategies such as random cropp
 
 Secondly, the Figure~\ref{fig:bev_before_after_data_aug_logs} shows the trainig process graph for the three models trained with \aclink{BEV} images and reveals some significant differences. The first model, without any data augmentation, exhibits notable overfitting. In contrast, both data augmentation strategies, the traditional geometric augmentations (random flipping, random cropping, and rescaling) and the custom strategy of modifying the camera's extrinsic parameters, seems to partially reduce this overfitting.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_logs.png}
     \caption{Training logs of models with BEV data augmentation techniques}
@@ -234,7 +234,7 @@ On the other hand, the model trained with the extrinsic's data augmentation stra
 
 Overall, the findings from the validation set suggest that the custom data augmentation techniques for BEV images offer better performance than directly applying traditional augmentations. However, it is crucial to examine the models' performance on the unseen test set. Figure~\ref{fig:bev_before_after_data_aug_test} illustrates this evaluation, revealing that the performance difference between the three models is not as substantial in reality. While the model trained with extrinsic's parameters modification shows slightly better results, the performance gap between the other two models is less clear, with the model using traditional data augmentation on BEV images occasionally surpassing the overfitted model in vehicle-related classes.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_test.png}
     \caption{Different data augmentation stategies evaluated with BEV images.}
@@ -302,7 +302,7 @@ This comprehensive analysis underscores the critical influence of the BEV transf
 \subsection{[T6] Annotation evaluation}
 For the pipeline's evaluation, NuScenes scene "scene-0061" \footnote{\url{https://youtu.be/4gkyUWSZUkg?si=y5D9iybgzkv37Bko}} was used. This scene, captured in Singapore, includes object annotations, map data, and odometry at 2Hz for a total of 39 frames. The scene features a parked truck, a construction area, an intersection requiring a left turn, and the ego-vehicle following a van. The ego-vehicle's path is shown in Figure~\ref{fig:scene_ego_path}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{./images/experiments/ground_truth_scene.png}
     \caption{Scene ego-vehicle's route}
@@ -317,7 +317,7 @@ Every object in the scene, including those from ground truth and pipeline output
 
 Using these parameters, the confusion matrix presented in Table~\ref{tab:scene_confusion_matrix} was generated. This table aggregates all instances between detections and the visible ground truth across all frames of the scene. In this context, a True Positive (TP) signifies a detection correctly associated with a ground truth object; a False Positive (FP) indicates a detection that was not associated with any ground truth object, and a False Negative (FN) represents a ground truth object that the pipeline failed to detect.
 
-\begin{table}[h!]
+\begin{table}[!ht]
     \centering
     \begin{tabular}{|l|c|c|}
     \hline
@@ -340,7 +340,7 @@ Overall, the Precision of the pipeline is approximately $80\%$. This indicates t
 \subsubsection{Dimension estimation accuracy} \label{sec:dimension_estimation_accuracy}
 Among all TPs, an evaluation of dimension estimation accuracy was performed, with the results summarized in Table~\ref{tab:combined_ded_metrics}. This table also includes metrics for objects in frames grouped by their alignment with the vehicle's front camera. This grouping is determined by the yaw angle difference between the annotated ground truth objects and the vehicle's orientation. An object is considered not aligned if this angular difference exceeds $15$ degrees.
 
-\begin{table}[h!]
+\begin{table}[!ht]
     \centering
     \begin{tabular}{|l|c|c|c|}
         \hline
@@ -373,7 +373,7 @@ Among all TPs, an evaluation of dimension estimation accuracy was performed, wit
 Observing the mean total difference in dimensions for each axis of the vehicle's coordinate system ($\mathbf{\hat{x}_v}$, $\mathbf{\hat{y}_v}$, $\mathbf{\hat{z}_v}$), the x-axis (aligned with the camera's depth axis $\mathbf{\hat{z}_c}$) exhibits a markedly higher error rate compared to the y-axis (width) and z-axis (height). This suggests that the object depth estimation is considerably less accurate than height and width estimations. Metrics grouped by camera alignment further support this observation, as objects aligned with the camera show a significantly higher error in depth estimation, whereas height and width estimations are relatively close to the ground truth (mean errors of 43cm and 27cm for width and height estimation, respectively). In contrast, objects not aligned with the camera display higher error rates not only in depth but across all axes. This reflects an over-estimation of the footprint (width and depth) when objects are not aligned with the camera, as illustrated in the specific case shown in Figure~\ref{fig:scene_open3d_cases_b}.
 However, for non-aligned objects, one might anticipate the height error to remain relatively stable, as the height should be largely unaffected by a z-axis rotation. This discrepancy prompted a more detailed analysis focusing on the metrics for each ground truth object for which detections were made.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.32\textwidth}
         \includegraphics[width=\linewidth]{images/experiments/evaluation_frames/3d_evaluation_frame_1_canva.png}
@@ -398,7 +398,7 @@ However, for non-aligned objects, one might anticipate the height error to remai
 
 To illustrate different facets of the annotation system's performance in object dimension estimation, three specific cases are highlighted: the parked truck at the scene's commencement (ID 41); the van preceding the ego-vehicle (ID 154); and an excavator stationary mid-curve (ID 129). These three objects are shown in Figure~\ref{fig:scene_open3d_cases}. The evolution of dimensional estimation errors for these objects on a per-frame basis is presented in Figure~\ref{fig:scene_ded_cases}, which also indicates via a horizontal bar whether the object is aligned with the camera in the current frame.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{./images/experiments/ded_selected_objects.png}
     \caption{Difference in Each Dimension (DED) metrics of selected objects along scene's frames. Bottom horizontal bar indicates alignment with the camera.}
@@ -414,14 +414,14 @@ The case of the parked excavator is notable due to an unusually high height esti
 \subsubsection{Position estimation accuracy}
 The Bounding Box Disparity (\aclink{BBD}) serves as a valuable metric for assessing the positional accuracy of cuboids and for readily identifying potential incorrect detections. For instance, Figure~\ref{fig:van_bbd_through_frames_a} illustrates the \aclink{BBD} evolution for the van throughout the scene. The horizontal line in this graph denotes the \aclink{BBD} metric's intrinsic threshold separating Intersection over Union (IoU) based calculations from Volume-to-Volume (V2V) based ones. An example is the initial detection of the van in frame 2, which exhibits a \aclink{BBD} greater than 1. This signifies that the detection does not intersect with the ground truth bounding box. 
 
-% \begin{figure}[h!]
+% \begin{figure}[!ht]
 %     \centering
 %     \includegraphics[width=0.6\linewidth]{images/experiments/bbd_followed_van.png}
 %     \caption{Followed van BBD evolution through frames.}
 %     \label{fig:van_bbd_through_frames}
 % \end{figure}
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.32\textwidth}
         \includegraphics[width=\linewidth]{images/experiments/bbd_followed_van.png}
@@ -454,7 +454,7 @@ The final results were evaluated by comparing the occupancy, occlusion, and driv
 
 It is important to note that the masks generated by the pipeline are based on different data sources and follow distinct generation processes. Specifically, the occupancy masks are obtained from the footprints of 3D bounding boxes derived from the 3D detection process, whereas the occlusion and drivable area masks are obtained from semantic segmentation masks reprojected into \aclink{BEV} space. In this context, occlusion is represented by the distorted projections of object-level semantic masks in \aclink{BEV} (see Section~\ref{sec:instance_bev_mask_methodology}), which contrasts with the ray-casting approach used to generate the ground truth. This difference in data origin and representation is crucial for interpreting the behavior observed in the evaluation metrics.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\linewidth]{./images/experiments/iou_occ2_masks.png}
     \caption{Intersection over Union (IoU) of the pipeline's semantic masks across scene frames.}

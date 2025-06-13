@@ -506,19 +506,15 @@ class DebugBEVMap(AppWindow):
         cur_pcd = semantic_data['pcd']
         cur_pcd_colors = semantic_data['pcd_colors']
         
-        # print(f"Computing accum pcd for: {semantic_data['label']}")
-        # if not semantic_data['dynamic']:
-        #     cur_pcd = semantic_data['pcd']
-        #     cur_pcd_colors = semantic_data['pcd_colors']
-        #     print(f"Non Dynamic cur_pcd.shape: {cur_pcd.shape}")
-        # else:
-        #     cur_pcd, cur_pcd_colors = np.empty((0, 3)), np.empty((0, 3))
-        #     num_instances = len(semantic_data['instance_pcds'])
-        #     for i in range(num_instances):
-        #         cur_pcd = np.vstack([cur_pcd, semantic_data['instance_pcds'][i]['pcd']])
-        #         cur_pcd_colors = np.vstack([cur_pcd_colors, semantic_data['instance_pcds'][i]['pcd_colors']])
-        #     print(f"Dynamic (there are {num_instances} instances) cur_pcd.shape: {cur_pcd.shape}")
-        # assert cur_pcd.size > 0
+        if semantic_data['dynamic'] and False:
+            print(f"Computing accum pcd for: {semantic_data['label']}")
+            cur_pcd, cur_pcd_colors = np.empty((0, 3)), np.empty((0, 3))
+            num_instances = len(semantic_data['instance_pcds'])
+            for i in range(num_instances):
+                cur_pcd = np.vstack([cur_pcd, semantic_data['instance_pcds'][i]['pcd']])
+                cur_pcd_colors = np.vstack([cur_pcd_colors, semantic_data['instance_pcds'][i]['pcd_colors']])
+            print(f"Dynamic (there are {num_instances} instances) cur_pcd.shape: {cur_pcd.shape}")
+        assert cur_pcd.size > 0
 
         mask = (abs(cur_pcd[:, 0]) <= lims[0]) & (abs(cur_pcd[:, 1]) <= lims[1]) & (abs(cur_pcd[:, 2]) <= lims[2])
         cur_pcd         = cur_pcd[mask]

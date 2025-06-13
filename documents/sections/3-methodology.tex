@@ -420,25 +420,16 @@ Once the semantic mask has been preprocessed and the point cloud computed, a pre
 
 The instance detection process faces two key challenges: extracting individual instances from dynamic semantic point clouds and mitigating the inherent noise and artifacts that result from the depth estimation process. To address this, the DBSCAN clustering algorithm is employed. It effectively extracts distinct instances from each dynamic semantic point cloud, removes noisy outlier points and minimizes the "trail" artifacts commonly left by depth estimation along object edges, as illustrated in Figure~\ref{fig:semantic_pointcloud_b}. Then, for each computed instance point cloud, the minimal camera \aclink{AABB} is calculated by taking the minimum and maximum coordinates along each of the camera axes $\mathbf{\hat{x}_c}$, $\mathbf{\hat{y}_c}$, and $\mathbf{\hat{z}_c}$. Oriented bounding boxes were not used in this work.
 
-Estimating the correct orientation of a bounding box is a challenging task, especially when only a partial view of the object is available (see Figure~\ref{fig:oriented_bounding_box_problems}). Depending on the viewpoint and the amount of visible surface, traditional methods are very likely to produce inaccurate orientation estimates. Modern 3D object detection models typically address this issue by learning the statistical distribution of common object shapes and orientations. Datasets like NuScenes even provide metrics such as Average Scale Error and Average Orientation Error to evaluate the accuracy of these predictions.
+Estimating the correct orientation of a bounding box is a challenging task, especially when only a partial view of the object is available. Depending on the viewpoint and the amount of visible surface, traditional methods are very likely to produce inaccurate orientation estimates. Modern 3D object detection models typically address this issue by learning the statistical distribution of common object shapes and orientations. Datasets like NuScenes even provide metrics such as Average Scale Error and Average Orientation Error to evaluate the accuracy of these predictions.
 
 However, the main goal in this thesis is to estimate the physical space occupied by a vehicle in the scene for pre-annotation purposes, not precise orientation or object alignment. In this context, using an \aclink{AABB} may slightly overestimate the occupied space when objects are not aligned with the camera's reference frame, for example during turns or when vehicles are parked at an angle. Nevertheless, this estimation does not pose a significant problem since these overestimated regions are not of special interest in the annotation process.
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.5\linewidth]{images/methodology/oriendet_bbox_problem_aux.jpeg}
-    \caption{Oriented bounding box problems.}
-    \label{fig:oriented_bounding_box_problems}
-\end{figure}
-
-\hl{Change oriented bounding box problems figure.}
 
 Finally, a filtering process is performed to ensure there are no noisy, redundant, too far away or floating instances. Also, it ensures there are no overlapping bounding boxes by checking each new instance's 3D bounding box against those already accepted. If an overlap is detected, the function compares their sizes: the larger box is kept, and the smaller one is removed or ignored. This helps avoid redundant or conflicting instances that may represent the same object or spatial region, improving the clarity and consistency of the data. The final results of this module are shown in Figure~\ref{fig:instance_scene_images}.
 
 \begin{figure}[h!]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
-        \includegraphics[width=\textwidth]{images/shared/no_signal.jpg}
+        \includegraphics[width=\textwidth]{images/methodology/3d_cuboids_1.png}
         \caption{}
         \label{fig:instance_scene_images_a}
     \end{subfigure}
@@ -461,7 +452,7 @@ To associate the \aclink{BEV} semantic masks with the detected 3D instances, the
 
 This methodology results in a final representation of occupancy, defined by the base of the 3D bounding box; and occlusion, which is captured by the distorted shape of the semantic mask from the \aclink{BEV} perspective. This approach, using distorted areas as occlusion masks, both accurately reflects the occluded area and limits the accumulation of errors that could arise if 3D detection occupancy masks were used as an intermediate input for their generation.
 
-Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
+Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible, making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \aclink{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
 
 \begin{figure}[h!]
     \centering
