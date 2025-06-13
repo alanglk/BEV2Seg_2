@@ -477,8 +477,49 @@ class DebugBEVMap(AppWindow):
         mesh.compute_triangle_normals()
         return mesh
 
-    def _get_accum_pcd(self, cur_pcd:np.ndarray, cur_pcd_colors:np.ndarray, prev_pcd:o3d.geometry.PointCloud, transform_4x4:np.ndarray, lims:tuple = (10, 5, 30),):
-        """prev_pcd is in odom frame and current is in camera frame"""
+    def _get_accum_pcd(self, semantic_data:dict, prev_pcd:o3d.geometry.PointCloud, transform_4x4:np.ndarray, lims:tuple = (10, 5, 30),):
+        """prev_pcd is in odom frame and current is in camera frame
+        semantic_data:
+        {   
+            'label': str, 
+            'label_id': int,
+            'camera_name': str,
+            'dynamic': bool, 
+            'pcd': np.ndarray, 
+            'pcd_colors': np.ndarray,
+            'instance_pcds': [{
+                'inst_id': int, 
+                'pcd': np.ndarray, 
+                'pcd_colors': np.ndarray
+            }],
+            'instance_3dboxes':[{
+                'inst_id': int, 
+                'center': (x_pos, y_pos, z_pos), 
+                'dimensions': (bbox_width, bbox_height, bbox_depth)  
+            }],
+            'instance_bev_mask':[{
+                'inst_id': int,
+                'occupancy_mask': (H, W) binary mask,
+                'oclussion_mask': (H, W) binary mask
+        }
+        """
+        cur_pcd = semantic_data['pcd']
+        cur_pcd_colors = semantic_data['pcd_colors']
+        
+        # print(f"Computing accum pcd for: {semantic_data['label']}")
+        # if not semantic_data['dynamic']:
+        #     cur_pcd = semantic_data['pcd']
+        #     cur_pcd_colors = semantic_data['pcd_colors']
+        #     print(f"Non Dynamic cur_pcd.shape: {cur_pcd.shape}")
+        # else:
+        #     cur_pcd, cur_pcd_colors = np.empty((0, 3)), np.empty((0, 3))
+        #     num_instances = len(semantic_data['instance_pcds'])
+        #     for i in range(num_instances):
+        #         cur_pcd = np.vstack([cur_pcd, semantic_data['instance_pcds'][i]['pcd']])
+        #         cur_pcd_colors = np.vstack([cur_pcd_colors, semantic_data['instance_pcds'][i]['pcd_colors']])
+        #     print(f"Dynamic (there are {num_instances} instances) cur_pcd.shape: {cur_pcd.shape}")
+        # assert cur_pcd.size > 0
+
         mask = (abs(cur_pcd[:, 0]) <= lims[0]) & (abs(cur_pcd[:, 1]) <= lims[1]) & (abs(cur_pcd[:, 2]) <= lims[2])
         cur_pcd         = cur_pcd[mask]
         cur_pcd_colors  = cur_pcd_colors[mask]
@@ -725,7 +766,7 @@ class DebugBEVMap(AppWindow):
                     prev_accum_pcd = None
                     if fk-1 in self.frame_acc_pcd and semantic_label in self.frame_acc_pcd[fk-1]:
                         prev_accum_pcd =  self.frame_acc_pcd[fk-1][semantic_label]
-                    self.frame_acc_pcd[fk][semantic_label] = self._get_accum_pcd(semantic_data['pcd'], semantic_data['pcd_colors'], prev_accum_pcd, transform_4x4)  
+                    self.frame_acc_pcd[fk][semantic_label] = self._get_accum_pcd(semantic_data, prev_accum_pcd, transform_4x4)  
                 all_pcds.append(self.frame_acc_pcd[fk][semantic_label])
                 all_pcd_ids.append(f"{semantic_label}_pcd_{fk}")
 
@@ -775,8 +816,9 @@ class DebugBEVMap(AppWindow):
         # for i, pcd in enumerate(aux_pcds):
         #     self._scene.scene.add_geometry(f"debuggig_pcds_{i}_{fk}", pcd, self.settings.material)
 
-        occ_pcd = self.vehicle_gridmap.get_pcd_for_debugging(frame_num=fk, oy_color=self.settings.oy_color, on_color=self.settings.on_color)
-        self._scene.scene.add_geometry(f"occupancy_occlusion_pcd_{fk}", occ_pcd, self.settings.material)
+        # Render occupancy/occlusion
+        # occ_pcd = self.vehicle_gridmap.get_pcd_for_debugging(frame_num=fk, oy_color=self.settings.oy_color, on_color=self.settings.on_color)
+        # self._scene.scene.add_geometry(f"occupancy_occlusion_pcd_{fk}", occ_pcd, self.settings.material)
 
         # Update camera and ego
         self._update_camera_ego(fk)

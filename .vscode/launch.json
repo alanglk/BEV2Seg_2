@@ -19,7 +19,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}", // Esto ejecuta el archivo que esté abierto
-            "args": ["./tmp/scene-0061", "./data/pipeline_3d_evaluations.pkl", "--debug", "--gen_bev_masks"],
+            "args": ["./tmp/scene-0061"],
+            // "args": ["./tmp/scene-0061", "./data/pipeline_3d_evaluations.pkl", "--debug", "--gen_bev_masks"],
             // "args": ["data/class_balance.json"],
             // "args": ["config/segformer_nu.toml"],
             "console": "integratedTerminal",
