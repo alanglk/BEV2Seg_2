@@ -1,11 +1,8 @@
 % ================================================
 % =                 METHODOLOGY                  =
 % ================================================ 
-% This section details the methodology and implementations undertaken to address the objectives described in Section~\ref{sec:objectives}. On the first hand, the pipeline design for addressing \textit{"wich is the best approach for segmenting planar elements"} is introduced, tackling the model and dataset selection and the training and validation processes. Afterward, the implementation of the occupancy, occlusion, and drivable area pre-annotation pipeline is presented. Finally, the evaluation strategy of the pipeline is discussed to measure the quality of the resulting semantic masks and the monocular 3D detections for estimating the object's dimensions.
-% Thus, this project can be divided into two main blocks: \aclink{BEV} semantic segmentation experimentation and the design and implementation of the pre-annotation pipeline. Finally, all experiments for evaluating the models and the resulting framework are presented in Section~\ref{sec:experiments_and_results}.
 
-
-This section details the methodology and implementations undertaken to address the objectives described in Section~\ref{sec:objectives}. To address the first objective (\objref{O1}), a comparative framework named BEV2Seg\_2 is established to analyze two distinct \aclink{BEV} semantic segmentation approaches: the traditional strategy of perspective image segmentation followed by an \aclink{IPM} reprojection, and the proposed alternative of direct segmentation in the \aclink{BEV} space. The methodology for this comparison includes the development of a common \aclink{BEV} reprojection module (\objref{T1}) to ensure consistency, the training of a shared semantic segmentation model architecture on both perspective images (\objref{T2}) and \aclink{BEV} images (\objref{T3}) resulting in two different models, and finally, the definition of a fair evaluation process on an identical validation set (\objref{T4}).
+This section details the methodology and implementations undertaken to address the objectives described in Section~\ref{sec:objectives} and visible in Figure~\ref{fig:objectives}. A comparative framework named BEV2Seg\_2 is established to analyze two distinct \aclink{BEV} semantic segmentation approaches (objective \objref{O1}): the traditional strategy of perspective image segmentation followed by an \aclink{IPM} reprojection, and the proposed alternative of direct segmentation in the \aclink{BEV} space. The methodology for this comparison includes the development of a common \aclink{BEV} reprojection module (\objref{T1}) to ensure consistency, the training of a shared semantic segmentation model architecture on both perspective images (\objref{T2}) and \aclink{BEV} images (\objref{T3}) resulting in two different models, and finally, the definition of a fair evaluation process on an identical validation set (\objref{T4}).
 
 Subsequently, the section addresses the second objective (\objref{O2}), which focuses on the practical application of these techniques. It details the implementation of an automated annotation pipeline (\objref{T5}) designed to generate \aclink{BEV} semantic masks for occupancy, occlusion, and drivable areas from vehicular scene data. To conclude, the methodology for the critical analysis of this annotation pipeline is outlined, assessing its overall effectiveness, strengths, and limitations (\objref{T6}).
 
@@ -25,7 +22,7 @@ The following sections detail the main parts of this flowchart. First, the BEV r
 \subsubsection{[T1] BEV reprojection module} \label{sec:bev_reprojection_module}
 The \aclink{BEV} reprojection module is a critical component responsible for transforming standar 2D perspective images and semantic masks into the \aclink{BEV} domain. This transformation is essential for creating the top-down views during inference of the BEV2Seg\_2 strategies but also for generating the necessary training and evaluation data of the framework.
 
-The core of this module leverages the \aclink{VCD} library \cite{VCD} to handle the complex geometric transformations required for reprojection. In order to generate a top-down view from either an input image or a semantic mask, it is necessary to provide the camera parameters to the module. This parameters are provided in the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format from which a lookup table is computed for appliying the \aclink{IPM} reprojection.
+The core of this module leverages the \aclink{VCD} library \cite{VCD} to handle the complex geometric transformations required for reprojection. In order to generate a top-down view from either an input image or a semantic mask, it is necessary to provide the camera's calibration parameters to the module. This parameters are provided in the structured ASAM OpenLABEL \footnote{\url{https://www.asam.net/standards/detail/openlabel/}} format from which a lookup table is computed for appliying the \aclink{IPM} reprojection.
 
 Since this reprojection involves image warping, the interpolation method must be carefully chosen:
 \begin{itemize}
@@ -441,13 +438,6 @@ Estimating the correct orientation of a bounding box is a challenging task, espe
 
 However, the main goal in this thesis is to estimate the physical space occupied by a vehicle in the scene for pre-annotation purposes, not precise orientation or object alignment. In this context, using an \aclink{AABB} may slightly overestimate the occupied space when objects are not aligned with the camera's reference frame, for example during turns or when vehicles are parked at an angle. Nevertheless, this estimation does not pose a significant problem since these overestimated regions are not of special interest in the annotation process.
 
-\begin{figure}[!ht]
-    \centering
-    \includegraphics[width=0.5\linewidth]{images/methodology/oriendet_bbox_problem_aux.jpeg}
-    \caption{Oriented bounding box problems.}
-    \label{fig:oriented_bounding_box_problems}
-\end{figure}
-
 Finally, a filtering process is performed to ensure there are no noisy, redundant, too far away or floating instances. Also, it ensures there are no overlapping bounding boxes by checking each new instance's 3D bounding box against those already accepted. If an overlap is detected, the function compares their sizes: the larger box is kept, and the smaller one is removed or ignored. This helps avoid redundant or conflicting instances that may represent the same object or spatial region, improving the clarity and consistency of the data. The final results of this module are shown in Figure~\ref{fig:instance_scene_images}.
 
 \begin{figure}[!ht]
@@ -476,7 +466,7 @@ To associate the \aclink{BEV} semantic masks with the detected 3D instances, the
 
 This methodology results in a final representation of occupancy, defined by the base of the 3D bounding box; and occlusion, which is captured by the distorted shape of the semantic mask from the \aclink{BEV} perspective. This approach, using distorted areas as occlusion masks, both accurately reflects the occluded area and limits the accumulation of errors that could arise if 3D detection occupancy masks were used as an intermediate input for their generation.
 
-Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible (see Figure~\ref{fig:oriented_bounding_box_problems}), making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \acp{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
+Furthermore, this method allows for estimating the vehicle's extent while handling certain ambiguities. For example, when a vehicle is perfectly aligned with the camera view, only the rear width and height are clearly visible, making the depth extent estimation ambiguous. However, when the vehicle is rotated relative to the camera, its dimensions become more discernible. In such cases, the 3D detection phase, despite the ovestimation of \acp{AABB}, enables a more reliable approximation of the vehicle's actual footprint.
 
 \begin{figure}[!ht]
     \centering
