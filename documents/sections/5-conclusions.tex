@@ -9,7 +9,7 @@ Furthermore, this work successfully presents a practical application: an automat
 Several key conclusions emerged from the performed experimentation:
 \begin{itemize}
 
-    \item \textbf{Hypothesis on segmentation strategy not supported by evidence:} Contrary to the initial hypothesis, this work did not find sufficient experimental evidence to support the idea that \textit{"training a semantic segmentation model directly on \aclink{BEV} images outperforms the traditional image-space segmentation followed by IPM reprojection"}. In fact, all results suggest that the traditional \textit{Segmenting-Then-IPM} strategy yields superior segmentation performance for both obstacles and planar elements.
+    \item \textbf{Hypothesis on segmentation strategy not supported by evidence:} Contrary to the initial hypothesis, this work did not find sufficient experimental evidence to support the idea that \textit{"training a semantic segmentation model directly on \aclink{BEV} images outperforms the traditional image-space segmentation followed"}. In fact, all results suggest that the traditional \textit{Segmenting-Then-IPM} strategy yields superior segmentation performance for both obstacles and planar elements.
 
     \item \textbf{Extrinsic \aclink{BEV} data augmentation:} Applying traditional geometric augmentations (e.g., random crops, rescales, flips) to perspective images before \aclink{BEV} reprojection often results in some information loss. In contrast, modifying the camera's extrinsic parameters prior to \aclink{BEV} reprojection proved to be more effective, reducing model overfitting by simulating multiple viewpoints.
 

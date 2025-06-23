@@ -11,14 +11,16 @@ To obtain \aclink{BEV} semantic segmentation from cameras, traditional methods f
 
 With the objective of addressing the afore mentioned limitations, recent methods leverage data-driven techniques for \aclink{BEV} representation \cite{view_parsing_network} \cite{lift_splat_shoot} \cite{m2bev}. However, to the best of our knowledge, no prior work has researched the impact of training a standard semantic segmentation model directly on \aclink{BEV} images.
 
-The main objective of this master's thesis is to test the hypothesis: \textit{Does training a semantic segmentation model directly on \aclink{BEV} images outperforms the traditional image-space segmentation followed by \aclink{IPM} reprojection?} Additionally, this work explores a technical application of \aclink{BEV} semantic segmentation for annotating vehicular scenes with occupancy, occlusion, and drivable area masks, contributing to the field of monocular 3D object detection given 2D semantic masks.
+The main objective of this master's thesis is to test the hypothesis: \textbf{Does training a semantic segmentation model directly on \aclink{BEV} images outperforms the traditional image-space segmentation?} 
+
+Additionally, this work explores a technical application of \aclink{BEV} semantic segmentation for annotating vehicular scenes with occupancy, occlusion, and drivable area masks, contributing to the field of monocular 3D object detection given 2D semantic masks.
 
 
 % ================================================
 % =                 OBJECTIVES                   =
 % ================================================ 
 \subsection{Objectives} \label{sec:objectives}
-This master's thesis aims to address key challenges in \aclink{BEV} semantic segmentation. While initially motivated by the reseach of optimal BEV segmentation strategies, this work also explores a tangible real-world application of these techniques in the \aclink{ADS} context. Accordingly, it focuses on achieving two main objectives: to analyze semantic segmentation in \aclink{BEV} space for planar elements by comparing a traditional strategy with a proposed alternative approach (\objref{O1}), and to implement an annotation system for generating BEV masks for occupancy, occlusion, and drivable areas (\objref{O2}).
+This master's thesis aims to address key challenges in \aclink{BEV} semantic segmentation. Accordingly, it focuses on achieving two main objectives: to analyze semantic segmentation in \aclink{BEV} space for planar elements by comparing a traditional strategy with a proposed alternative approach (\objref{O1}), and to implement an annotation system for generating BEV masks for occupancy, occlusion, and drivable areas (\objref{O2}).
 
 \begin{figure}[h!]
     \centering

@@ -8,7 +8,7 @@ Subsequently, the section addresses the second objective (\objref{O2}), which fo
 
 
 \subsection{[O1] BEV2Seg\_2} \label{sec:bev2seg_2}
-To address the hypotesis that \textit{"A semantic segmentation model trained with \aclink{BEV} images better segments planar elements than a traditional image-space segmentation followed by IPM"} the framework represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. This framework performs a direct comparison between two approaches: \textit{Segmenting-Then-IPM} strategy and an \textit{IPM-Then-Segmenting} strategy. Both approaches recieve perspective images as input, share a common BEV Reprojection Module, have the same model's architecture for obtaining semantic masks and they converge at a final comparison task where the quality of the output BEV semantic masks are evaluated.
+To address the hypotesis that \textit{"A semantic segmentation model trained with \aclink{BEV} images better segments planar elements than a traditional image-space segmentation"} the framework represented in Figure~\ref{fig:beg2seg_2_flow} has been designed. This framework performs a direct comparison between two approaches: \textit{Segmenting-Then-IPM} strategy and an \textit{IPM-Then-Segmenting} strategy. Both approaches recieve perspective images as input, share a common BEV Reprojection Module, have the same model's architecture for obtaining semantic masks and they converge at a final comparison task where the quality of the output BEV semantic masks are evaluated.
 
 \begin{figure}[!ht]
     \centering
@@ -17,7 +17,7 @@ To address the hypotesis that \textit{"A semantic segmentation model trained wit
     \label{fig:beg2seg_2_flow}
 \end{figure}
 
-The following sections detail the main parts of this flowchart. First, the BEV reprojection module is described, explaining how it converts standard images into a unified \acl{BEV} and the selected \aclink{BEV} parameters. Next, the training process of both strategies is covered, including the selection of the semantic segmentation model and the dataset that is used. Finally, the evaluation method and metrics are presented to measure and compare both approaches, which help to confirm the initial hypothesis.
+The following sections detail the main parts of this flowchart. First, the \aclink{BEV} reprojection module is described, explaining how it converts standard images into a unified \aclink{BEV} map and the selected parameters. Next, the training process of both strategies is covered, including the selection of the semantic segmentation model and the dataset that is used. Finally, the evaluation method and metrics are presented to measure and compare both approaches, which help to confirm the initial hypothesis.
 
 \subsubsection{[T1] BEV reprojection module} \label{sec:bev_reprojection_module}
 The \aclink{BEV} reprojection module is a critical component responsible for transforming standar 2D perspective images and semantic masks into the \aclink{BEV} domain. This transformation is essential for creating the top-down views during inference of the BEV2Seg\_2 strategies but also for generating the necessary training and evaluation data of the framework.
@@ -97,7 +97,7 @@ The Segformer model consists on an hierarchical Transformer  encoder, which extr
 
 \begin{figure}[!ht]
     \centering
-    \includegraphics[width=\linewidth]{images/methodology/segformer_architecture.png}
+    \includegraphics[width=0.8\linewidth]{images/methodology/segformer_architecture.png}
     \caption{Segformer architecture}
     \label{fig:segformer_architecture}
 \end{figure}
@@ -553,12 +553,12 @@ These distinct cases are illustrated in Figure~\ref{fig:bbox_disparity}.
 \begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
-        \includegraphics[width=\textwidth]{images/methodology/frame_0_3d_bb.png}
+        \includegraphics[width=0.8\textwidth]{images/methodology/frame_0_3d_bb.png}
         \caption{}
         \label{fig:bbox_disparity_a}
     \end{subfigure}
     \begin{subfigure}[b]{0.45\textwidth}
-        \includegraphics[width=\textwidth]{images/methodology/frame_2_3d_bb.png}
+        \includegraphics[width=0.8\textwidth]{images/methodology/frame_2_3d_bb.png}
         \caption{}
         \label{fig:bbox_disparity_b}
     \end{subfigure}
