@@ -29,7 +29,7 @@ The two approaches were firstly trained using the smallest Segformer model varia
 
 \begin{figure}[!ht]
     \centering
-    \includegraphics[width=0.7\linewidth]{./images/experiments/overfitting_bev_nu.png}
+    \includegraphics[width=\linewidth]{./images/experiments/overfitting_bev_nu.png}
     \caption{Training and evaluation loss of segformer's Segmenting-Then-IPM and IPM-Then-Segmenting MiT-b0 models without any regularization technique}
     \label{fig:overfitting_mit-b0}
 \end{figure}
@@ -44,7 +44,7 @@ This distinction motivates the analysis shown in Figure~\ref{fig:normal_vs_bev_e
 
 \begin{figure}[!ht]
     \centering
-    \includegraphics[width=0.8\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.2_new_test_evaluation.png}
+    \includegraphics[width=0.9\linewidth]{./images/experiments/raw2segbev_mit-b0_v0.2_new_test_evaluation.png}
     \caption{Segformer's Segmenting-Then-IPM MiT-B0 model evaluated with normal and BEV images}
     \label{fig:normal_vs_bev_evaluation}
 \end{figure}
@@ -79,11 +79,11 @@ In general, the results indicate that both models achieve comparable performance
     \toprule
     \textbf{Merged Class} & \textbf{Original Label} & \textbf{mIoU A} & \textbf{mIoU B} & \textbf{mF1 A} & \textbf{mF1 B} \\
     \midrule
-    background & background & 0.97 & 0.97 & 0.99 & 0.99 \\
+    background & background & 0.97 & \textbf{0.97} & 0.99 & \textbf{0.99} \\
     \midrule
     animal & animal & 0.00 & 0.00 & 0.00 & 0.00 \\
     \midrule
-    human.pedestrian.adult & human.pedestrian.adult & 0.07 & 0.08 & 0.09 & 0.11 \\
+    human.pedestrian.adult & human.pedestrian.adult & 0.07 & \textbf{0.08} & 0.09 & \textbf{0.11} \\
      & human.pedestrian.child & 0.00 & - & 0.00 & - \\
      & human.pedestrian.construction\_worker & 0.00 & - & 0.00 & - \\
      & human.pedestrian.personal\_mobility & 0.00 & - & 0.00 & - \\
@@ -91,7 +91,7 @@ In general, the results indicate that both models achieve comparable performance
      & human.pedestrian.stroller & 0.00 & - & 0.00 & - \\
      & human.pedestrian.wheelchair & 0.00 & - & 0.00 & - \\
     \midrule
-    movable\_object.barrier & movable\_object.barrier & 0.08 & 0.14 & 0.09 & 0.17 \\
+    movable\_object.barrier & movable\_object.barrier & 0.08 & \textbf{0.14} & 0.09 & \textbf{0.17} \\
      & movable\_object.debris & 0.00 & - & 0.00 & - \\
      & movable\_object.pushable\_pullable & 0.00 & - & 0.00 & - \\
      & movable\_object.trafficcone & 0.08 & - & 0.10 & - \\
@@ -99,7 +99,7 @@ In general, the results indicate that both models achieve comparable performance
     \midrule
     vehicle.car & vehicle.bus.bendy & 0.00 & - & 0.00 & - \\
      & vehicle.bus.rigid & 0.02 & - & 0.03 & - \\
-     & vehicle.car & 0.30 & 0.38 & 0.33 & 0.42 \\
+     & vehicle.car & 0.30 & \textbf{0.38} & 0.33 & \textbf{0.42} \\
      & vehicle.construction & 0.01 & - & 0.01 & - \\
      & vehicle.emergency.ambulance & 0.00 & - & 0.00 & - \\
      & vehicle.emergency.police & 0.00 & - & 0.00 & - \\
@@ -109,17 +109,16 @@ In general, the results indicate that both models achieve comparable performance
     vehicle.ego & vehicle.ego & 0.00 & 0.00 & 0.00 & 0.00 \\
     \midrule
     vehicle.motorcycle & vehicle.bicycle & 0.02 & - & 0.02 & - \\
-     & vehicle.motorcycle & 0.04 & 0.06 & 0.05 & 0.07 \\
+     & vehicle.motorcycle & 0.04 & \textbf{0.06} & 0.05 & \textbf{0.07} \\
     \midrule
-    flat.driveable\_surface & flat.driveable\_surface & 0.94 & 0.94 & 0.97 & 0.97 \\
+    flat.driveable\_surface & flat.driveable\_surface & 0.94 & \textbf{0.94} & 0.97 & \textbf{0.97} \\
     \bottomrule
-     & & 0.10 & 0.32 & 0.11 & 0.34 \\
+     & & 0.10 & \textbf{0.32} & 0.11 & \textbf{0.34} \\
     \bottomrule
     \end{tabular}
-    \caption{Per-class metric comparison between Model A and merged Model B evaluated with BEV images}
+    \caption{Per-class metric comparison between Model A and merged Model B evaluated with BEV images. Last row shows the mean IoU and mean F1 scores along all semantic classes of each model.}
     \label{tab:merging_comparison_bev}
 \end{table}
-    
 
 
 
@@ -214,7 +213,7 @@ Therefore, the introduction of data augmentation strategies such as random cropp
 
 \begin{figure}[!ht]
     \centering
-    \includegraphics[width=0.7\linewidth]{./images/experiments/nor_before_after_data_aug_logs.png}
+    \includegraphics[width=\linewidth]{./images/experiments/nor_before_after_data_aug_logs.png}
     \caption{Before and after regularization techniques on models trained with camera-domain images}
     \label{fig:normal_before_after_data_aug_logs}
 \end{figure}
@@ -223,7 +222,7 @@ Secondly, the Figure~\ref{fig:bev_before_after_data_aug_logs} shows the trainig 
 
 \begin{figure}[!ht]
     \centering
-    \includegraphics[width=0.7\linewidth]{./images/experiments/bev_before_after_data_aug_logs.png}
+    \includegraphics[width=\linewidth]{./images/experiments/bev_before_after_data_aug_logs.png}
     \caption{Training logs of models with BEV data augmentation techniques}
     \label{fig:bev_before_after_data_aug_logs}
 \end{figure}
@@ -283,7 +282,7 @@ The Table~\ref{tab:model_comparison} shows a comparative analysis of semantic se
     \end{threeparttable} 
 
 
-    \caption{mIoU models comparison.}
+    \caption{Comparison of mIoU scores across models. Bold values indicate the best-performing model for each semantic class.}
     \label{tab:model_comparison}
 \end{table}
 
