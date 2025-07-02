@@ -18,6 +18,10 @@ tmp/
 
 /data/eval_debug/
 
+
+# Final signed version
+*TFM_Report_AlanGarciaJustel.pdf
+
 *.mp4
 *.gz
 *.tar
