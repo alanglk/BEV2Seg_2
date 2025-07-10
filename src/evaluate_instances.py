@@ -1929,7 +1929,7 @@ def main(
     _debug = debug
     if _debug:
         _debug_3d = True
-        _debug_plt = True
+        _debug_plt = False
         print(f"[DEBUG] Debugging evaluation of 3d intances -> _debug_3d: {_debug_3d}, _debug_plt: {_debug_plt}")
 
     # Load OpenLABEL

@@ -17,7 +17,7 @@
         "oldatasets/tests",
         "tests"
     ],
-    "cmake.sourceDirectory": "/home/VICOMTECH/agarciaj/GitLab/bev2seg_2/tracking",
+    "cmake.sourceDirectory": "/home/ag6154lk/BEV2Seg_2/tracking",
     "files.associations": {
         "ostream": "cpp",
         "iosfwd": "cpp",

@@ -199,3 +199,11 @@ setup(
     python_requires='>=3.6',
 )
 ```
+
+
+## DEMO
+
+```bash
+python3 src/evaluate_instances.py ./tmp/scene-0061 ./data/pipeline_3d_evaluations.pkl --debug
+python3 src/scene_renderer.py ./tmp/scene-0061
+```

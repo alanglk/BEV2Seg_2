@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# Defaults
+FRAMERATE=10
+RESOLUTION=""
+ASPECT=""
+ASPECT_RATIO=""
+CROP_X=0.5
+OUTPUT="output.gif"
+
+print_usage() {
+  echo "Uso: $0 <directorio> -p <prefijo> [opciones]"
+  echo
+  echo "Posicional:"
+  echo "  <directorio>            Ruta a las imágenes (obligatorio)"
+  echo
+  echo "Opciones:"
+  echo "  -p, --prefix <prefijo>  Prefijo de imágenes (ej: raw_cuboid_)"
+  echo "      --framerate <N>     Cuadros por segundo (default: 10)"
+  echo "      --resolution WxH    Escalado final (ej: 360:-1 para ancho 360px)"
+  echo "      --aspect <modo>     Modo de aspect: mobile | custom"
+  echo "      --aspect-ratio WxH  Ratio personalizado si usas --aspect custom"
+  echo "      --crop-x <0-1>      Desplazamiento horizontal del crop (0=izq, 0.5=centro, 1=der)"
+  echo "      --output <archivo>  Archivo de salida (default: output.gif)"
+  echo "  -h, --help              Mostrar esta ayuda"
+}
+
+# Parseo de argumentos
+if [[ $# -lt 1 ]]; then
+  print_usage
+  exit 1
+fi
+
+DIR="$1"
+shift
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--prefix) PREFIX="$2"; shift 2 ;;
+    --framerate) FRAMERATE="$2"; shift 2 ;;
+    --resolution) RESOLUTION="$2"; shift 2 ;;
+    --aspect) ASPECT="$2"; shift 2 ;;
+    --aspect-ratio) ASPECT_RATIO="$2"; shift 2 ;;
+    --crop-x) CROP_X="$2"; shift 2 ;;
+    --output) OUTPUT="$2"; shift 2 ;;
+    -h|--help) print_usage; exit 0 ;;
+    *) echo "❌ Opción no reconocida: $1"; print_usage; exit 1 ;;
+  esac
+done
+
+# Validaciones
+if [[ -z "$PREFIX" ]]; then
+  echo "❌ Falta el prefijo (-p o --prefix)"
+  exit 1
+fi
+
+if [[ ! -d "$DIR" ]]; then
+  echo "❌ Directorio no encontrado: $DIR"
+  exit 1
+fi
+
+if ! [[ "$CROP_X" =~ ^0(\.[0-9]+)?$|^1(\.0+)?$ ]]; then
+  echo "❌ --crop-x debe estar entre 0 y 1"
+  exit 1
+fi
+
+if [[ "$ASPECT" == "custom" && ! "$ASPECT_RATIO" =~ ^[0-9]+:[0-9]+$ ]]; then
+  echo "❌ Si usas --aspect custom, debes indicar --aspect-ratio con formato WxH (ej: 10:12)"
+  exit 1
+fi
+
+# Entrar al directorio con imágenes
+cd "$DIR" || exit 1
+
+IMAGES=($(ls "${PREFIX}"*.png 2>/dev/null | sort -V))
+if [[ ${#IMAGES[@]} -eq 0 ]]; then
+  echo "❌ No se encontraron imágenes con prefijo: $PREFIX"
+  exit 1
+fi
+
+# Crear directorio temporal y renombrar imágenes secuencialmente
+TMPDIR=$(mktemp -d)
+COUNT=1
+for IMG in "${IMAGES[@]}"; do
+  printf -v NEWNAME "frame_%04d.png" "$COUNT"
+  cp "$IMG" "$TMPDIR/$NEWNAME"
+  ((COUNT++))
+done
+
+cd "$TMPDIR" || exit 1
+
+# Construcción del filtro
+FILTER=""
+
+if [[ "$ASPECT" == "mobile" ]]; then
+  # 9:16 crop con desplazamiento horizontal
+  CROP_FILTER="crop=ih*9/16:ih:'(iw - ih*9/16)*$CROP_X':0"
+elif [[ "$ASPECT" == "custom" ]]; then
+  RATIO_W=$(echo "$ASPECT_RATIO" | cut -d: -f1)
+  RATIO_H=$(echo "$ASPECT_RATIO" | cut -d: -f2)
+  CROP_FILTER="crop=ih*$RATIO_W/$RATIO_H:ih:'(iw - ih*$RATIO_W/$RATIO_H)*$CROP_X':0"
+fi
+
+if [[ -n "$CROP_FILTER" ]]; then
+  if [[ -n "$RESOLUTION" ]]; then
+    FILTER="$CROP_FILTER,scale=$RESOLUTION"
+  else
+    FILTER="$CROP_FILTER"
+  fi
+elif [[ -n "$RESOLUTION" ]]; then
+  FILTER="scale=$RESOLUTION"
+fi
+
+# Ejecutar ffmpeg
+if [[ -n "$FILTER" ]]; then
+  ffmpeg -y -framerate "$FRAMERATE" -i frame_%04d.png -vf "$FILTER" -loop 0 "$OLDPWD/$OUTPUT"
+else
+  ffmpeg -y -framerate "$FRAMERATE" -i frame_%04d.png -loop 0 "$OLDPWD/$OUTPUT"
+fi
+
+cd "$OLDPWD"
+rm -r "$TMPDIR"
+
+echo "✅ GIF generado: $OUTPUT"
